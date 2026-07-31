@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0B0F17" />
+<title>Board of Directors — Streamsong 2027</title>
+<meta name="description" content="The Board of Directors — Streamsong 2027. February 4–7. A live countdown to the first tee." />
+
+<!-- Open Graph so the link previews nicely when texted to the group -->
+<meta property="og:title" content="Board of Directors — Streamsong 2027" />
+<meta property="og:description" content="February 4–7 · Streamsong Resort · Countdown to the first tee" />
+<meta property="og:type" content="website" />
+
+<!-- Interim page: Google Fonts via CDN for speed. Phase 1 self-hosts + subsets per the brief. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --ground: #0B0F17;
+    --ground-2: #10151f;
+    --paper: #F5EFE1;
+    --paper-dim: #b9b3a6;
+    --paper-faint: #6f6b62;
+    --brass: #B08D57;
+    --brass-bright: #cBA36a;
+    --green: #274D3B;
+    --hair: rgba(245, 239, 225, 0.12);
+    --hair-strong: rgba(245, 239, 225, 0.22);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { background: var(--ground); }
+
+  body {
+    color: var(--paper);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #14202e 0%, rgba(20,32,46,0) 55%),
+      linear-gradient(180deg, #0B0F17 0%, #090c12 100%);
+    background-attachment: fixed;
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: clamp(2rem, 6vw, 4rem) clamp(1.25rem, 5vw, 2.5rem) 3rem;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- letter-spaced small-caps section labels --- */
+  .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--brass);
+    font-weight: 600;
+  }
+
+  .rule {
+    height: 1px;
+    background: var(--hair);
+    border: 0;
+    margin: 1.25rem 0;
+  }
+  .rule.brass {
+    background: linear-gradient(90deg, var(--brass) 0%, rgba(176,141,87,0.15) 100%);
+    height: 1.5px;
+  }
+
+  /* --- masthead --- */
+  header { text-align: center; }
+  .masthead-top {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0.9rem; margin-bottom: 1.4rem;
+  }
+  .masthead-top .line { flex: 1; height: 1px; background: var(--hair); max-width: 90px; }
+
+  h1.wordmark {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(2.6rem, 11vw, 4.4rem);
+    line-height: 0.98;
+    letter-spacing: -0.01em;
+    color: var(--paper);
+  }
+  h1.wordmark .amp {
+    font-style: italic;
+    font-weight: 500;
+    color: var(--brass);
+  }
+  .subtitle {
+    margin-top: 1rem;
+    font-size: clamp(0.9rem, 3.4vw, 1.05rem);
+    color: var(--paper-dim);
+    letter-spacing: 0.02em;
+  }
+  .venue {
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--paper-faint);
+    letter-spacing: 0.03em;
+  }
+
+  /* --- countdown --- */
+  .countdown-block {
+    margin: clamp(2.2rem, 7vw, 3.4rem) 0 clamp(1.6rem, 5vw, 2.4rem);
+    text-align: center;
+  }
+  .countdown {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: clamp(0.4rem, 2.5vw, 1.4rem);
+    align-items: end;
+    justify-items: center;
+  }
+  .unit { display: flex; flex-direction: column; align-items: center; width: 100%; }
+  .unit .num {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(2.4rem, 14vw, 5rem);
+    line-height: 1;
+    color: var(--paper);
+    letter-spacing: -0.02em;
+  }
+  .unit .lab {
+    margin-top: 0.7rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--paper-faint);
+    font-weight: 600;
+  }
+  .unit + .unit { position: relative; }
+  .unit + .unit::before {
+    content: "";
+  }
+
+  .firsttee {
+    margin-top: 1.6rem;
+    font-size: 0.9rem;
+    color: var(--paper-dim);
+    letter-spacing: 0.02em;
+  }
+  .firsttee strong { color: var(--brass-bright); font-weight: 600; }
+
+  .live-note {
+    margin-top: 0.5rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--paper-faint);
+  }
+
+  /* --- roster --- */
+  section { margin-top: clamp(2rem, 6vw, 3rem); }
+  .roster {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.9rem 1.2rem;
+    margin-top: 1.1rem;
+  }
+  .player {
+    display: flex; align-items: baseline; gap: 0.7rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--hair);
+  }
+  .player .mono {
+    font-family: 'Fraunces', Georgia, serif;
+    font-variant-numeric: tabular-nums;
+    color: var(--brass);
+    font-size: 0.8rem;
+    min-width: 1.1rem;
+  }
+  .player .pname {
+    font-size: 0.98rem;
+    color: var(--paper);
+    letter-spacing: 0.01em;
+  }
+
+  /* --- schedule --- */
+  .schedule { margin-top: 1.1rem; }
+  .round {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: baseline;
+    gap: 0.4rem 1rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .round:first-child { border-top: 1px solid var(--hair-strong); }
+  .round .rno {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    color: var(--paper-faint);
+    text-transform: uppercase;
+  }
+  .round .rmain { display: flex; flex-direction: column; gap: 0.15rem; }
+  .round .rcourse {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 1.12rem;
+    font-weight: 600;
+    color: var(--paper);
+  }
+  .round .rarch {
+    font-size: 0.76rem;
+    color: var(--paper-faint);
+    letter-spacing: 0.02em;
+  }
+  .round .rday {
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--paper-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .round .rday .rtime {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--brass);
+    margin-top: 0.15rem;
+    letter-spacing: 0.04em;
+  }
+
+  footer {
+    margin-top: auto;
+    padding-top: 2.5rem;
+    text-align: center;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--paper-faint);
+  }
+
+  @media (max-width: 420px) {
+    .roster { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <header>
+      <div class="masthead-top">
+        <span class="line"></span>
+        <span class="eyebrow">The Board of Directors</span>
+        <span class="line"></span>
+      </div>
+      <h1 class="wordmark">Streamsong<br>20<span class="amp">2</span>7</h1>
+      <p class="subtitle">February 4&ndash;7, 2027 &middot; Thursday through Sunday</p>
+      <p class="venue">Streamsong Resort &middot; Bowling Green, Florida</p>
+    </header>
+
+    <div class="countdown-block">
+      <hr class="rule brass" />
+      <div class="countdown" id="countdown" role="timer" aria-live="off">
+        <div class="unit"><span class="num" id="d">--</span><span class="lab">Days</span></div>
+        <div class="unit"><span class="num" id="h">--</span><span class="lab">Hours</span></div>
+        <div class="unit"><span class="num" id="m">--</span><span class="lab">Minutes</span></div>
+        <div class="unit"><span class="num" id="s">--</span><span class="lab">Seconds</span></div>
+      </div>
+      <p class="firsttee">First tee &mdash; <strong>Thu, Feb 4</strong> &middot; <strong>1:10 PM ET</strong> &middot; Streamsong Red</p>
+      <p class="live-note" id="livenote">Counting down &middot; Eastern Time</p>
+    </div>
+
+    <section>
+      <span class="eyebrow">The Field</span>
+      <div class="roster">
+        <div class="player"><span class="mono">01</span><span class="pname">Jon Aronson</span></div>
+        <div class="player"><span class="mono">02</span><span class="pname">Kyle Siegel</span></div>
+        <div class="player"><span class="mono">03</span><span class="pname">Adam Hersh</span></div>
+        <div class="player"><span class="mono">04</span><span class="pname">Chris Denove</span></div>
+      </div>
+    </section>
+
+    <section>
+      <span class="eyebrow">The Card &mdash; Four Rounds, Four Days</span>
+      <div class="schedule">
+        <div class="round">
+          <span class="rno">R1</span>
+          <span class="rmain"><span class="rcourse">Streamsong Red</span><span class="rarch">Coore &amp; Crenshaw</span></span>
+          <span class="rday">Thu, Feb 4<span class="rtime">1:10 PM ET</span></span>
+        </div>
+        <div class="round">
+          <span class="rno">R2</span>
+          <span class="rmain"><span class="rcourse">Streamsong Blue</span><span class="rarch">Tom Doak</span></span>
+          <span class="rday">Fri, Feb 5<span class="rtime">TBD</span></span>
+        </div>
+        <div class="round">
+          <span class="rno">R3</span>
+          <span class="rmain"><span class="rcourse">Streamsong Black</span><span class="rarch">Gil Hanse &amp; Jim Wagner</span></span>
+          <span class="rday">Sat, Feb 6<span class="rtime">TBD</span></span>
+        </div>
+        <div class="round">
+          <span class="rno">R4</span>
+          <span class="rmain"><span class="rcourse">Bone Valley</span><span class="rarch">David McLay Kidd</span></span>
+          <span class="rday">Sun, Feb 7<span class="rtime">TBD</span></span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Net Stableford &middot; 100% allowance &middot; See you in Florida
+    </footer>
+
+  </div>
+
+<script>
+  // First tee: 1:10 PM ET on Thu Feb 4, 2027. February = EST = UTC-5.
+  // Fixed offset in the literal so the countdown is correct in any viewer's timezone.
+  var TARGET = new Date('2027-02-04T13:10:00-05:00').getTime();
+
+  var el = {
+    d: document.getElementById('d'),
+    h: document.getElementById('h'),
+    m: document.getElementById('m'),
+    s: document.getElementById('s'),
+    note: document.getElementById('livenote')
+  };
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  function tick() {
+    var diff = TARGET - Date.now();
+
+    if (diff <= 0) {
+      el.d.textContent = '00';
+      el.h.textContent = '00';
+      el.m.textContent = '00';
+      el.s.textContent = '00';
+      el.note.textContent = 'Tee it up';
+      return false;
+    }
+
+    var totalSec = Math.floor(diff / 1000);
+    var days = Math.floor(totalSec / 86400);
+    var hours = Math.floor((totalSec % 86400) / 3600);
+    var mins = Math.floor((totalSec % 3600) / 60);
+    var secs = totalSec % 60;
+
+    el.d.textContent = days;            // days can exceed 99, don't pad
+    el.h.textContent = pad(hours);
+    el.m.textContent = pad(mins);
+    el.s.textContent = pad(secs);
+    return true;
+  }
+
+  tick();
+  var timer = setInterval(function () {
+    if (tick() === false) clearInterval(timer);
+  }, 1000);
+</script>
+</body>
+</html>
