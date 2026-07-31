@@ -179,6 +179,21 @@ Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are env vars. Everything m
 
 ---
 
+## Actual tee sheet (supersedes the brief's assumed schedule)
+
+Kyle supplied the booked tee times on 2025-07-31. All times **EST** (February = standard time).
+
+| Round | Day | Course | Architect | Tee (EST) |
+|---|---|---|---|---|
+| R1 | Thu Feb 4, 2027 | Streamsong Red | Coore & Crenshaw | 1:10 PM |
+| R2 | Fri Feb 5, 2027 | **Streamsong Black** | Gil Hanse & Jim Wagner | 10:33 AM |
+| R3 | Sat Feb 6, 2027 | **Streamsong Blue** | Tom Doak | 10:35 AM |
+| R4 | Sun Feb 7, 2027 | Bone Valley | David McLay Kidd | 8:28 AM |
+
+**Friday and Saturday courses are swapped relative to the brief** (brief had Blue Fri / Black Sat; the booking is Black Fri / Blue Sat). The tee sheet is ground truth. Phase 2 must seed `rounds` with this course-per-round order and these `tee_time` values.
+
+**Open consequence for Phase 3 — flag to Kyle before building the tiebreaker.** The brief's Overall countback preference order is "Round 3, then 4, 2, 1," with the stated rationale that "Round 3 (Black) comes first ... because Bone Valley's stroke index may still be placeholder." After the swap, **Round 3 is Blue and Black is Round 2.** Both Blue and Black have reliable (non-placeholder) stroke indexes, so the *intent* — count back on the latest round with trustworthy stroke-index data, never leading with placeholder Bone Valley — still holds if we keep "R3 first" (now Blue). But the brief names Black specifically. Do not silently resolve this. Confirm with Kyle in Phase 3 whether the preference order stays positional (R3=Blue first) or should be re-pinned to Black by course.
+
 ## Deviations from the brief
 
 ### Phase 0 pushed directly to `main`, not to a `phase-0-spec` branch
