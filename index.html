@@ -226,7 +226,6 @@
         <div class="unit"><span class="num" id="s">--</span><span class="lab">Seconds</span></div>
       </div>
       <p class="firsttee">First tee &mdash; <strong>Thu, Feb 4</strong> &middot; <strong>1:10 PM ET</strong> &middot; Streamsong Red</p>
-      <p class="live-note" id="livenote">Counting down &middot; Eastern Time</p>
     </div>
 
     <section>
@@ -276,8 +275,7 @@
 
   var el = {
     d: document.getElementById('d'), h: document.getElementById('h'),
-    m: document.getElementById('m'), s: document.getElementById('s'),
-    note: document.getElementById('livenote')
+    m: document.getElementById('m'), s: document.getElementById('s')
   };
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -286,7 +284,6 @@
     if (diff <= 0) {
       el.d.textContent = '00'; el.h.textContent = '00';
       el.m.textContent = '00'; el.s.textContent = '00';
-      el.note.textContent = 'Tee it up';
       return false;
     }
     var t = Math.floor(diff / 1000);
