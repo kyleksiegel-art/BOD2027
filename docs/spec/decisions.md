@@ -142,12 +142,20 @@ Fraunces (variable, 300–700, italic + roman) for display + figures; Inter (var
 
 ### Color tokens
 
-- Ground: `#0B0F17` (near-black-navy)
-- Paper: `#F5EFE1` (warm cream)
-- Brass accent: `#B08D57`
-- Secondary green: `#274D3B` (dark forest)
+Superseded by the Streamsong-branded palette Kyle refined on the interim
+countdown page (commits `0c1013…`/`467ce68`). Phase 1 adopted that palette as the
+canonical token set — accents are lifted from the resort's own logo — and it now
+lives in `src/index.css` `:root`:
 
-Contrast checked against WCAG AA at 4.5:1 for body copy on the dark ground.
+- Ground: `#0c1013` (near-black); raised surfaces `#12171c`
+- Paper: `#f5efe1` (warm cream); dim `#bcb6a9`; faint `#726d64`
+- Gold / brass accent: `#d18316`; bright `#e6a442`
+- Steel blue: `#3b6e8f`; olive: `#9fa617`
+- Hairlines: `rgba(245,239,225,0.12)` / `0.22`
+
+The earlier draft (`#0B0F17` ground, `#B08D57` brass, `#274D3B` green) predated the
+Streamsong branding and is retired. Contrast still checked against WCAG AA 4.5:1
+for body copy on the dark ground; full Lighthouse a11y pass is Phase 9.
 
 ### Home countdown fallback
 

@@ -2,7 +2,33 @@
 
 Live golf trip tournament web app for The Board of Directors' 2027 trip to Streamsong Resort (Feb 4–7, 2027). Offline-capable PWA, deployed to Netlify, backed by Supabase.
 
-**Status: Phase 0 — spec only, no code yet.**
+**Status: Phase 1 — scaffold (routing, app shell, design tokens, Netlify config).**
+
+## Local setup
+
+Requires Node 22 (pinned in `netlify.toml`; use `nvm use 22`).
+
+```bash
+npm install
+npm run dev        # Vite dev server at http://localhost:5173
+npm run build      # tsc -b + vite build → dist/
+npm run preview    # serve the production build locally
+npm run typecheck  # tsc project-references, no emit
+npm test           # vitest (no tests until Phase 3)
+```
+
+No environment variables yet. Phase 2 introduces `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` (the only two env vars the app will ever need — see
+`decisions.md`); everything else mutable lives in Supabase, not in config.
+
+## Deployment (Netlify)
+
+`main` serves the live static countdown at `bod2027.netlify.app` and has **no
+`netlify.toml`**, so it keeps its dashboard static-publish settings. Every other
+branch carries `netlify.toml` (build `npm run build`, publish `dist`, SPA
+fallback, Node 22, cache headers) and gets its own deploy preview. The SPA
+replaces the countdown only when a phase branch is merged to `main` after
+sign-off.
 
 ## Where to start
 

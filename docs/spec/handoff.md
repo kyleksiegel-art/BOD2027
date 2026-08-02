@@ -1,19 +1,15 @@
 # Handoff
 
-**Phase just finished:** 0 — spec split, decisions, phase plan, schema draft.
+**Phase just finished:** 1 — Vite/React/TS/Tailwind scaffold, routing, app shell, design tokens, self-hosted fonts, `netlify.toml`. On branch `phase-1-scaffold`; `main` (live countdown) untouched.
 
-**Next phase:** 1 — Vite/React/TS/Tailwind scaffold, routing, app shell, design tokens, Netlify deploy.
+**Next phase:** 2 — Supabase schema + RLS + seeds (no UI). Read `docs/spec/schema.md` + phase-plan §"Phase 2".
 
-**Half-finished work:** none.
+**What's built:** Five tab routes (Standings/Rounds/Enter/Money/Info) + `/`, `/admin`, Info sub-routes (itinerary/courses/players/rules), 404. Home is the live countdown ported to React (target `FIRST_TEE_ISO`, 1:10 PM ET Feb 4 2027). Persistent top bar (wordmark + `navigator.onLine` badge **stub**) + bottom tab bar. Streamsong palette tokens in `src/index.css`. Static trip copy in `src/config/trip.ts`.
 
-**Decisions Kyle still owes:**
-- Nothing blocking Phase 1. `CONFIG` items (indexes, tees, lodging, purse) can stay TODO until their relevant phase.
-- **Phase 3:** confirm tiebreaker countback preference after the course swap (see decisions.md "Actual tee sheet"). R3 is now Blue, Black is R2.
+**Half-finished / deferred:** Font payload 84.9 KB (target ≤80 — Phase 9). No favicon (Phase 9). Connection badge + reachability = Phase 6. No Supabase/Dexie/TanStack wired yet (by design — scaffold only).
 
-**Tee times received (2025-07-31, all EST):** R1 Red Thu 1:10 PM · R2 Black Fri 10:33 AM · R3 Blue Sat 10:35 AM · R4 Bone Valley Sun 8:28 AM. Recorded in decisions.md; Phase 2 seeds `rounds.tee_time` + course order from it. Note Fri/Sat course swap vs the brief.
+**Kyle still owes:** (1) Push `phase-1-scaffold`, confirm the Netlify **deploy-preview URL** loads + capture Lighthouse baseline. (2) Phase 3 tiebreaker: R3 is Blue, Black is R2 after the swap — confirm countback stays positional (R3 first) or re-pins to Black.
 
-**Interim countdown page:** a standalone `index.html` + `assets/` (Streamsong hero, logo) live at the site root as a shareable landing page. Phase 1 replaces it with the DB-backed Home route; carry over the countdown target (1:10 PM EST Feb 4 = 18:10 UTC).
+**Verified:** `npm run build` clean; live preview of Home/Standings/Info/404 on 375px mobile, no console errors; countdown ticking; active-tab highlight works.
 
-**Read at start of next session:** `CLAUDE.md`, `docs/spec/acceptance-checklist.md`, this file, `docs/spec/phase-plan.md` §"Phase 1".
-
-**Push status:** Phase 0 files committed locally to `main` at first commit. Kyle to run `git push -u origin main` from `~/projects/BOD2027` to publish. Then Netlify → Add new site → Import from GitHub → `kyleksiegel-art/BOD2027`.
+**Read at start of next session:** `CLAUDE.md`, `docs/spec/acceptance-checklist.md`, this file, `docs/spec/schema.md`, phase-plan §"Phase 2".

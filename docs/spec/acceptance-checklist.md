@@ -51,7 +51,42 @@ Everything in the brief is deferred to a later phase per the phase plan. The bri
 
 ## Phase 1 — Scaffold
 
-_(To be filled in at end of Phase 1.)_
+Built on branch `phase-1-scaffold`. `main` (the live static countdown) untouched.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| Vite + React + TS + Tailwind project | `npm run build` succeeds: `tsc -b` clean + Vite build (56 modules, 969ms). `package.json`, `vite.config.ts`, `tailwind.config.ts`, `tsconfig*.json` |
+| React Router with five tab routes + `/`, `/admin`, Info sub-routes as empty pages | `src/router.tsx`. Verified live in preview: `/` (Home), `/standings`, `/info` (→ `/info/itinerary`), `/nope` (404) all render; bottom-tab active state toggles gold |
+| Design tokens in CSS (colors, tabular numerals, hairline borders) | `src/index.css` `:root` — Streamsong palette, `.tnum`/`th`/`td` tabular-nums, `--hair`/`--hair-strong`. Mapped into Tailwind in `tailwind.config.ts` |
+| Self-hosted Fraunces + Inter, subsetted to Latin | `src/fonts.css` + `src/assets/fonts/*.woff2` (Latin `wght`-axis subsets from Fontsource 5.3.0, provenance in comment). No CDN. **Measured payload 84.9 KB** (Fraunces 36.6 + Inter 48.3) — marginally over the ≤80 KB target; trim/confirm in Phase 9 |
+| Persistent top bar (wordmark + connection badge stub) | `src/components/TopBar.tsx` + `ConnectionBadge.tsx`. Badge reflects `navigator.onLine` only — labeled a STUB; real reachability probe is Phase 6 |
+| Persistent bottom tab bar | `src/components/BottomTabBar.tsx`. 44px targets (`.tap`), no hover dependence, safe-area insets. Verified across routes |
+| `netlify.toml` (build cmd, publish dir, SPA redirect, Node pin, no-cache headers) | `netlify.toml`: `npm run build` → `dist`, `NODE_VERSION=22`, `/*`→`/index.html` 200, `index.html`/`sw.js` no-cache, `/_assets/*` immutable, `/assets/*` 1-day |
+| Deployed to a live URL + branch deploy previews | **Pending** — Kyle to confirm the branch deploy-preview URL loads after push (Netlify auto-builds PRs/branches once this branch is pushed) |
+
+### Automated tests
+
+None yet. No unit-testable logic in the scaffold; the scoring test suite is Phase 3. `npm test` passes with `--passWithNoTests`.
+
+### Manual tests
+
+- Home `/`: hero, wordmark, **live countdown ticking** (186d / seconds decrementing between screenshots), field roster, four-round card — all render on a 375-px mobile viewport. No console errors.
+- Navigation: `/standings`, `/info` (redirects to Itinerary), `/nope` (404 "Off the fairway") verified. Active-tab highlight works.
+- Countdown target carried over from the interim page: 1:10 PM ET Feb 4 2027 (`FIRST_TEE_ISO` in `src/config/trip.ts`).
+
+### Deferred requirements
+
+- **Live Netlify URL / Lighthouse baseline** — deferred to Kyle's post-push confirmation and Phase 9's full Lighthouse pass. Netlify wiring is a dashboard action, not a code change.
+- **Font payload ≤80 KB** — measured at 84.9 KB; revisit in Phase 9 (drop an axis or ship static weights if it must come under).
+- No favicon yet (Phase 9 polish).
+
+### Deviations
+
+1. **Palette** — Phase 1 uses the Streamsong-branded palette from the interim page, not the earlier draft tokens in `decisions.md`. That section has been updated to match; see it for the retired values and rationale.
+2. **Hashed build output moved to `/_assets/`** (via `build.assetsDir`) so stable public images at `/assets/` (hero, logo — the OG image URL) can keep a separate, non-immutable caching policy. Not a spec change; enables the netlify.toml caching split.
+3. **Fonts self-hosted by copying Fontsource's Latin woff2 into the repo** rather than importing the npm package at runtime — truly offline, stable cache URLs, and full control of which faces ship. Only roman (no italic) is shipped to stay near the payload budget.
 
 ---
 
