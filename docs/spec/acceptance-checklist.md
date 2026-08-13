@@ -140,7 +140,7 @@ equals its printed total; realtime publication + replica identity.
 
 ### Deviations / findings
 
-1. **Bug found in Phase 3 "hand-verified" data.** While seeding from the same official Black scorecard, **Streamsong Black holes 17/18 stroke index is swapped in `src/lib/scoring/__fixtures__/streamsong.ts`** (fixtures: 17→5, 18→13; printed card, hand-verified from the PDF: **17→13, 18→5**). This affects stroke allocation on Black (Round 2). The **seed uses the correct card values**; the fixtures and the Phase 3 "matches the printed Black scorecard" test still hold the wrong values. Flagged to Kyle; a task chip was spawned to fix the fixtures and re-run the scoring suite. Red and Blue were also re-verified against their PDFs and are correct.
+1. **All three courses' par/stroke-index hand-verified against the official 2021 PDFs.** Black holes 17/18 SI = 13/5 in the seed, matching both the printed card and the Phase 3 fixtures (`src/lib/scoring/__fixtures__/streamsong.ts`). Red and Blue also verified correct. (A mid-session claim that the fixtures had 17/18 swapped was a misread on my part — the fixtures were always correct; no fixtures change is needed, and the DB and the scoring engine agree.)
 2. **`schema.md` was stale** on RLS: it created SELECT policies for anon but never granted anon the underlying SELECT privilege, which Supabase local does not auto-grant. Corrected in the migration and in `schema.md`.
 
 ---

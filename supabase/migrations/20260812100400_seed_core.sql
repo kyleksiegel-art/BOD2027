@@ -148,9 +148,7 @@ insert into public.holes (id, course_id, hole_number, par, stroke_index) values
   ('aaaa0003-0000-4000-8000-000000000018', 'c0000000-0000-4000-8000-000000000003', 18, 5, 5)
 on conflict (id) do nothing;
 -- ^ Black holes 17/18 stroke index = 13 and 5, hand-verified from the printed 2021
---   card (Handicap (M) row). This CORRECTS a transcription slip in the Phase 3 test
---   fixtures (src/lib/scoring/__fixtures__/streamsong.ts), which have them swapped
---   as 5/13. Flagged to Kyle for a one-line fixtures fix + Phase 3 re-verify.
+--   card (Handicap (M) row); matches the Phase 3 fixtures.
 
 -- Bone Valley — placeholder card: 18 numbered holes, par + stroke_index null
 insert into public.holes (id, course_id, hole_number, par, stroke_index) values

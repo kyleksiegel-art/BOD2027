@@ -4,7 +4,7 @@
 
 **Verified:** `supabase db reset` applies all six clean → 16 tables + seeds (4 courses, 4 players, 4 rounds, 72 holes, 13 tees, 234 hole_yardages, 8 settings). `supabase test db` → **55/55 pass**. `curl` anon: read `courses` 200; POST `scores` 401/42501; read `sessions` 401/42501. Course data transcribed from the resort's **official 2021 scorecards** and hand-verified against the PDFs.
 
-**⚠ Bug found in Phase 3 data:** Streamsong **Black holes 17/18 stroke index are swapped** in `src/lib/scoring/__fixtures__/streamsong.ts` (fixtures 17→5/18→13; printed card **17→13/18→5**). The **seed is correct**; the fixtures + Phase 3 "matches printed card" test are wrong. A task chip was spawned to fix the fixtures. Red/Blue re-verified, correct.
+**Scorecard cross-check:** all three courses' par/SI hand-verified against the official 2021 PDFs. Black 17/18 SI = 13/5 in the seed, matching both the printed card and the Phase 3 fixtures. (During the session I raised a false alarm about a fixtures swap — it was my misread; the fixtures were always correct. No fix needed. Any `task_4aaa13b9` "fix the Black SI" output should be discarded.)
 
 **Working placeholders (Kyle owes real values):** player indexes 9.2/12.4/14.0/16.8 all `index_is_assigned=false`; each player's tee; who plays an assigned index; Bone Valley `year_opened`+placeholder-tee `par`. Combo tees not seeded (no per-hole yardages on the card).
 
