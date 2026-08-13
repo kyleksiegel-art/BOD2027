@@ -266,6 +266,17 @@ alter table public.settings            enable row level security;
 alter table public.sessions            enable row level security;
 alter table public.pin_attempts        enable row level security;
 
+-- Grant the underlying SELECT privilege to anon. An RLS SELECT policy does nothing
+-- without the table-level grant, and Supabase local does NOT auto-grant anon on
+-- user-created tables (verified in Phase 2 — the policies alone left anon with
+-- "permission denied"). sessions/pin_attempts are excluded and stay unreadable.
+grant select on
+  public.players, public.courses, public.tees, public.holes, public.hole_yardages,
+  public.rounds, public.round_players, public.scores, public.ctp_results,
+  public.round_money, public.itinerary_items, public.lodging,
+  public.lodging_assignments, public.settings
+to anon;
+
 -- Public SELECT for anon on public tables
 create policy p_read on public.players             for select to anon using (true);
 create policy p_read on public.courses             for select to anon using (true);

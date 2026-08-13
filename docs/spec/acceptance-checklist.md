@@ -92,7 +92,56 @@ None yet. No unit-testable logic in the scaffold; the scoring test suite is Phas
 
 ## Phase 2 — Supabase schema + RLS + seeds
 
-_(To be filled in at end of Phase 2.)_
+Built on branch `phase-3-scoring` (Phase 2 was owed; the scoring engine had been built
+first because it has no DB dependency — see the Phase 3 deviation). Supabase project
+scaffolded with `supabase init`. Six migrations in `supabase/migrations/` (enums,
+tables, RLS, realtime, core seed, tees seed); pgTAP tests in `supabase/tests/`.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| Migrations for every table in `schema.md` | `20260812100100_tables.sql` — all 16 tables. `supabase db reset` applies all six migrations clean; `select count(*) from information_schema.tables where table_schema='public'` = 16 |
+| Enums | `20260812100000_enums.sql` — `round_status`, `rp_status`, `itin_category`, guarded idempotent |
+| RLS on; permissive anon `SELECT` on public tables; `sessions`/`pin_attempts` locked | `20260812100200_rls.sql`. pgTAP `rls_smoke.sql`: anon SELECT succeeds on all 14 public tables, is denied (42501) on `sessions`/`pin_attempts`. **Correction:** anon needs an explicit `grant select` — Supabase local does not auto-grant it, so RLS policies alone left anon with "permission denied." Grant added; `schema.md` updated (it had omitted this) |
+| No anon INSERT/UPDATE/DELETE anywhere | Blanket `revoke insert,update,delete ... from anon`. pgTAP: INSERT denied on all 14 writable tables, UPDATE+DELETE denied on `scores` (all 42501) |
+| Realtime publication wrapped in `DO` blocks; `REPLICA IDENTITY FULL` on published tables | `20260812100300_realtime.sql`. pgTAP `seed_integrity.sql`: all six intended tables (`scores`, `ctp_results`, `rounds`, `settings`, `players`, `round_players`) are in `supabase_realtime` and have `relreplident='f'` |
+| Idempotent seeds in migration files, stable UUIDs | `on conflict do nothing` + hard-coded UUID scheme (courses `c…00C`, players `d…00P`, rounds `e…00R`, holes `aaaa000C…HH`, tees `bbbb000C…T`). Re-running `db reset` is deterministic |
+| Red/Blue/Black scorecards: rating, slope, par, yardage per tee, stroke index | `20260812100400_seed_core.sql` (holes: par + SI) + `20260812100500_seed_tees.sql` (4 base tees/course: Green/Black/Silver/Gold with rating/slope/total + per-hole yardage). 13 tees, 72 holes, 234 hole_yardages (216 non-null) |
+| **Course data researched + cited from a named source** (brief §Phase 2) | Transcribed from the resort's **official 2021 printed scorecards** (Red/Blue/Black-2021-Scorecard.pdf), hand-verified page-by-page against the saved PDFs. Cited in both seed migration headers |
+| Bone Valley seeded placeholder: `data_is_placeholder=true`, null par/SI/rating/slope/yardage | `seed_core.sql` course row + 18 null-par/SI holes; `seed_tees.sql` one placeholder tee (rating/slope/total null) + 18 null-yardage rows. pgTAP asserts all 18 pars/SIs null and the flag true |
+| Course-per-round order + tee times = actual booked tee sheet | `rounds` seed: R1 Red, R2 Black, R3 Blue, R4 Bone Valley; tee times at -05 (EST). Rendered in `America/New_York`: Thu 01:10 PM, Fri 10:33 AM, Sat 10:35 AM, Sun 08:28 AM. pgTAP asserts the round→course mapping |
+| pgTAP smoke test: anon SELECT ok, anon write denied | `supabase test db` → **55/55 pass** (`rls_smoke.sql` 32, `seed_integrity.sql` 23) |
+| Course-data source citations in seed comments | Headers of both seed migrations |
+
+### Automated tests
+
+`supabase test db` → **PASS, 55 tests** (0 failures). `rls_smoke.sql` (32): anon read
+allowed on the 14 public tables, write denied everywhere, locked-table reads denied.
+`seed_integrity.sql` (23): par totals 72/72/73; each course's stroke index a complete
+1–18 permutation; Black 17/18 SI = 13/5 (printed card); Bone Valley all-null +
+placeholder flag; row counts; round→course mapping; every base tee's hole-yardage sum
+equals its printed total; realtime publication + replica identity.
+
+### Manual tests
+
+- `supabase db reset` on a clean instance: all six migrations apply, no errors; produces 16 tables + all seed rows.
+- `curl` with the anon key: reads `courses` → HTTP 200 with 4 rows (Bone Valley `data_is_placeholder=true`, others false); reads `scores` → 200 `[]`; **POST `scores` → HTTP 401, `42501` "permission denied for table scores"**; reads `sessions` → 401, 42501. (Commands recorded in the README.)
+- Scorecard spot-check via `psql`: Black hole 17 (par 3, SI 13, 205 yd) and hole 18 (par 5, SI 5, 586 yd) match the printed card.
+
+### Deferred requirements / open items
+
+- **RPCs are not implemented** (all the `rpc_*` in `schema.md`). Correct per the phase plan — RPCs are Phase 5 (auth + write path). Phase 2 is schema + RLS + realtime + seeds + pgTAP only.
+- **Player handicap indexes are WORKING PLACEHOLDERS** (9.2 / 12.4 / 14.0 / 16.8, all `index_is_assigned=false`). The brief lists all four indexes (and each player's tee) as TODO; working values are acceptable until 2027-02-01, when finals are entered and the four rounds re-snapshotted. **Kyle to supply real indexes + who plays an assigned index + each player's tee.**
+- **`round_players` and `scores` are not seeded.** `round_players` creation is the Phase 5 "Set tees and confirm handicaps" admin action; fake scores are a Phase 4 seed.
+- **Combo tees not seeded** (Green/Black, Black/Silver, Silver/Gold): the card gives their rating/slope/total but no per-hole yardages, so they'd be incomplete. Admin can add them if the group plays a combo set.
+- **Bone Valley `year_opened` (2025) and its placeholder tee `par` (72)** are working values — the schema forces non-null on both. Overwritten when the real card is entered and published (Phase 5). Rating/slope/total/yardages/hole-par/SI are all correctly null.
+- Realtime *event delivery* over a socket (definition-of-done) is demonstrable once a write path exists (Phase 5/6); Phase 2 verifies the publication + replica identity are configured.
+
+### Deviations / findings
+
+1. **Bug found in Phase 3 "hand-verified" data.** While seeding from the same official Black scorecard, **Streamsong Black holes 17/18 stroke index is swapped in `src/lib/scoring/__fixtures__/streamsong.ts`** (fixtures: 17→5, 18→13; printed card, hand-verified from the PDF: **17→13, 18→5**). This affects stroke allocation on Black (Round 2). The **seed uses the correct card values**; the fixtures and the Phase 3 "matches the printed Black scorecard" test still hold the wrong values. Flagged to Kyle; a task chip was spawned to fix the fixtures and re-run the scoring suite. Red and Blue were also re-verified against their PDFs and are correct.
+2. **`schema.md` was stale** on RLS: it created SELECT policies for anon but never granted anon the underlying SELECT privilege, which Supabase local does not auto-grant. Corrected in the migration and in `schema.md`.
 
 ---
 

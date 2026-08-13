@@ -1,17 +1,19 @@
 # Handoff
 
-**Phase just finished:** 3 — Scoring engine. Pure TS in `src/lib/scoring/` (`types`, `rounding`, `handicap`, `round`, `championship`, `tiebreak`, `money`, `index`). No React/network. Branch `phase-3-scoring` (off `phase-1-scaffold`).
+**Phase just finished:** 2 — Supabase schema + RLS + realtime + seeds + pgTAP. Six migrations in `supabase/migrations/` (enums, tables, RLS, realtime, core seed, tees seed); two pgTAP files in `supabase/tests/`.
 
-**Built out of order:** Phase 2 (Supabase schema/RLS/seeds) is NOT built — it needs Docker + Supabase CLI to verify, neither installed here. Phase 3 has no DB dependency, so Kyle had me do it first. **Phase 2 still owed.**
+**Verified:** `supabase db reset` applies all six clean → 16 tables + seeds (4 courses, 4 players, 4 rounds, 72 holes, 13 tees, 234 hole_yardages, 8 settings). `supabase test db` → **55/55 pass**. `curl` anon: read `courses` 200; POST `scores` 401/42501; read `sessions` 401/42501. Course data transcribed from the resort's **official 2021 scorecards** and hand-verified against the PDFs.
 
-**Verified:** `npm run test:scoring` → 67 passed (6 files); `tsc -b` clean; `npm run build` clean. Three hand-verified course-handicap worked examples (Red/Blue/Black Green tees) with manual arithmetic in comments; real card data in `__fixtures__/streamsong.ts`, cited from the resort's 2021 scorecard PDFs Kyle provided. Black uses par 73 and matches the brief's worksheet exactly.
+**⚠ Bug found in Phase 3 data:** Streamsong **Black holes 17/18 stroke index are swapped** in `src/lib/scoring/__fixtures__/streamsong.ts` (fixtures 17→5/18→13; printed card **17→13/18→5**). The **seed is correct**; the fixtures + Phase 3 "matches printed card" test are wrong. A task chip was spawned to fix the fixtures. Red/Blue re-verified, correct.
 
-**Open decision left as a note (per Kyle):** overall countback preference order. `DEFAULT_COUNTBACK_ROUND_ORDER = [3,4,2,1]` (brief's literal text). After the tee-sheet swap R3=Blue, R2=Black. Decide positional (keep R3-first=Blue) vs. re-pin to Black — one-line change to that constant in `tiebreak.ts`.
+**Working placeholders (Kyle owes real values):** player indexes 9.2/12.4/14.0/16.8 all `index_is_assigned=false`; each player's tee; who plays an assigned index; Bone Valley `year_opened`+placeholder-tee `par`. Combo tees not seeded (no per-hole yardages on the card).
 
-**Not committed** — new files + `package.json` (`test:scoring` script) in the working tree on `phase-3-scoring`, awaiting Kyle's go to commit.
+**Doc fix:** `schema.md` was missing the anon `grant select` (RLS policy alone left anon denied on Supabase local) — corrected in migration + schema.md.
 
-**Phase 2 tooling now installed** (2026-08-10): Homebrew, Docker Desktop 29.7.2 (engine runs), Supabase CLI 2.114.0. `docker ps` clean. Phase 2 is buildable+verifiable — note the first `supabase start`/`db reset` pulls several hundred MB of images (needs a connection, slow once).
+**Not committed / branch question:** Phase 2 files are uncommitted in the working tree **on `phase-3-scoring`** (`supabase/` untracked; README/schema/acceptance modified). Recommend a `phase-2-schema` branch — but the acceptance-checklist/handoff edits sit on Phase 3 history, so Kyle should decide how to slice it. Awaiting go to commit.
 
-**Kyle still owes (carried from P1):** push `phase-1-scaffold`, confirm Netlify deploy-preview + Lighthouse baseline.
+**Local stack is running** (12 containers up). `supabase stop` to tear down.
 
-**Next phase:** 2 (schema/RLS/seeds — needs tooling) OR 4 (read-only UI — can render from the engine + seeded fake scores). Read `CLAUDE.md`, `acceptance-checklist.md`, this file, + the target phase's spec.
+**Kyle still owes (carried):** push `phase-1-scaffold`; confirm Netlify deploy-preview + Lighthouse baseline.
+
+**Next phase:** 4 (read-only UI — can render from the engine + a Phase 4 fake-scores seed) or 5 (auth + RPCs + write path). Read `CLAUDE.md`, `acceptance-checklist.md`, this file, + the target phase's spec.
