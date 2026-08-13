@@ -10,6 +10,8 @@
 
 **Not committed** — new files + `package.json` (`test:scoring` script) in the working tree on `phase-3-scoring`, awaiting Kyle's go to commit.
 
-**Kyle still owes (carried from P1):** push `phase-1-scaffold`, confirm Netlify deploy-preview + Lighthouse baseline. Install Docker + Supabase CLI when ready for Phase 2 (`brew install --cask docker && brew install supabase/tap/supabase`).
+**Phase 2 tooling now installed** (2026-08-10): Homebrew, Docker Desktop 29.7.2 (engine runs), Supabase CLI 2.114.0. `docker ps` clean. Phase 2 is buildable+verifiable — note the first `supabase start`/`db reset` pulls several hundred MB of images (needs a connection, slow once).
+
+**Kyle still owes (carried from P1):** push `phase-1-scaffold`, confirm Netlify deploy-preview + Lighthouse baseline.
 
 **Next phase:** 2 (schema/RLS/seeds — needs tooling) OR 4 (read-only UI — can render from the engine + seeded fake scores). Read `CLAUDE.md`, `acceptance-checklist.md`, this file, + the target phase's spec.
