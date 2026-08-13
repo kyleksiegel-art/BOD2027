@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run --reporter=dot --passWithNoTests"
+    "test": "vitest run --reporter=dot --passWithNoTests",
+    "test:scoring": "vitest run src/lib/scoring --reporter=dot"
   },
   "dependencies": {
     "react": "^18.3.1",
