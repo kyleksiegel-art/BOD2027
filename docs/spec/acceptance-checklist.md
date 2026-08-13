@@ -98,7 +98,53 @@ _(To be filled in at end of Phase 2.)_
 
 ## Phase 3 — Scoring engine
 
-_(To be filled in at end of Phase 3.)_
+Built on branch `phase-3-scoring` (off `phase-1-scaffold`, since Phase 2 is not yet built — the scoring engine is pure TS with no DB dependency). Pure `src/lib/scoring/`, no React/network imports.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| `rounding.ts` — half-away-from-zero | `roundHalfAwayFromZero`; `rounding.test.ts` asserts `.5`/`−.5` symmetry and non-half cases |
+| `handicap.ts` — course/playing handicap, cap, allocation | `computeHandicap`, `allocateStrokes`, `resolveStrokesReceived`; `handicap.test.ts` (21 tests) |
+| **3 hand-verified worked examples (Red/Blue/Black)** | `handicap.test.ts`: Red/Green 74.1/137 idx 8.0→12; Blue/Green 74.0/134 idx 12.4→17; Black/Green 74.7/135 **par 73** idx 12.4→17. Manual arithmetic in comments above each. Black reproduces the brief's own worksheet (14.82 + 1.7 = 16.52). Real rating/slope/par/SI transcribed in `__fixtures__/streamsong.ts` from the resort's official 2021 scorecard PDFs (cited) |
+| Allowance 100% and 95%, rounding once after allowance | `handicap.test.ts` §allowance |
+| The 18 cap: 19/24/40→18 `capApplied=true`; exactly 18→`false`; plus handicap unaffected | `handicap.test.ts` §cap |
+| Cap ordering: 24 @ 95% → 23 → 18 (never 24→18→17) | `handicap.test.ts` "applies the cap AFTER the allowance and rounding" |
+| Stroke allocation for PH 0, 5, 18, 22, 38, −2 (wrap + plus) | `handicap.test.ts` §allocateStrokes |
+| Strokes-received hole list matches the printed scorecard SI | `handicap.test.ts` "matches the printed Black scorecard stroke index"; fixtures assert SI is a complete 1–18 permutation on all three cards |
+| `round.ts` — per-hole net + points, DNP/shortened | `computeHoleResult`, `computePlayerRound`, `commonCompletedHoleCount`, `stablefordPoints`; `round.test.ts` (12) |
+| Every points-table row + both clamps; par-5-in-2; ace on par 3 w/ stroke | `round.test.ts` §stablefordPoints / §computeHoleResult |
+| Picked-up = 0 pts, counts as played; unentered = null, doesn't count; plus-handicap net = gross+1 | `round.test.ts` §computeHoleResult |
+| Shortened cutoff excludes DNP players | `round.test.ts` §commonCompletedHoleCount |
+| `championship.ts` — cumulative, position change, projection | `totalPoints`, `computeStandings`, `standingsThroughRound`, `computeProjection`; `championship.test.ts` (7) |
+| Cumulative with mix of final/shortened/abandoned/DNP | `championship.test.ts` §totalPoints |
+| Projection suppressed until thru 5, never for DNP, one decimal | `championship.test.ts` §computeProjection |
+| `tiebreak.ts` — holes-won, countback chain, round-preference order, shortened fallback | `outrightHoleWinner`, `tallyHolesWon`, `countbackHoleStages`, `resolveCountback`; `tiebreak.test.ts` (11) |
+| Holes-won: outright low net, halved→nobody, picked-up can't win, <2 completed→nobody | `tiebreak.test.ts` §outrightHoleWinner |
+| Countback branches: preference order, all abandoned→tie, shortened <hole 10 fallback | `tiebreak.test.ts` §resolveCountback |
+| `money.ts` — purse allocation, CTP weights, greedy settlement (integer cents) | `computePurse`, `settle`, `allocate*Cents`, `reconcile`; `money.test.ts` (13) |
+| CTP weighted by par-3 count (every par 3 worth ~the same); abandoned round redistributes | `money.test.ts` §computePurse |
+| Three-way $100 split reconciles to the cent; greedy settlement ≤ n−1 transfers | `money.test.ts` §settle / §reconcile |
+| `types.ts` + `index.ts` barrel | Public surface; all views import from `@/lib/scoring` |
+
+### Automated tests
+
+`npm run test:scoring` → **67 passed** (6 files), dot reporter. Also `npx tsc -b` clean and `npm run build` clean (production bundle unchanged at 56 modules — test files are not bundled).
+
+### Manual tests
+
+Course-handicap hand calculations verified against the resort's published rating/slope for one tee on each course; arithmetic is written out in comments above each worked-example test. Black uses par 73 in the `(Rating − Par)` term and reproduces the brief's worksheet figures exactly.
+
+### Deferred requirements / open items
+
+- **Overall countback preference order** is parameterized (`DEFAULT_COUNTBACK_ROUND_ORDER = [3,4,2,1]`, the brief's literal text). Per Kyle's Phase 3 instruction, the positional-vs-re-pin-to-Black decision is left as a note (see handoff). Changing it is a one-line edit to that constant.
+- Shortened round that reached hole 10 but not 18: the standard windows are clamped to the counted end (documented in `countbackHoleStages`). The brief only specifies the <hole-10 fallback; this is a reasonable extension, tested only for the full-18 and <hole-10 cases the brief names.
+- `money.ts` is the pure engine only; wiring to `settings`/`round_money` and the Money UI is Phase 7.
+
+### Deviations
+
+1. **Built before Phase 2.** Phase 2 (Supabase schema/RLS/seeds) needs Docker + the Supabase CLI to verify and neither is installed on this machine; the scoring engine has no DB dependency, so Phase 3 was built first at Kyle's direction. Phase 2 remains to be done.
+2. **Branch base:** `phase-3-scoring` branches from `phase-1-scaffold`, not `main`/`phase-2`, for the same reason.
 
 ---
 
