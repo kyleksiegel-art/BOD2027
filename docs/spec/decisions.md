@@ -106,6 +106,148 @@ Rendered as `12.4*` on the Players page with a footnote. The footnote text is a 
 
 ## Technical decisions
 
+### PIN removed from score entry (2026-08-17, supersedes the brief)
+
+**Decision.** Score entry and CTP entry are open — no PIN, no session. The Enter screen
+gets an explicit **Save** button per hole in place of the lock. `/admin` keeps the PIN, and
+so does `rpc_upsert_round_player`.
+
+**Kyle's reasoning, in his words:** *"I dont want a pin - just a hole by hole save button."*
+Asked whether it should come off `/admin` too, he chose entry only.
+
+**Why the line falls where it does.** It is not an arbitrary carve-out — it is the same
+line the brief already draws between offline-capable and online-only writes:
+
+| Write | Gate | Why |
+|---|---|---|
+| `rpc_upsert_scores` | none | The hot path, four people in a cart. |
+| `rpc_upsert_ctp` | none | Entered at the same moment, in the same cart. |
+| `rpc_upsert_round_player` | PIN | It rewrites handicaps; a wrong stroke allocation silently corrupts every leaderboard. Offline day-of changes still need it, so Phase 6's local PIN hash is still required. |
+| every admin RPC | PIN | Course cards, points table, purse, finalize, abandon, re-snapshot. |
+
+**Accepted exposure, stated plainly.** Anyone who has the URL can write scores. There is
+no rate limit on score writes and no audit of who wrote what beyond `client_id`. The
+mitigations that remain are: the server-side validation rules (a score still has to be a
+legal score, on a real hole, for a player actually playing that round); nothing in the app
+deletes scores; and the URL is not linked from anywhere. **This is not protection against
+a determined stranger — it is the absence of protection, chosen deliberately** because the
+realistic threat to a four-person golf trip is a mistyped PIN at the first tee, not
+vandalism.
+
+**What was kept rather than deleted.** The `pin-verify` Edge Function, `sessions`,
+`pin_attempts`, the throttle functions and `fn_require_session` all stay — `/admin` uses
+them from Phase 5B. Re-gating score entry later is a one-line change: restore the
+`session_token` parameter and the `perform public.fn_require_session(...)` call.
+
+### Starting a round (`rpc_start_round`, added in Phase 5B)
+
+`schema.md`'s RPC list had no way to move a round from `upcoming` to `in_progress` —
+`rpc_upsert_round` deliberately cannot touch `status`, and only finalize and abandon moved
+it. But the Enter screen refuses an `upcoming` round and tells the scorer to "start it from
+admin," so the app described a door that did not exist. Added `rpc_start_round(session_token,
+round_id)`, session-gated like every other admin RPC. It enforces the same two preconditions
+the Enter screen checks — the course card must be published, and the round must have
+`round_players` rows — so starting a round is also the moment those get caught.
+
+### Publishing a course also requires a rating and slope on every tee
+
+The brief's four publish checks are about the hole card (par, stroke index, the 1–18
+permutation, yardages). They say nothing about `tees.rating` / `tees.slope`, both nullable
+for Bone Valley. But publishing is precisely what unblocks scoring, and `fn_compute_handicap`
+falls back to slope 113 when slope is null — so a card could pass all four checks, publish,
+and hand every player a quietly wrong stroke allocation with nothing on screen looking odd.
+`rpc_validate_and_publish_course` therefore adds a fifth check, and `courseCardIssues()` in
+`compute.ts` mirrors it so the Enter screen and the admin editor say the same thing.
+
+### A new course starts as a placeholder; editing a hole un-publishes the card
+
+Two consequences of the same idea — `data_is_placeholder = false` should mean "this card was
+validated," not "nobody has said otherwise."
+
+* `rpc_upsert_course` creates new courses with `data_is_placeholder = true`. A course with no
+  holes yet is exactly the state the flag describes, and it means a new course cannot be
+  scored by accident.
+* `rpc_upsert_hole` sets the flag back to `true` on any edit to a published card. A card
+  whose par just changed is no longer a validated card. This *does* stop scoring mid-round
+  until someone re-runs Validate & publish — one extra tap, loudly, versus a silent typo
+  re-deriving four leaderboards. The course editor says so above the fold.
+
+Only `rpc_validate_and_publish_course` may clear the flag, as the brief requires.
+
+### `round_money.championship_share_cents` is this round's share, not the whole pot
+
+The column names are ambiguous: `round_money` is per round, but the championship pot is not.
+Read as "the whole championship pot, snapshotted at this round's finalization," summing the
+four rows would quadruple-count it. It is therefore **this round's even share of the
+championship pot** — `allocateEvenCents(championshipTotal, countingRounds)`, remainder to the
+earliest round. All three money columns are then per-round and additive, and the four rows sum
+back to the trip's pots exactly. `round_purse_cents` and `ctp_pot_cents` were already
+per-round in the brief's model.
+
+`fn_allocate_even_cents` and `fn_allocate_proportional_cents` are line-for-line mirrors of
+`allocateEvenCents` / `allocateProportionalCents` in `src/lib/scoring/money.ts`, including
+where the remainder cents land. Same cases are asserted in both languages, because a
+one-cent disagreement between the frozen figure and the Money page's derivation is an
+argument at the end of the trip.
+
+### Admin `round_players` writes stamp the comparator columns
+
+`rpc_upsert_round_player_admin` has no comparator — it is the online-only pre-flight path. But
+it writes the same rows the offline outbox variant writes, so leaving
+`client_updated_at_*` / `client_id` null would make a deliberate admin write **lose** to any
+older cart write that happened to arrive afterwards. It stamps `now()` and a sentinel
+`client_id` of `ffffffff-ffff-4fff-8fff-ffffffffffff` — deliberately high-sorting, so an exact
+timestamp tie goes to admin, and admin writes are identifiable in an export.
+
+### `rpc_upsert_settings` is a whitelist with a shape check per key
+
+Settings are read by the scoring engine at compute time and are retroactive, so a malformed
+value silently rewrites every leaderboard on the trip, and a typo'd key writes a row nothing
+reads. The RPC therefore rejects unknown keys outright and validates the shape of each known
+one (all six `points_table` bands present and numeric; `allowance` in (0, 1]; a whole-number
+`handicap_cap`; the `purse_mode` and `ctp_carry_mode` enums). Note the `jsonb_typeof(...) IS
+DISTINCT FROM 'number'` form — a plain `<>` returns NULL for a *missing* key and would let it
+through.
+
+### `28000` answers 403, not 401
+
+Recorded in the Phase 5A checklist and repeated here because two source comments claimed 401:
+this PostgREST maps `28000` (what `fn_require_session` raises) to **HTTP 403**, and `42501`
+(a table-level permission denial) to 401. Both are refusals. The comments have been corrected.
+
+### RESOLVED — the brief's "Black has five par 3s" is wrong; the seed was right
+
+**Raised** during Phase 5B: the brief (§"Two things that look like data-entry errors but are
+not — do not 'correct' them") says *"Black has five par 3s; Red and Blue have four each,"*
+and uses that to motivate weighting the CTP pot by par-3 count. The Phase 2 seed said four.
+
+**Settled 2026-08-17** against the resort's official 2021 scorecards, which Kyle supplied.
+**The brief is wrong and the seed is right.** Black has **four par 3s** (holes 5, 7, 15, 17)
+and **five par 5s** (holes 1, 4, 10, 12, 18). 4×3 + 9×4 + 5×5 = 73, so par 73 is correct —
+the extra stroke is the fifth par 5, not a fifth par 3. The brief almost certainly
+transposed the two.
+
+Rather than settle it by eye, all three cards were transcribed and diffed against the
+database: **0 discrepancies across 54 hole pars, 54 stroke indexes, 12 tee rating/slope/par/
+total rows and 216 hole yardages.** The check is kept as `scripts/verify-card-data.py`, and
+it validates its own transcription against each card's printed Out/In/Total first, so a typo
+in the transcription fails as a transcription error rather than being blamed on the seed.
+
+**Nothing in the code changed.** The CTP rule reads the par-3 count from the data, so it was
+always going to do the right thing. What did change: the brief carries a marked correction,
+and the `money.test.ts` fixture comment — which had copied "Red 4, Black 5, Blue 4" out of
+the brief — now says plainly that its uneven 4/5/4/4 counts are synthetic. Keeping them
+uneven is deliberate: with the real 4/4/4/4 a proportional split and a flat split are
+indistinguishable, and the test would pass on a broken implementation.
+
+**The rule still earns its place.** All three published courses being equal means it has
+nothing to correct for *today*, but Bone Valley's par-3 count is still unknown, and an
+abandoned round redistributes. Both cases need it.
+
+**Worth noting for next time:** the brief pre-emptively told the builder not to correct this
+line. That is what kept it alive through three phases — a "don't touch this" is exactly where
+an error is most expensive, because it disables the normal check.
+
 ### PIN size and hash
 
 6-digit PIN (per brief). Server-side hash: **argon2id**, moderate params (memory 64 MiB, iterations 3, parallelism 1). Chosen over bcrypt so Edge Function CPU stays cheap on hotel wifi during PIN unlocks.

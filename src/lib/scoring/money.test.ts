@@ -38,7 +38,12 @@ describe('computePurse — buy-in mode, 40/30/30', () => {
     buyInPerPlayerCents: 10000,
     playerCount: 4,
   }
-  // Par-3 counts: Red 4, Black 5, Blue 4, Bone Valley (assume 4) → the swap-era order.
+  // A deliberately UNEVEN set of par-3 counts (4/5/4/4). It is not the real trip — all
+  // three published Streamsong cards have four par 3s each (verified against the printed
+  // cards; see scripts/verify-card-data.py). Unequal counts are the point: with 4/4/4/4 the
+  // proportional split and a flat split are indistinguishable, so the test would pass on a
+  // broken implementation. Bone Valley's real count is still unknown, which is exactly the
+  // case this protects.
   const rounds: MoneyRound[] = [
     { roundNumber: 1, par3Count: 4, abandoned: false },
     { roundNumber: 2, par3Count: 5, abandoned: false },
@@ -79,11 +84,11 @@ describe('computePurse — buy-in mode, 40/30/30', () => {
 
   it('sends remainder cents to the last par 3 within a round', () => {
     const p = computePurse(config, rounds)
-    const black = p.perRoundCtpPerHoleCents.get(2)! // 5 par 3s
-    expect(black).toHaveLength(5)
-    expect(sum(black)).toBe(p.perRoundCtpCents.get(2))
+    const fivePar3s = p.perRoundCtpPerHoleCents.get(2)! // the 5-par-3 round in the fixture
+    expect(fivePar3s).toHaveLength(5)
+    expect(sum(fivePar3s)).toBe(p.perRoundCtpCents.get(2))
     // non-decreasing, with any extra cent on the last hole
-    expect(black[4]).toBeGreaterThanOrEqual(black[0])
+    expect(fivePar3s[4]).toBeGreaterThanOrEqual(fivePar3s[0])
   })
 })
 

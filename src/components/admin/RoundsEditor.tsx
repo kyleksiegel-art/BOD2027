@@ -1,0 +1,375 @@
+import { useState } from 'react'
+import {
+  abandonRound,
+  finalizeRound,
+  resnapshotRound,
+  saveRoundPlayers,
+  setManualOverride,
+  startRound,
+  type RoundPlayerInput,
+} from '@/lib/data/admin'
+import type { AdminRoundVM, AdminSettingsVM } from '@/lib/data/compute'
+import type { PlayerRow } from '@/lib/data/types'
+import { StatusBadge } from '@/components/StatusBadge'
+import { formatDay, formatTeeTime } from '@/lib/format'
+import { Button, Field, Report, Section, inputClass, num, useAdminAction } from './kit'
+
+/**
+ * Round setup and the round lifecycle.
+ *
+ * This is the pre-flight screen the brief asks for: before a round can start, every player
+ * needs a tee, and a tee is what turns an index into strokes received. Without a
+ * round_players row a device cannot compute a stroke allocation at all — offline least of
+ * all — so the Enter screen refuses to score that player, and this is where that gets
+ * fixed.
+ *
+ * The client sends INPUTS (index, allowance, cap, tee). The server owns the arithmetic, so
+ * two phones can never disagree about who gets a stroke on the 7th.
+ */
+export function RoundsEditor({
+  rounds,
+  players,
+  settings,
+  disabled,
+}: {
+  rounds: AdminRoundVM[]
+  players: PlayerRow[]
+  settings: AdminSettingsVM
+  disabled: boolean
+}) {
+  return (
+    <>
+      {rounds.map((r) => (
+        <RoundPanel
+          key={r.round.id}
+          vm={r}
+          players={players}
+          settings={settings}
+          disabled={disabled}
+        />
+      ))}
+    </>
+  )
+}
+
+function RoundPanel({
+  vm,
+  players,
+  settings,
+  disabled,
+}: {
+  vm: AdminRoundVM
+  players: PlayerRow[]
+  settings: AdminSettingsVM
+  disabled: boolean
+}) {
+  const setup = useAdminAction()
+  const life = useAdminAction()
+
+  const indexOf = new Map(players.map((p) => [p.id, p.handicap_index]))
+
+  // The form's own copy of the tee/status assignment, so the whole foursome saves in one
+  // request rather than four.
+  const [assign, setAssign] = useState<Record<string, { teeId: string; status: string }>>(() =>
+    Object.fromEntries(
+      vm.participants.map((p) => [
+        p.playerId,
+        {
+          teeId: p.row?.tee_id ?? vm.tees[0]?.id ?? '',
+          status: p.row?.status ?? 'playing',
+        },
+      ]),
+    ),
+  )
+  const [holesCounted, setHolesCounted] = useState('')
+  const [confirmAbandon, setConfirmAbandon] = useState(false)
+
+  const unassigned = vm.participants.filter((p) => p.row === null)
+  const canSave = vm.tees.length > 0 && vm.participants.every((p) => assign[p.playerId]?.teeId)
+
+  function entries(): RoundPlayerInput[] {
+    return vm.participants.map((p) => ({
+      roundId: vm.round.id,
+      playerId: p.playerId,
+      teeId: assign[p.playerId].teeId,
+      indexUsed: indexOf.get(p.playerId) ?? 0,
+      allowanceUsed: settings.allowance,
+      capUsed: settings.handicapCap,
+      status: assign[p.playerId].status === 'did_not_play' ? 'did_not_play' : 'playing',
+    }))
+  }
+
+  return (
+    <Section
+      title={`Round ${vm.round.round_number} — ${vm.course.name}`}
+      meta={
+        <span className="inline-flex items-center gap-2">
+          {formatDay(vm.round.date)}
+          {vm.round.tee_time ? ` · ${formatTeeTime(vm.round.tee_time)}` : ''}
+          <StatusBadge status={vm.round.status} />
+        </span>
+      }
+    >
+      {unassigned.length > 0 ? (
+        <p className="mt-3 rounded-md border border-gold/40 bg-gold/10 p-3 text-[0.85rem] leading-relaxed text-paper">
+          <strong>No tee set</strong> for {unassigned.map((p) => p.name).join(', ')}. They cannot
+          be scored in this round until this is saved.
+        </p>
+      ) : null}
+
+      {/* ── Tees and handicaps ─────────────────────────────────────────────── */}
+      <div className="mt-4 space-y-3">
+        {vm.participants.map((p) => (
+          <div key={p.playerId} className="rounded-md border border-hair p-3">
+            <div className="flex items-baseline justify-between">
+              <span className="font-semibold text-paper">{p.name}</span>
+              <span className="text-[0.75rem] text-paper-faint tnum">
+                index {indexOf.get(p.playerId)}
+                {p.row ? ` · ${p.row.strokes_received} strokes` : ''}
+                {p.row?.cap_applied ? ' (capped)' : ''}
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field label="Tee">
+                <select
+                  className={inputClass}
+                  value={assign[p.playerId]?.teeId ?? ''}
+                  disabled={disabled || vm.tees.length === 0}
+                  onChange={(e) =>
+                    setAssign((a) => ({
+                      ...a,
+                      [p.playerId]: { ...a[p.playerId], teeId: e.target.value },
+                    }))
+                  }
+                >
+                  {vm.tees.length === 0 ? <option value="">No tees on this course</option> : null}
+                  {vm.tees.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Status">
+                <select
+                  className={inputClass}
+                  value={assign[p.playerId]?.status ?? 'playing'}
+                  disabled={disabled}
+                  onChange={(e) =>
+                    setAssign((a) => ({
+                      ...a,
+                      [p.playerId]: { ...a[p.playerId], status: e.target.value },
+                    }))
+                  }
+                >
+                  <option value="playing">Playing</option>
+                  <option value="did_not_play">Did not play</option>
+                </select>
+              </Field>
+            </div>
+
+            {p.row ? (
+              <ManualOverride
+                roundId={vm.round.id}
+                playerId={p.playerId}
+                computed={p.row.strokes_received}
+                current={p.row.manual_override}
+                disabled={disabled}
+              />
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        <Button
+          tone="primary"
+          disabled={disabled || setup.busy || !canSave}
+          onClick={() =>
+            void setup.run('Tees and handicaps saved.', () => saveRoundPlayers(entries()))
+          }
+        >
+          {setup.busy ? 'Saving…' : 'Save tees & handicaps'}
+        </Button>
+        <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
+          Saved at {Math.round(settings.allowance * 100)}% allowance, cap{' '}
+          {settings.handicapCap}. The server recomputes course handicap, playing handicap and
+          strokes received from the tee — this form never sends them.
+        </p>
+        <Report report={setup.report} />
+      </div>
+
+      {/* ── Lifecycle ──────────────────────────────────────────────────────── */}
+      <div className="mt-5 border-t border-hair pt-4">
+        <span className="eyebrow block">Round status</span>
+
+        <ul className="mt-2 space-y-1 text-[0.85rem] text-paper-dim tnum">
+          {vm.participants
+            .filter((p) => p.row?.status === 'playing')
+            .map((p) => (
+              <li key={p.playerId} className="flex justify-between">
+                <span>{p.name}</span>
+                <span>
+                  thru {p.thru}
+                  {p.missingHoles > 0 ? ` · ${p.missingHoles} to go` : ''}
+                </span>
+              </li>
+            ))}
+        </ul>
+
+        {vm.round.status === 'upcoming' ? (
+          <div className="mt-4">
+            <Button
+              disabled={disabled || life.busy}
+              onClick={() => void life.run('Round started.', () => startRound(vm.round.id))}
+            >
+              {life.busy ? 'Starting…' : 'Start round'}
+            </Button>
+            {vm.startIssues.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-[0.82rem] text-gold-bright">
+                {vm.startIssues.map((i) => (
+                  <li key={i}>· {i}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {vm.round.status === 'in_progress' ? (
+          <div className="mt-4">
+            <Field
+              label="Holes counted"
+              hint="Leave blank for a full 18. Set it only if the round was cut short — then only those holes need a score."
+            >
+              <input
+                className={inputClass}
+                inputMode="numeric"
+                placeholder="18"
+                value={holesCounted}
+                onChange={(e) => setHolesCounted(e.target.value)}
+                disabled={disabled}
+              />
+            </Field>
+            <div className="mt-3">
+              <Button
+                tone="primary"
+                disabled={disabled || life.busy}
+                onClick={() =>
+                  void life.run('Round final — money frozen.', () =>
+                    finalizeRound(vm.round.id, num(holesCounted)),
+                  )
+                }
+              >
+                {life.busy ? 'Checking…' : 'Finalize round'}
+              </Button>
+            </div>
+            <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
+              Finalizing freezes this round's money. Every playing player needs a score or a
+              picked-up flag on every counted hole first.
+            </p>
+          </div>
+        ) : null}
+
+        {vm.round.status === 'final' ? (
+          <p className="mt-4 text-[0.85rem] text-paper-dim">
+            Final{vm.round.holes_counted !== null ? ` over ${vm.round.holes_counted} holes` : ''}.
+            Money is frozen; re-snapshotting handicaps is blocked.
+          </p>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          {vm.round.status !== 'final' && vm.round.status !== 'abandoned' ? (
+            <Button
+              disabled={disabled || life.busy}
+              onClick={() =>
+                void life.run('Handicaps re-snapshotted from current indexes.', () =>
+                  resnapshotRound(vm.round.id),
+                )
+              }
+            >
+              Re-snapshot handicaps
+            </Button>
+          ) : null}
+
+          {vm.round.status !== 'abandoned' ? (
+            confirmAbandon ? (
+              <>
+                <Button
+                  tone="danger"
+                  disabled={disabled || life.busy}
+                  onClick={() => {
+                    setConfirmAbandon(false)
+                    void life.run('Round abandoned — it no longer counts for money.', () =>
+                      abandonRound(vm.round.id),
+                    )
+                  }}
+                >
+                  Yes, abandon it
+                </Button>
+                <Button onClick={() => setConfirmAbandon(false)}>Cancel</Button>
+              </>
+            ) : (
+              <Button tone="danger" disabled={disabled} onClick={() => setConfirmAbandon(true)}>
+                Abandon round
+              </Button>
+            )
+          ) : null}
+        </div>
+
+        <Report report={life.report} />
+      </div>
+    </Section>
+  )
+}
+
+/**
+ * The escape hatch when the computed allocation is wrong on the day. Kept next to the
+ * computed number so it is always obvious what is being overridden and by how much;
+ * clearing it hands the computed value back rather than freezing today's number in.
+ */
+function ManualOverride({
+  roundId,
+  playerId,
+  computed,
+  current,
+  disabled,
+}: {
+  roundId: string
+  playerId: string
+  computed: number
+  current: number | null
+  disabled: boolean
+}) {
+  const { busy, report, run } = useAdminAction()
+  const [value, setValue] = useState(current === null ? '' : String(current))
+
+  return (
+    <div className="mt-3 border-t border-hair pt-3">
+      <Field
+        label="Manual stroke override"
+        hint={`Blank uses the computed ${computed}.`}
+      >
+        <div className="flex gap-2">
+          <input
+            className={inputClass}
+            inputMode="numeric"
+            placeholder={String(computed)}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={disabled}
+          />
+          <Button
+            disabled={disabled || busy}
+            onClick={() =>
+              void run('Override saved.', () => setManualOverride(roundId, playerId, num(value)))
+            }
+          >
+            {busy ? '…' : 'Set'}
+          </Button>
+        </div>
+      </Field>
+      <Report report={report} />
+    </div>
+  )
+}

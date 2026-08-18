@@ -199,13 +199,335 @@ Course-handicap hand calculations verified against the resort's published rating
 
 ## Phase 4 — Read-only UI
 
-_(To be filled in at end of Phase 4.)_
+Built on branch `phase-4-read-ui` (off `phase-2-schema`, which carries Phases 1+2+3).
+The read pipeline is real and end-to-end: **anon Supabase SELECT → TanStack Query →
+Dexie → `useLiveQuery` → screen**. Every derived number comes from the Phase 3 scoring
+engine; no scoring math is recomputed in a component. Verified live against a local
+Supabase stack seeded with Phase-4 fake scores.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| Read path honors the data-layering rule | `src/lib/supabase.ts` (anon client) → `src/lib/data/hydrate.ts` (TanStack Query fetches all public tables, bulkPut into Dexie) → components read **only** via `src/lib/data/selectors.ts` (`useLiveQuery`). No screen imports Dexie or Supabase directly. `QueryProvider` in `main.tsx`; `HydrationGate` in the shell |
+| Seeded fake scores (Phase 4 seed) | `supabase/migrations/20260817120000_seed_phase4_fake_scores.sql`, **generated** by `scripts/gen-phase4-seed.ts` so handicap snapshots are computed by the real engine. `supabase db reset` applies clean; anon REST returns 170 `scores` + 12 `round_players`. R1 Red final(18); R2 Black final but **curtailed after 15** (`holes_counted=15`); R3 Blue **in progress** (~thru 13), Chris **DNP** |
+| Standings, cumulative + **live** + position change | `/standings`. The overall board is **inclusive of the round in play** (Kyle's request): the live `in_progress` round counts toward the total as it stands. Live: Jon 91, Adam 84 (▲1), Kyle 83 (▼1), Chris 48 — Adam climbs past Kyle on the live round. Position change is movement between the two most recent counting rounds (R2-final → R3-live). Matrix marks R3 live (•, counted) / R4 upcoming (·, not counted). `Movement.tsx` renders ▲/▼/–/· |
+| Rounds list | `/rounds`. Each round: course, ET day+tee time, `StatusBadge` (Final / • In progress / Upcoming), round **winner/leader** name. Bone Valley shown |
+| Round detail: leaderboard | `/rounds/:n`. Round-specific board (distinct from championship). R2 result Kyle 30 / Jon 26 / Adam 23 / Chris 22; live R3 shows "thru X · proj Y" (Jon 25/13×18 = **34.6**, Adam 20/12×18 = **30.0**); tied players share rank |
+| Round detail: scorecard grid | `Scorecard.tsx` — horizontally-scrollable, sticky label column, Par/S.I. rows, OUT/IN/TOT. Points ⇆ Gross toggle. Net-to-par marks (circle=net birdie+, square=net bogey+), strokes-received pips, **PU** cells, per-nine + total subtotals |
+| **Derived points match the engine** | Hand-checked R2 Jon front nine: 2+1+2+2+2+2+1+2+3 = **17 = OUT**; total 26 = leaderboard. All cells are `computeHoleResult` output surfaced via `compute.ts`; the generator's stderr dump is the independent expected-value source |
+| Excluded-holes strikethrough | R2 holes 16–18 render struck-through "–" (past the `holes_counted=15` cutoff). Header shows "Shortened — 15 holes count" |
+| PU legend | Rendered under every scorecard (net birdie+, net bogey+, strokes received, PU, excluded) |
+| Position-change indicators against prior-round data | See Standings row — ▲1 / ▼1 driven by `standingsThroughRound` for the previous counting round |
+| Handicap worksheet toggle | `HandicapWorksheet.tsx` (collapsible). Re-derives each line from stored snapshot inputs. Verified by hand: Jon 9.2 → 10.99 + 1.7 = 12.69 → PH 13; Kyle 12.4 → 16.51 → 17; **CAPPED 18** badge on Chris (22→18); Adam's exact 18.43→18 shows **no** cap |
+| Players page | `/info/players`. Roster with initials avatars, index with `*` for unassigned, live footnote from `settings.assigned_index_footnote` |
+| Rules page | `/info/rules`. Format, **live** points table + allowance + cap from `settings`, money split, ties. Plain language (no annual-report winking) |
+| Design tokens / tabular numerals / dark / 44px | All screens use the Phase 1 tokens; numbers are `tnum`; tap targets ≥44px; `font-size:16px` inputs preserved. No console errors on any route |
+
+### Automated tests
+
+Scoring suite unchanged: `npx vitest run src/lib/scoring --reporter=dot` → **67 passed**.
+`npx tsc -b --noEmit` clean; `npm run build` succeeds. No new unit tests were added —
+Phase 4 is presentation over the already-tested engine, verified live against known-good
+generator output (per the phase plan's screenshot-based verification).
+
+### Manual tests
+
+- `supabase db reset` applies the Phase-4 seed clean; anon REST reads confirm 170 scores /
+  12 round_players / correct round statuses.
+- Live browser walk-through (screenshots captured in-session): Standings, Rounds list,
+  Round 1 (final), Round 2 (scorecard Points + Gross, worksheet open with cap badge),
+  Round 3 (live projections + DNP), Round 4 (Bone Valley placeholder), Players, Rules.
+- Toggles exercised: Points⇆Gross scorecard, worksheet expand/collapse.
+
+### Deferred requirements / open items
+
+- **No write path** — correct for Phase 4. Score entry, PIN auth, RPCs, Realtime, and the
+  offline outbox/comparator are Phases 5–6. The Enter/Money/Admin/Itinerary/Courses screens
+  remain Phase-1 stubs.
+- **Fake scores are invented** for the demo and are overwritten by real entry in Phase 5+.
+- **Bundle size** now 616 KB (184 KB gzip) after adding supabase-js + TanStack Query + Dexie;
+  over Vite's 500 KB warning. Code-splitting is a Phase 9 concern.
+- **Home is briefly behind the hydration gate** on a cold, empty-cache first visit (falls
+  through instantly once Dexie is populated, which persists). Making the marquee Home fully
+  static-first is a Phase 9 nicety.
+
+### Deviations
+
+1. **Read pipeline built for real, not stubbed.** The phase plan says "via Dexie +
+   `useLiveQuery` after TanStack Query hydrates"; since Docker + the Supabase CLI are
+   available, this was wired against a live local Supabase rather than faked — the same
+   pipeline Phase 5/6 extend. Only the *scores* are fake.
+2. **Fake-scores seed is generated, not hand-written.** `scripts/gen-phase4-seed.ts` imports
+   the scoring engine so `round_players` handicap snapshots are guaranteed consistent with
+   what the UI derives; its stderr dump doubles as the expected-value oracle.
+3. **Scorecard shows net-to-par marks on the displayed value in both modes.** In Points mode
+   the circle/square encodes the hole's net-to-par while the number is points — a deliberate
+   dual-encoding, clarified by the always-on legend.
+4. **Overall standings are live-inclusive (overrides a Phase 3 default).** Kyle asked the
+   overall scoreboard to include the current round. `src/lib/data/compute.ts` sets a round's
+   `counts` flag true for `final` **and** `in_progress` (never `upcoming`/`abandoned`); the
+   pure engine is unchanged (the caller has always owned the `counts` flag). Nothing jumps at
+   finalization — the live points were already in the total. The Phase 3 doc comment in
+   `championship.ts` was softened to say the caller decides. This supersedes the "final only"
+   line in `championship.ts`'s original comment; **do not revert.**
 
 ---
 
-## Phase 5 — Auth + score entry
+## Phase 5A — Auth + score entry (online only)
 
-_(To be filled in at end of Phase 5.)_
+**Phase 5 was split.** As specified it covers the PIN Edge Function, sessions, ~20 RPCs,
+every server-side validation rule, the Enter screen, *and* four admin editors (players,
+courses + Bone Valley validate-and-publish, rounds + finalize/abandon/re-snapshot,
+settings). That is two sessions of work, and the brief explicitly says to split an
+oversized phase rather than rush the back half. **5A is auth + the write path + Enter,
+which is what the phase title names and what Phase 6 builds on. 5B is the admin
+editors and their RPCs.** Nothing in 5A is stubbed.
+
+Built on branch `phase-4-read-ui` (Phase 4 is still uncommitted, awaiting sign-off).
+
+> **Mid-phase amendment — the PIN came off score entry.** Kyle: *"I dont want a pin - just
+> a hole by hole save button."* Asked whether `/admin` should lose it too, he chose entry
+> only. So `rpc_upsert_scores` and `rpc_upsert_ctp` now take **no session token** and the
+> Enter screen has an explicit per-hole **Save** button instead of a lock;
+> `rpc_upsert_round_player` and every admin RPC still require a session. The brief carries
+> a marked amendment and the reasoning + accepted exposure are in `decisions.md`
+> §"PIN removed from score entry". The auth machinery below was all built and tested first
+> and is **retained in full** for `/admin` (Phase 5B) — none of it is dead-lettered.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| PIN Edge Function with argon2id, real client IP | `supabase/functions/pin-verify/index.ts`. argon2id via `npm:hash-wasm` at OWASP parameters (m=19456 KiB, t=3, p=1) — verified running inside `supabase-edge-runtime-1.74.3`. IP from the left-most `x-forwarded-for` entry, which only the edge can see (the reason this is a function and not an RPC) |
+| Per-IP throttling; short global backoff at a high threshold; never an indefinite lockout | `public.rpc_pin_gate(inet)`. Per-IP: 5 free failures **since that IP's last success**, then `min(300, 30·2^(n−5))` seconds. Global: only above 25 failures across all IPs in 10 min, and only for 60 s. pgTAP asserts the trip, the scope, the finite `retry_after`, that a *different* IP is unaffected, and that a success clears the count |
+| **Failed PIN attempts never invalidate an issued session** | Structural: neither throttle function touches `public.sessions`. pgTAP asserts the session row survives and can still write while another IP is locked out. `scripts/verify-write-path.sh` §10 demonstrates it live: 6 wrong PINs → unlock returns **429 `retry_after: 30`**, and the same session's write returns **200 `applied: true`** |
+| Constant error messaging (no PIN oracle) | A wrong PIN and a malformed PIN both return `401 {"error":"Incorrect PIN."}` — verify script §4/§5 |
+| PIN hash is an Edge Function secret, never a readable row | `APP_PIN_ARGON2_HASH` env var. `supabase/functions/.env` is gitignored; `.env.example` carries only the local-dev PIN `271828`'s hash, labelled as such |
+| `sessions` populated with hashed tokens, ≥128-bit | 256 bits from `crypto.getRandomValues`; only `encode(sha256(token),'hex')` is stored. pgTAP asserts no row equals the raw token |
+| `rpc_create_session`, `rpc_revoke_all_sessions` | `20260818090000_auth_write_rpcs.sql`. **`rpc_create_session` is granted to `service_role` only** — anon minting its own session would make the PIN decorative. pgTAP asserts anon lacks EXECUTE; verify script §2 shows `42501` |
+| `rpc_upsert_scores`, `rpc_upsert_ctp`, `rpc_upsert_round_player` | Same migration. Batch `jsonb` in, `[{key, applied, error, row}]` out, so a client can distinguish "rejected as stale" from "error" |
+| All `SECURITY DEFINER` with `SET search_path = ''`, fully schema-qualified | pgTAP test 1 counts SECURITY DEFINER functions in `public` **without** `search_path=""` in `proconfig` and asserts **0**. (`COALESCE`/`LEAST`/`GREATEST`/`EXTRACT` appear unqualified because they are SQL constructs, not schema-resolvable functions — noted in the migration header) |
+| `CREATE FUNCTION`'s implicit `EXECUTE TO PUBLIC` revoked, re-granted narrowly | Every function has an explicit `revoke ... from public` followed by a grant to `anon` or `service_role`. pgTAP asserts both directions for 8 functions, including that `fn_require_session` is granted to nobody (no token oracle) |
+| The comparator, SQL guard (site 1 of 4) | `(excluded.client_updated_at_effective, excluded.client_id) > (existing…)`. pgTAP covers: first write applies; older loses; **the loser is handed the current winner row**; an exact tie on both loses (replays are idempotent); a timestamp tie breaks by `client_id` in both directions; newer wins regardless of client_id |
+| `client_updated_at_effective = least(raw, now() + 5 min)`, computed server-side | pgTAP: a write stamped 2031 is accepted, its `_effective` is clamped under `now()+6 min`, and `_raw` still holds the value as sent for diagnostics |
+| Whole-tuple replacement; **no `COALESCE` merges** | pgTAP: picking up a hole that had a gross score returns `gross_strokes: null` — both columns are replaced together |
+| Every server-side validation rule from the brief | pgTAP §4 + verify script §8, one cell per rule: `round_not_found`, `round_upcoming`, `course_data_is_placeholder`, `no_round_player_row`, `player_not_playing`, `hole_not_on_course`, `gross_strokes_out_of_range` (both ends), `picked_up_requires_null_gross`, `missing_required_field` |
+| A failing cell is reported specifically and the batch continues | pgTAP asserts a batch containing a malformed uuid still applies its valid cell. (This needed a fix: the key fields were parsed *outside* the per-cell exception block, so one bad uuid aborted the whole call) |
+| CTP validation | pgTAP §6: par-3 only, DNP cannot win, negative distance refused, **null `player_id` accepted** (no winner yet / a carry), and a placeholder card has no par 3s so Bone Valley is refused structurally |
+| `rpc_upsert_round_player` — server owns the handicap math | `public.fn_compute_handicap` mirrors `src/lib/scoring/handicap.ts` (numeric `round()` in Postgres is already half-away-from-zero). pgTAP: client-sent outputs of 999 are **ignored** and the server returns 17; `course_handicap` reproduces the hand-verified Blue/Green example (12.4 × 134/113 = 14.70 + 2.0 = **16.70** → 17), matching `handicap.test.ts`; the cap is applied last (index 30 → 18); a tee from another course is refused |
+| **Score entry needs no PIN; the gated RPCs still do** | pgTAP asserts `rpc_upsert_scores`/`rpc_upsert_ctp` exist exactly once, take only `cells`/`results` (no overload left behind), and that **anon itself** can call both with no session — while still being denied a direct `INSERT` on `scores` (`42501`), so the RPC remains the only door. `rpc_upsert_round_player` is asserted to refuse a bogus, expired and null token. Verify script §3 vs §7 shows both halves live |
+| Session token in Dexie, expiry Feb 8 2027 (for `/admin`) | `src/lib/auth/session.ts` + Dexie `session` table. Dexie, not `sessionStorage` — a force-quit in the cart must not log the scorer out. Expiry `2027-02-08T23:59:59-05:00`, configurable via `APP_SESSION_EXPIRES_AT` |
+| Enter screen: hole-by-hole, all players on one screen | `/enter`. Header (hole, par, S.I., yardage + tee name), one row per player with 44px ± steppers and a large number, strokes-received pips, live points, PU button, prev/next, an 18-hole picker marking holes that already have entries, and a "Round N so far" footer with points and thru per player |
+| **The par default is display-only and is never written** | Verified live twice — before the Save button (paging 14 holes wrote 0 rows) and after (steppers and PU edit a local draft only; `select count(*) … hole_number = 15` returned **0** with edits visibly pending on screen, and 2 rows immediately after tapping Save). With an explicit Save there is now no code path at all that writes without a deliberate tap |
+| Explicit per-hole Save | `Save hole N` commits every edited player on the hole in **one** `rpc_upsert_scores` request. Verified: Jon +3 and Kyle PU → one request → both rows correct. The button reads `No changes` / `Save hole N` / `Saving…` / `Saved`, and unsaved cells carry a `•` marker |
+| Unsaved edits survive navigation | Drafts are keyed by hole, not cleared on page. Verified: edited hole 16, paged to 15 and back — the edit and the `Save hole 16` state were both still there. Holes with unsaved edits are outlined in gold in the hole picker, and a footer line lists them when more than one is pending |
+| A failed save never loses a hole | `saveCells` returns false and the drafts are kept; the message is non-destructive ("your scores are still here"). Offline is treated as a normal state, not an error |
+| Unentered players render muted; "thru X" counts only written rows | Muted at `opacity-60` until entered; DNP at `opacity-40` with no controls. `thru` comes from `computePlayerRound().holesCompleted` |
+| Picked-up is a first-class button | Verified live: tapping PU for Kyle on hole 15 wrote `gross_strokes = null, picked_up = true`, the row rendered `—` / `0 pt`, and **thru advanced 13 → 14** while his round total stayed at 19 |
+| Round 4 hard-blocked until the card is validated | Verified live (screenshot): `/enter` R4 shows no steppers at all and lists "Par is not set on 18 holes · Stroke index is not set on 18 holes · Green tees are missing yardages", with a link to the editor. Belt-and-braces server-side: `course_data_is_placeholder` (pgTAP) |
+| Loud pre-flight when `round_players` rows are missing | Verified live on R4: "No tee or handicap set for Jon Aronson, Kyle Siegel, Adam Hersh, Chris Denove." |
+| Writes are coalesced into one request per hole | The 500 ms debounce became unnecessary: an explicit Save is the coalescing point, and one hole is one request carrying up to four cells |
+| iOS install-then-unlock tip | On the PIN panel (now `/admin`-only) and in the README |
+| Data-layering rule holds in both directions | The write path puts the server's returned rows into Dexie; screens still read only through `selectors.ts`. Optimistic drafts are overlaid in **`compute.ts`**, not patched over rendered numbers, so points/thru/standing derive from the draft through the scoring engine |
+
+### Automated tests
+
+- `supabase test db` → **PASS, 126 tests** (`rls_smoke.sql` 32, `seed_integrity.sql` 23,
+  **`write_path.sql` 71**).
+- `npx vitest run src/lib/scoring --reporter=dot` → **67 passed**, unchanged.
+- `npx tsc -b --noEmit` clean; `npm run build` clean.
+
+### Manual tests
+
+- `scripts/verify-write-path.sh` run end to end against the local stack; full transcript
+  in session. All ten sections behaved as described above.
+- Browser walkthrough at 375 px, run twice — once with the PIN gate and once after it was
+  removed. Pre-amendment: locked → wrong PIN (`Incorrect PIN.`) → correct PIN → unlocked.
+  Post-amendment, from a cleared IndexedDB: straight into scoring with no gate; three `+`
+  taps and a PU held as unsaved drafts with **0 rows in the database**; one Save wrote both
+  cells; an edit on hole 16 survived paging to 15 and back; R4 still hard-blocked. The
+  database was queried after each step. No console errors.
+
+### Bugs found and fixed during verification
+
+1. **One malformed cell aborted the whole batch.** `round_id`/`player_id`/`hole_number`
+   were cast to uuid/int *before* the per-cell exception block, so a bad uuid raised out of
+   the loop — exactly the failure the per-cell error reporting exists to prevent. The key
+   is now echoed back as sent and all casts happen inside the guard.
+2. **Dexie's `scores` table was keyed by the server `id`, not the logical cell key.** A row
+   whose server id changed left the old row behind, so one cell had two conflicting entries
+   locally and whichever sorted last won — the UI showed 6 while the database held 9.
+   Re-keyed to `[round_id+player_id+hole_number]`, mirroring the Postgres unique key
+   (Dexie v3 drops the table, v4 recreates it; it is a read mirror and re-hydrates).
+   This also gives the Phase 6 comparator the key it reasons about.
+3. **The Phase 4 fake-score seed stamped its client timestamps on the trip dates
+   (Feb 2027).** Since the comparator is last-write-wins on `client_updated_at_effective`
+   and the server clamps an incoming stamp to `now() + 5 min`, every real entry made before
+   the trip lost to the demo data and was rejected as stale. `gen-phase4-seed.ts` now
+   stamps January 2026; the seed was regenerated and **only the timestamps changed** (diff
+   of all non-timestamp lines is empty).
+4. **Rapid stepper taps dropped increments.** The row computed `value + delta` from a prop
+   that had not round-tripped yet. The parent now owns the value in a ref, so a burst
+   accumulates; `onStep(delta)` is relative rather than absolute.
+
+### Deferred to Phase 5B
+
+- **All admin RPCs and screens**: `rpc_upsert_player/course/tee/hole/hole_yardage`,
+  `rpc_validate_and_publish_course`, `rpc_upsert_round`, `rpc_upsert_round_player_admin`,
+  `rpc_resnapshot_round_handicaps`, `rpc_finalize_round`, `rpc_abandon_round`,
+  `rpc_set_manual_override`, `rpc_upsert_itinerary/lodging/lodging_assignment/settings`,
+  `rpc_export_all_scores`; and the players / courses (Bone Valley editor) / rounds /
+  settings editors with their online-only guards. `/admin` is still a Phase 1 stub, so the
+  Enter screen's "Open the course editor" link currently lands on that stub.
+- **`rpc_upsert_ctp` and `rpc_upsert_round_player` have no UI yet** — both are built,
+  validated and tested at the SQL layer. CTP entry is Phase 7 (Money); the day-of tee
+  change screen is Phase 5B.
+- **Round status transitions** are not exposed: a round cannot yet be moved from
+  `upcoming` to `in_progress` from the app (Phase 5B `rpc_upsert_round` / finalize).
+  R3 is `in_progress` only because the Phase 4 seed set it there.
+- **Offline everything** — Phase 6. Phase 5 writes straight through; there is no outbox,
+  no local PIN hash, and no Realtime. The "sync indicator" is a request state, not an
+  outbox depth.
+
+### Deviations
+
+1. **Phase 5 split into 5A/5B** (see the note at the top of this section).
+0. **The PIN came off score entry mid-phase, at Kyle's direction** — see the amendment box
+   above. This supersedes the brief; the brief, `decisions.md`, `CLAUDE.md`, the README and
+   the pgTAP suite were all updated rather than left describing the old posture.
+2. **argon2id comes from `npm:hash-wasm`**, a pure-WASM implementation, because native
+   argon2 bindings do not load in the Deno-based edge runtime. Verified working in the
+   local edge runtime before anything was built on it.
+3. **Local drafts were added**, which the phase plan puts under "Writes go to Dexie, then
+   the outbox" (Phase 6). With an explicit Save they are no longer merely an optimisation —
+   they are the mechanism: an edit has to live somewhere between the tap and the tap that
+   commits it. They are overlaid in the pure layer (`compute.ts`), so points, "thru" and the
+   round standing all derive from a pending edit through the scoring engine rather than
+   being patched over rendered numbers, and no scoring math moved into a component.
+4. **`28000` maps to HTTP 403, not 401**, through this PostgREST version (`42501` maps to
+   401). Both are refusals; recorded here rather than claiming 401.
+5. **The local-dev PIN hash is committed** in `supabase/functions/.env.example` so a fresh
+   clone can run the stack. It hashes `271828` and is labelled as local-only; the real PIN
+   is a Supabase secret Kyle sets.
+
+---
+
+## Phase 5B — Admin RPCs + admin editors (online only)
+
+The back half of Phase 5: everything the brief lists under "admin screens" plus the RPCs
+behind them. Built on branch `phase-4-read-ui` (Phases 4, 5A and 5B are all uncommitted).
+Nothing here is stubbed.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| Every admin RPC in `schema.md` §"Admin (online-only)": `rpc_upsert_player` / `_course` / `_tee` / `_hole` / `_hole_yardage` / `_round` / `_round_player_admin` / `_settings` / `_itinerary` / `_lodging` / `_lodging_assignment`, `rpc_validate_and_publish_course`, `rpc_resnapshot_round_handicaps`, `rpc_finalize_round`, `rpc_abandon_round`, `rpc_set_manual_override` | `supabase/migrations/20260819090000_admin_rpcs.sql`; `admin_path.sql` asserts EXECUTE is granted to `anon` on each by exact signature |
+| `rpc_export_all_scores` (brief §Diagnostics) | `admin_path.sql`: the payload carries `players, courses, tees, holes, rounds, round_players, scores, ctp_results, round_money, settings, exported_at` and non-empty scores. `verify-admin-path.sh` §15 prints 170 score rows / 12 round_players rows over PostgREST |
+| **All 18 are `SECURITY DEFINER` with `SET search_path = ''`, fully schema-qualified** | `admin_path.sql` test 1 asserts zero unpinned `SECURITY DEFINER` functions in `public` (catches any future one too) |
+| **Every admin RPC requires a PIN session** | 18 individual `throws_ok('28000')` assertions in `admin_path.sql`, plus an expired-session case. `verify-admin-path.sh` §1 shows all 18 answering **403** over PostgREST with a forged token and the real argument list |
+| Anon still cannot write to an admin table directly | `verify-admin-path.sh` §2: `PATCH /courses` → `42501` "permission denied for table courses" |
+| Admin screens for **players** (name, title, index, agreed-index flag) | `src/components/admin/PlayersEditor.tsx`; browser at 375 px |
+| Admin screen for **courses** — Bone Valley editor + validate-and-publish | `src/components/admin/CoursesEditor.tsx`. Browser: Bone Valley listed "4 to fix"; Validate & publish returned the server's five reasons; hole 1 saved par 4 / S.I. 5 / 412 yds and the DB row shows exactly that; the on-screen issue list re-derived from Dexie to "17 holes" without a reload |
+| Admin screen for **rounds** — tee assignment, start, finalize, abandon, re-snapshot | `src/components/admin/RoundsEditor.tsx`. Browser: Finalize on R3 rendered "Jon Aronson is missing 5 hole(s) / Kyle Siegel 5 / Adam Hersh 6" and **not** Chris Denove (DNP) |
+| Admin screen for **settings** — points table, allowance, cap, purse | `src/components/admin/SettingsEditor.tsx`. Browser: allowance 100 → 95 saved; `select value from settings where key='allowance'` → `0.95` |
+| Online-only guards with a plain-language notice | `Admin.tsx`. Browser: with `navigator.onLine` forced false, the banner reads "No connection. Admin changes go straight to the server — they are not queued like scores are," and every control is disabled |
+| Round 4 stays hard-blocked until the card is published | `verify-admin-path.sh` §4–§5: Bone Valley refuses to publish with five specific reasons, and `rpc_start_round` on R4 then refuses with "the course card is not published yet" |
+| Changing an index is **not** retroactive; re-snapshot is the explicit action | `admin_path.sql`: after `rpc_upsert_player` moves Jon to 20.0, R1's `index_used` is still 9.2; `rpc_resnapshot_round_handicaps` on R3 rewrites every row to 20.0 while R1 keeps its own snapshot |
+| Server owns the handicap math on every path | `rpc_upsert_round_player_admin` sends INPUTS only and calls the same `fn_compute_handicap` the outbox variant uses; `admin_path.sql` asserts `strokes_received` came back computed, and that a tee from another course is refused |
+| `rpc_finalize_round` writes `round_money` matching a compute-time derivation | `admin_path.sql`: $100 × 4 players, 40/30/30, four counting rounds → `championship_share_cents` 4000, `round_purse_cents` 3000, `par_3_count` from the round's own card. `verify-admin-path.sh` §12 shows the same row over the API |
+| Every server-side validation rule tested by direct API call | `verify-admin-path.sh` §7–§10 (hole edit un-publishes; slope 1370 refused; hole 19 refused; cross-course tee refused; unknown settings key, malformed points table, 150% allowance all refused) |
+
+### Automated tests
+
+`supabase test db` → **232 pass** across four files (**106 new** in `supabase/tests/admin_path.sql`).
+`npx vitest run --reporter=dot` → 67 pass (unchanged; the scoring engine did not move).
+`npx tsc -b` and `npm run build` clean.
+
+Notable assertions beyond the table above:
+
+- `fn_allocate_even_cents` / `fn_allocate_proportional_cents` are asserted against the same
+  cases as `allocateEvenCents` / `allocateProportionalCents` in `src/lib/scoring/money.ts` —
+  `1000/3 → {334,333,333}` (remainder to the *earliest* part), the 40/30/30 split of a $400
+  pool, the 4/4/5/0 CTP split summing back exactly, and the zero-weight and zero-parts cases
+  that would otherwise divide by zero.
+- The two helpers are asserted **not** executable by `anon`: they are internal arithmetic,
+  reachable only from inside a definer function.
+- A duplicate stroke index refuses to publish even though all 18 values are non-null.
+- A tee with a null slope refuses to publish (see Deviations).
+- A `final` round refuses to re-snapshot; an `abandoned` round refuses to finalize; abandoning
+  a finalized round removes its `round_money` row but keeps its scores.
+
+### Manual tests
+
+Browser at 375 × 812, dark, against local Supabase + `supabase functions serve`:
+
+1. `/admin` locked → PIN gate with copy explaining why admin is gated and score entry is not.
+2. Unlocked with `271828` → "Session runs to Mon, Feb 8", four tabs.
+3. **Courses → Bone Valley**: issue list, Validate & publish refusal, one hole entered and
+   saved, DB row confirmed by `psql`, issue list re-derived to 17 with no reload.
+4. **Rounds → R3**: per-player "thru 13 · 5 to go", Finalize refused naming three players and
+   omitting the DNP.
+5. **Settings**: allowance saved and confirmed in `settings`.
+6. **Offline**: banner up, controls disabled, banner clears on reconnect.
+7. **Points-table retroactivity, round trip through the UI.** `/standings` read
+   91 / 84 / 83 / 48. Settings → "Level" 2 → 3 → Save; `/standings` re-read
+   113 / 112 / 110 / 64 **and the order changed** (Adam 112 passed Kyle 110). Set it back to
+   2; standings returned to 91 / 84 / 83 / 48 exactly. No scores were touched — every figure
+   re-derived from stored gross strokes.
+8. Browser console: no errors or warnings beyond the pre-existing React Router v7 future-flag
+   notice.
+
+### Deferred requirements
+
+| Deferred | To | Why |
+|---|---|---|
+| Itinerary / lodging **editors** (the RPCs exist and are gated + tested) | Phase 8 | The phase plan puts Info sub-pages and their editors in Phase 8 |
+| Buy-in vs fixed **reconciliation** on the Money page | Phase 7 | The purse *settings* are editable here; the Money page derives from them |
+| Export as **CSV**, and the rest of the Diagnostics screen | Phase 6 | JSON export + copy-to-clipboard ships now; the CSV shape and the outbox/dead-letter views belong with the offline work |
+| Photo upload for players (`photo_url` is passed through unchanged) | Phase 9 | Needs the upload Edge Function |
+| Adding/removing players and courses from the UI | — | The RPCs support it; the trip has four fixed players and four fixed courses, and a create form is a way to make a duplicate at 6 a.m. Edit-in-place only |
+
+### Deviations from the brief
+
+1. **`rpc_start_round` was added.** Nothing in `schema.md` could move a round out of
+   `upcoming`, yet the Enter screen tells the scorer to "start it from admin". See
+   `decisions.md` §"Starting a round".
+2. **Publishing a course also requires rating and slope on every tee** — a fifth check beyond
+   the brief's four. `fn_compute_handicap` falls back to slope 113 on null, so the brief's
+   checks alone could publish a card that hands out quietly wrong strokes.
+   `decisions.md` §"Publishing a course also requires a rating and slope on every tee".
+3. **Editing a hole un-publishes the card, and new courses start as placeholders.** Stronger
+   than the brief, which only says the publish RPC is the one thing that may clear the flag.
+   `decisions.md` §"A new course starts as a placeholder…".
+4. **`round_money.championship_share_cents` is read as this round's share**, not the whole
+   pot, so the four rows are additive. `decisions.md`.
+5. **`rpc_upsert_settings` is a whitelist.** The brief does not say to validate settings
+   shapes; they are retroactive at compute time, so a malformed value silently rewrites every
+   leaderboard.
+
+### Resolved in-session — the brief's par-3 claim
+
+The brief says Streamsong Black has five par 3s and uses that to motivate the CTP weighting.
+The seed said four. **Kyle supplied the resort's 2021 scorecard PDFs and the seed is right:**
+Black has four par 3s (5, 7, 15, 17) and five par 5s (1, 4, 10, 12, 18); 4×3 + 9×4 + 5×5 = 73.
+
+| Checked | Result |
+|---|---|
+| All three cards transcribed and diffed against the database — 54 hole pars, 54 stroke indexes, 12 tee rating/slope/par/total rows, 216 hole yardages | **0 discrepancies.** `python3 scripts/verify-card-data.py` |
+| The transcription checks itself against each card's printed Out / In / Total, and that each stroke-index row is a 1–18 permutation | Passes, so a transcription typo cannot masquerade as a seed error |
+| Anything in code assuming five par 3s | None. `computePurse` reads the count from the data. The only carrier was a fixture comment in `money.test.ts`, now corrected |
+
+Changed: the brief carries a marked correction; `decisions.md` §"RESOLVED — the brief's
+'Black has five par 3s' is wrong"; a provenance note in the seed migration; the
+`money.test.ts` fixture comment. **No seed data and no scoring code changed.** The fixture
+keeps its uneven 4/5/4/4 par-3 counts on purpose — with the real 4/4/4/4 a proportional
+split and a flat split are indistinguishable and the test would pass on a broken
+implementation.
+
+The CTP-by-par-3-count rule still earns its place: Bone Valley's count is unknown until its
+card is entered, and an abandoned round redistributes.
 
 ---
 
@@ -238,21 +560,21 @@ _(To be filled in at end of Phase 9.)_
 These are the final acceptance criteria. Every line needs verification evidence before the trip.
 
 - [ ] All four rounds enterable end to end, hole by hole, from a phone, including picked-up holes
-- [ ] Round 4 entry is blocked until the Bone Valley card is complete and validated, and unblocks the moment it is
-- [ ] Changing a point value in admin instantly recalculates every leaderboard from stored gross scores
-- [ ] Changing an index or allowance does not, and requires an explicit re-snapshot
+- [~] Round 4 entry is blocked until the Bone Valley card is complete and validated, and unblocks the moment it is — blocking verified end to end (Phase 4 Enter screen, `rpc_upsert_scores` `course_data_is_placeholder`, `rpc_start_round` refusal); the *unblocks* half is proved on a complete card (`verify-admin-path.sh` §7: Red un-publishes on a hole edit and re-publishes on validate). Not yet proved on Bone Valley itself, which has no real card to enter
+- [x] Changing a point value in admin instantly recalculates every leaderboard from stored gross scores — Phase 5B manual test 7: "Level" 2 → 3 moved the standings 91/84/83/48 → 113/112/110/64 and changed the order; setting it back restored them exactly
+- [x] Changing an index or allowance does not, and requires an explicit re-snapshot — `admin_path.sql`: after `rpc_upsert_player` moves Jon to 20.0, R1's `index_used` is still 9.2; `rpc_resnapshot_round_handicaps` on R3 rewrites that round only, and refuses on a `final` round
 - [ ] Handicaps verify by hand (Red, Blue, Black) against a manual calculation
 - [ ] Strokes-received hole list matches the printed scorecard's stroke index
-- [ ] No playing handicap anywhere in the app exceeds 18
+- [x] No playing handicap anywhere in the app exceeds 18 — enforced in the engine (Phase 3) and again server-side in `fn_compute_handicap`; pgTAP asserts index 30 → 18
 - [ ] Two phones open at once: a score on one appears on the other without a refresh
 - [ ] Airplane-mode test: 18 holes × 4 players entered offline, force-quit, cold reopen offline, then reconnect syncs without loss or duplication
-- [ ] Admin screens clearly refuse to write while offline; score entry in the same session stays fully functional
+- [~] Admin screens clearly refuse to write while offline; score entry in the same session stays fully functional — the admin half is done (Phase 5B manual test 6: banner + every control disabled). The score-entry half needs the outbox, so it completes in Phase 6
 - [ ] Stale offline writes never clobber newer data; losing device rolls back to the winner
 - [ ] A refetch on reconnect never wipes unsynced local entry
-- [ ] Every server-side validation rule is enforced against a direct API call
-- [ ] Anon cannot write to any table without a valid PIN session (demonstrate with `curl`)
+- [x] Every server-side validation rule is enforced against a direct API call — `supabase/tests/write_path.sql` + `scripts/verify-write-path.sh` §8 (Phase 5A)
+- [~] Anon cannot write to any table without a valid PIN session — **superseded by the 2026-08-17 amendment.** What holds now, and is demonstrated in `scripts/verify-write-path.sh` §1–§3 and §7: anon can never write to a *table* directly (`42501`), can never mint a session, and can never reach a gated RPC without one — but `rpc_upsert_scores` / `rpc_upsert_ctp` are deliberately open. See `decisions.md` §"PIN removed from score entry"
 - [ ] Anon can read every public table and Realtime events actually arrive (demonstrate with `curl` and a socket client)
-- [ ] Failed PIN attempts on one device never lock out a device that already holds a valid session
+- [x] Failed PIN attempts on one device never lock out a device that already holds a valid session — `scripts/verify-write-path.sh` §10: unlock 429 while the live session writes 200 (Phase 5A)
 - [ ] Buy-in mode reconciles to the cent
 - [ ] Lighthouse mobile performance and accessibility both above 90
 - [ ] Deployed and reachable at a live Netlify URL

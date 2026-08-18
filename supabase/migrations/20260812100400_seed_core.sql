@@ -15,6 +15,12 @@
 -- 2021 printed scorecards, cross-checked against BlueGolf/ProVisualizer detailed cards.
 -- The same par + stroke-index numbers are transcribed in
 -- src/lib/scoring/__fixtures__/streamsong.ts and verified by the Phase 3 scoring tests.
+--
+-- VERIFIED 2026-08-17 against the scorecard PDFs themselves: 0 discrepancies across all
+-- 54 hole pars, 54 stroke indexes, 12 tee rating/slope/par/total rows and 216 hole
+-- yardages. Re-runnable as `python3 scripts/verify-card-data.py`. This also settled the
+-- brief's claim that Black has five par 3s -- it has four par 3s and five par 5s, and the
+-- brief now carries a correction. Do not "fix" Black to five par 3s.
 -- Per-tee rating/slope/yardage live in the tees seed. See that file's citations.
 
 -- ─── Courses ────────────────────────────────────────────────────────────────

@@ -1,0 +1,256 @@
+// The admin write path (Phase 5B). ONLINE ONLY, by design, not by omission.
+//
+// CLAUDE.md §"Offline capability boundary" draws the line: score entry, picked-up flags,
+// CTP results and day-of tee changes ride the outbox; everything else in /admin is a
+// direct RPC that needs a signal. That is a decision about consequences, not about
+// difficulty. A score entered in a dead spot is one cell the next scorer fixes in a tap.
+// A course card published, a round finalized, or a handicap re-snapshotted from a stale
+// local copy silently re-derives every leaderboard for the rest of the trip, and nothing
+// on screen looks wrong. So these calls fail loudly when there is no signal instead of
+// queueing.
+//
+// Every function here demands a PIN session. Score entry lost its PIN on 2026-08-17
+// (docs/spec/decisions.md §"PIN removed from score entry"); these did not.
+//
+// After a successful write the hydrate query is invalidated and the ordinary
+// network→Dexie→useLiveQuery path refills the screen — the same path a cold start uses.
+// Nothing here writes Dexie by hand, and nothing renders from a promise.
+import { supabase } from '@/lib/supabase'
+import { readToken, lock } from '@/lib/auth/session'
+import { queryClient } from './queryClient'
+import type { HoleRow } from './types'
+
+export type AdminFailure = 'locked' | 'offline' | 'refused'
+
+export class AdminError extends Error {
+  kind: AdminFailure
+  constructor(kind: AdminFailure, message: string) {
+    super(message)
+    this.name = 'AdminError'
+    this.kind = kind
+  }
+}
+
+/** Server-side outcomes that report a list of reasons rather than throwing. */
+export interface CheckedResult {
+  ok: boolean
+  errors: string[]
+}
+
+/** Refill Dexie from the server through the one existing network→Dexie path. */
+function revalidate(): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: ['hydrate'] })
+}
+
+async function call<T>(
+  fn: string,
+  args: Record<string, unknown>,
+  opts: { revalidate?: boolean } = {},
+): Promise<T> {
+  const token = await readToken()
+  if (token === null) throw new AdminError('locked', 'Your session has expired. Enter the PIN again.')
+
+  let data: unknown
+  let error: { message: string; code?: string } | null
+  try {
+    ;({ data, error } = await supabase.rpc(fn, { session_token: token, ...args }))
+  } catch (e) {
+    throw new AdminError(
+      'offline',
+      e instanceof Error && /fetch|network/i.test(e.message)
+        ? 'No connection. Admin changes need a signal — nothing was saved.'
+        : (e as Error)?.message || 'Could not reach the server.',
+    )
+  }
+
+  if (error) {
+    // 28000 is what fn_require_session raises (PostgREST answers 403). The token is
+    // dead, so drop it locally too — otherwise the screen keeps offering an Unlock that
+    // has already happened.
+    if (error.code === '28000' || /invalid or expired session/i.test(error.message)) {
+      await lock()
+      throw new AdminError('locked', 'Your session has expired. Enter the PIN again.')
+    }
+    throw new AdminError('refused', error.message)
+  }
+
+  if (opts.revalidate !== false) await revalidate()
+  return data as T
+}
+
+// ── Players ──────────────────────────────────────────────────────────────────
+
+export interface PlayerInput {
+  id: string | null
+  name: string
+  title: string | null
+  handicapIndex: number
+  indexIsAssigned: boolean
+  photoUrl: string | null
+  sortOrder: number | null
+}
+
+export function savePlayer(p: PlayerInput) {
+  return call<unknown>('rpc_upsert_player', {
+    p_id: p.id,
+    p_name: p.name,
+    p_title: p.title,
+    p_handicap_index: p.handicapIndex,
+    p_index_is_assigned: p.indexIsAssigned,
+    p_photo_url: p.photoUrl,
+    p_sort_order: p.sortOrder,
+  })
+}
+
+// ── Course cards ─────────────────────────────────────────────────────────────
+
+/**
+ * One hole's whole line on the card: par, stroke index, and a yardage per tee.
+ *
+ * The hole goes first because a hole that does not exist yet has no id for the yardages to
+ * reference — the server hands back the row it wrote and the yardages hang off that. Dexie
+ * is refilled once at the end rather than after each leg, so the editor doesn't flicker
+ * through four intermediate states while saving one hole.
+ *
+ * NOTE for the caller: editing a hole on a PUBLISHED card un-publishes it server-side
+ * (rpc_upsert_hole). That is deliberate — a card whose par just changed is no longer a
+ * validated card — and it means scoring stops until Validate & publish is run again.
+ */
+export async function saveHoleCard(
+  courseId: string,
+  holeNumber: number,
+  par: number | null,
+  strokeIndex: number | null,
+  yardages: { teeId: string; yardage: number | null }[],
+): Promise<void> {
+  const hole = await call<HoleRow>(
+    'rpc_upsert_hole',
+    {
+      p_id: null,
+      p_course_id: courseId,
+      p_hole_number: holeNumber,
+      p_par: par,
+      p_stroke_index: strokeIndex,
+    },
+    { revalidate: false },
+  )
+  for (const y of yardages) {
+    await call<unknown>(
+      'rpc_upsert_hole_yardage',
+      { p_hole_id: hole.id, p_tee_id: y.teeId, p_yardage: y.yardage },
+      { revalidate: false },
+    )
+  }
+  await revalidate()
+}
+
+export interface TeeInput {
+  id: string | null
+  courseId: string
+  name: string
+  rating: number | null
+  slope: number | null
+  par: number
+  totalYardage: number | null
+}
+
+export function saveTee(t: TeeInput) {
+  return call<unknown>('rpc_upsert_tee', {
+    p_id: t.id,
+    p_course_id: t.courseId,
+    p_name: t.name,
+    p_rating: t.rating,
+    p_slope: t.slope,
+    p_par: t.par,
+    p_total_yardage: t.totalYardage,
+  })
+}
+
+/** The only call permitted to clear data_is_placeholder, and only if the card is whole. */
+export async function publishCourse(courseId: string): Promise<CheckedResult> {
+  const r = await call<{ published: boolean; errors: string[] }>('rpc_validate_and_publish_course', {
+    p_course_id: courseId,
+  })
+  return { ok: r.published, errors: r.errors ?? [] }
+}
+
+// ── Rounds ───────────────────────────────────────────────────────────────────
+
+export interface RoundPlayerInput {
+  roundId: string
+  playerId: string
+  teeId: string
+  indexUsed: number
+  allowanceUsed: number
+  capUsed: number
+  status: 'playing' | 'did_not_play'
+}
+
+/** Batch: one request sets the whole foursome's tees and handicaps for a round. */
+export async function saveRoundPlayers(entries: RoundPlayerInput[]): Promise<CheckedResult> {
+  const results = await call<{ applied: boolean; error: string | null }[]>(
+    'rpc_upsert_round_player_admin',
+    {
+      entries: entries.map((e) => ({
+        round_id: e.roundId,
+        player_id: e.playerId,
+        tee_id: e.teeId,
+        index_used: e.indexUsed,
+        allowance_used: e.allowanceUsed,
+        cap_used: e.capUsed,
+        status: e.status,
+      })),
+    },
+  )
+  const refused = (results ?? []).filter((r) => !r.applied)
+  return { ok: refused.length === 0, errors: refused.map((r) => r.error ?? 'refused') }
+}
+
+export async function startRound(roundId: string): Promise<CheckedResult> {
+  const r = await call<{ started: boolean; errors: string[] }>('rpc_start_round', {
+    p_round_id: roundId,
+  })
+  return { ok: r.started, errors: r.errors ?? [] }
+}
+
+export async function finalizeRound(roundId: string, holesCounted: number | null): Promise<CheckedResult> {
+  const r = await call<{ finalized: boolean; errors: string[] }>('rpc_finalize_round', {
+    p_round_id: roundId,
+    p_holes_counted: holesCounted,
+  })
+  return { ok: r.finalized, errors: r.errors ?? [] }
+}
+
+export function abandonRound(roundId: string) {
+  return call<unknown>('rpc_abandon_round', { p_round_id: roundId })
+}
+
+/** The one door that makes an index edit retroactive — for one named round, deliberately. */
+export async function resnapshotRound(roundId: string): Promise<number> {
+  const r = await call<{ resnapshotted: number }>('rpc_resnapshot_round_handicaps', {
+    p_round_id: roundId,
+  })
+  return r.resnapshotted
+}
+
+export function setManualOverride(roundId: string, playerId: string, override: number | null) {
+  return call<unknown>('rpc_set_manual_override', {
+    p_round_id: roundId,
+    p_player_id: playerId,
+    p_override: override,
+  })
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+// Retroactive at compute time (the brief), which is exactly why the server validates the
+// shape of every value rather than trusting this form.
+
+export function saveSetting(key: string, value: unknown) {
+  return call<unknown>('rpc_upsert_settings', { p_key: key, p_value: value })
+}
+
+// ── Diagnostics ──────────────────────────────────────────────────────────────
+
+export function exportAll() {
+  return call<Record<string, unknown>>('rpc_export_all_scores', {})
+}

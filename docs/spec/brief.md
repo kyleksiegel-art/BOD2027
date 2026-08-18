@@ -95,6 +95,17 @@ Two things that look like data-entry errors but are not — do not "correct" the
 - **Streamsong Black is par 73**, not 72. Red and Blue are par 72. The `(Course Rating − Par)` term must use 73 at Black.
 - **Black has five par 3s**; Red and Blue have four each. This drives the CTP money weighting below.
 
+> **CORRECTION — 2026-08-17, verified against the resort's 2021 scorecards** (the PDFs Kyle
+> supplied during Phase 5B). The line above is wrong, and it is the one place in the brief
+> where "do not correct this" pointed at the wrong number. **Black has four par 3s and five
+> par 5s** — holes 5, 7, 15, 17 are the par 3s; holes 1, 4, 10, 12, 18 are the par 5s;
+> 4×3 + 9×4 + 5×5 = 73. All three published courses have **four** par 3s each. Par 73 at
+> Black is correct and unaffected; the extra stroke comes from the fifth par 5, not a fifth
+> par 3. The Phase 2 seed had it right all along: every hole par, stroke index, tee
+> rating/slope and hole yardage on all three cards matches the printed scorecards exactly —
+> see `scripts/verify-card-data.py`. Nothing in the code changed; the CTP rule below reads
+> the par-3 count from the data.
+
 **Stroke index is modeled once per course, not per tee** — one `stroke_index` column on `holes`. That matches how Streamsong prints its cards and avoids a join plus a class of bugs for no benefit here. Don't relitigate this in Phase 0.
 
 ### Bone Valley — incomplete course data
@@ -473,7 +484,7 @@ Writes go to Dexie, then the outbox. Optimistic UI with a sync indicator.
 | Closest to pin | 30% total |
 
 - **Round allocation:** the 30% splits evenly across the four *counting* rounds — 7.5% each. An abandoned round's share redistributes evenly across the remaining counting rounds.
-- **CTP allocation:** the 30% is allocated **per round in proportion to that round's par-3 count**, so every par 3 across the trip is worth the same. This is what fixes Black's five par 3s versus Red and Blue's four — a flat per-round CTP pot would have made each Black par 3 worth 20% less, and nobody would have noticed until Saturday. Show total CTP money at stake per round on the Money page.
+- **CTP allocation:** the 30% is allocated **per round in proportion to that round's par-3 count**, so every par 3 across the trip is worth the same. (The stated motivation — "this is what fixes Black's five par 3s versus Red and Blue's four" — rests on a factual error; see the correction above. All three published courses have four par 3s, so the split comes out even between them. **The rule stands regardless**: it is what will keep Bone Valley honest once its card is entered, since nobody yet knows its par-3 count, and it is what protects the split if a round is abandoned.) Show total CTP money at stake per round on the Money page.
 - **Remainder cents** from any division go to the last par 3 of the round (for CTP) or to the player higher in the final standings (for payouts). State the rule in the UI.
 - **DNP players still contribute** to that day's pots — they bought in for the trip — but cannot win them. Say this on the Rules page.
 
@@ -572,11 +583,24 @@ In the migration:
 
 ### Auth
 
-Everything is publicly viewable. Score entry and `/admin` sit behind a **shared PIN** — anyone with it can enter and edit scores for **all players**, not just their own. **Use 6 digits, not 4.** Two extra taps, 100× the search space.
+> **AMENDMENT — 2026-08-17, Kyle, during Phase 5A.** The PIN comes **off score entry**.
+> Scores and closest-to-pin are written by anyone with the URL; the Enter screen gets an
+> explicit per-hole **Save** button instead of a lock. **`/admin` keeps the PIN**, and so
+> does `rpc_upsert_round_player` (it rewrites handicaps). The line is now exactly the
+> offline/online split the brief already draws: the in-the-cart writes are open, the
+> online-only admin writes stay gated. Everything below still describes the PIN as it
+> applies to `/admin`. Rationale and the accepted exposure are in
+> `decisions.md` §"PIN removed from score entry".
+>
+> ~~Original text:~~ Everything is publicly viewable. Score entry and `/admin` sit behind a
+> **shared PIN** — anyone with it can enter and edit scores for **all players**, not just
+> their own. **Use 6 digits, not 4.** Two extra taps, 100× the search space.
+
+Everything is publicly viewable. **`/admin`** sits behind a **shared PIN** — anyone with it can edit every mutable thing in the trip. **Use 6 digits, not 4.** Two extra taps, 100× the search space. **Score entry is open** and requires an explicit Save per hole.
 
 **Reads:** RLS on with **explicit permissive SELECT policies for `anon`** on every publicly-readable table (`CREATE POLICY ... FOR SELECT TO anon USING (true)`). Not optional — with RLS enabled and no SELECT policy the tables are readable by nobody, fetches return `[]`, and **Realtime silently delivers zero events** with no error, failing the two-phones requirement invisibly. `sessions` and `pin_attempts` are the exceptions: RLS on, zero policies, `REVOKE ALL FROM anon`.
 
-**Writes:** denied by the *absence* of INSERT/UPDATE/DELETE policies plus `REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM anon`. All writes route through `SECURITY DEFINER` RPCs taking a session token validated against `sessions`.
+**Writes:** denied by the *absence* of INSERT/UPDATE/DELETE policies plus `REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM anon`. All writes route through `SECURITY DEFINER` RPCs. **Per the amendment above**, the score and CTP RPCs no longer take a session token; every other write RPC still validates one against `sessions`. Direct table writes remain impossible either way — the RPC is still the only door, it is just unlocked for the two in-the-cart tables.
 
 - **Pin `SET search_path = ''`** on every `SECURITY DEFINER` function and fully schema-qualify every reference. This is the canonical Supabase privilege-escalation footgun and the database linter flags it.
 - `CREATE FUNCTION` grants `EXECUTE TO PUBLIC` by default — `REVOKE EXECUTE ... FROM PUBLIC`, then `GRANT EXECUTE TO anon` on only the intended RPCs.

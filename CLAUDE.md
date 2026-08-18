@@ -57,7 +57,15 @@ The self-echo rule: your own Realtime echo clears the "unsynced" marker **only w
 
 ## Auth model in one paragraph
 
-Reads are public. Writes require a 6-digit PIN session. PIN verification happens in an **Edge Function** (real client IP for throttling), not an RPC. On success, the client receives a 128-bit opaque session token; the server stores only its hash. All writes go through `SECURITY DEFINER` RPCs that validate the token against `sessions`. Every `SECURITY DEFINER` function pins `SET search_path = ''` and fully schema-qualifies references. `CREATE FUNCTION`'s implicit `EXECUTE TO PUBLIC` is revoked, then re-granted to `anon` only on intended RPCs. Do **not** call `supabase.realtime.setAuth(token)` — the token is opaque, not a JWT; the Realtime connection stays on the anon key. Local offline PIN verification uses a stored bcrypt hash — accepted tradeoff for a four-person golf trip.
+**Amended 2026-08-17 (Kyle): score entry has NO PIN.** `rpc_upsert_scores` and
+`rpc_upsert_ctp` take no session token and are open to `anon`; the Enter screen has an
+explicit per-hole **Save** button instead of a lock. `rpc_upsert_round_player` (it rewrites
+handicaps) and every admin RPC still require a session. The line is the brief's own
+offline/online split. See `docs/spec/decisions.md` §"PIN removed from score entry"; the
+brief carries a marked amendment. Everything below describes the PIN as it now applies to
+`/admin`.
+
+Reads are public. Admin writes require a 6-digit PIN session. PIN verification happens in an **Edge Function** (real client IP for throttling), not an RPC. On success, the client receives a 128-bit opaque session token; the server stores only its hash. All writes go through `SECURITY DEFINER` RPCs that validate the token against `sessions`. Every `SECURITY DEFINER` function pins `SET search_path = ''` and fully schema-qualifies references. `CREATE FUNCTION`'s implicit `EXECUTE TO PUBLIC` is revoked, then re-granted to `anon` only on intended RPCs. Do **not** call `supabase.realtime.setAuth(token)` — the token is opaque, not a JWT; the Realtime connection stays on the anon key. Local offline PIN verification uses a stored bcrypt hash — accepted tradeoff for a four-person golf trip.
 
 ## Scoring in one paragraph
 
@@ -81,3 +89,80 @@ Net Stableford. Points table stored in `settings` (retroactive). Handicaps snaps
 - `docs/spec/schema.md` — full schema, RLS policies, RPC signatures.
 - `docs/spec/acceptance-checklist.md` — per-phase evidence, updated at end of every phase.
 - `docs/spec/handoff.md` — 15-line session-end note. Overwritten every session.
+
+## Read path (Phase 4) — the shape to reuse
+
+The read pipeline is live and enforces the data-layering rule: `src/lib/supabase.ts` (anon
+client, env vars) → `src/lib/data/hydrate.ts` (`useHydrate` — TanStack Query fetches every
+public table, `bulkPut` into Dexie) → `src/lib/db.ts` (Dexie read mirror) → pure assembly in
+`src/lib/data/compute.ts` (rows in, view models out, all scoring via `@/lib/scoring`) →
+`src/lib/data/selectors.ts` (`useLiveQuery` hooks) → screens. **Screens import only from
+`selectors.ts`** — never Dexie, Supabase, or the scoring engine directly. `QueryProvider`
+wraps the router in `main.tsx`; `HydrationGate` runs the hydrate in the shell. Fake demo
+scores: `scripts/gen-phase4-seed.ts` → `supabase/migrations/*_seed_phase4_fake_scores.sql`.
+Env: copy `.env.example` → `.env.local` (local anon key from `supabase start`).
+
+## Write path (Phase 5A) — the shape to reuse
+
+`src/components/PinGate.tsx` → `src/lib/auth/session.ts` (unlock via the `pin-verify` Edge
+Function, token in the Dexie `session` table, expiry Feb 8 2027) → `src/lib/data/mutations.ts`
+(500 ms debounce keyed by `(round, player, hole)`, batch RPC, **server's returned rows written
+back into Dexie** so the screen re-renders through the same `useLiveQuery`). Optimistic edits
+are `EnterDraft`s overlaid **inside `compute.ts`**, never patched over rendered numbers, so
+points/thru/standing still derive through the scoring engine. Screens still import only from
+`selectors.ts`.
+
+Things that will bite if forgotten:
+- **Dexie's `scores` table is keyed by `[round_id+player_id+hole_number]`**, not the server
+  `id` — mirroring the Postgres unique key. Keyed by `id`, a regenerated id left two rows for
+  one cell and the wrong one won.
+- **`rpc_create_session` and the two PIN-throttle functions are granted to `service_role`
+  only.** Only the Edge Function may call them. Everything else client-callable is `anon`.
+- In SQL, `COALESCE`/`LEAST`/`GREATEST`/`EXTRACT` are constructs, not schema-qualifiable
+  functions — they stay bare under `SET search_path = ''`.
+- Per-cell parsing lives **inside** the per-cell exception block, or one malformed uuid
+  aborts the whole batch.
+- The Phase 4 seed's client timestamps are January 2026 on purpose: dated on the trip they
+  would out-rank every real entry made before February 2027 and it would be rejected as stale.
+- Phase 5 is **online only**. No outbox, no local PIN hash, no Realtime — all Phase 6.
+- **Nothing auto-saves.** Edits live in per-hole drafts (`DraftsByHole` in `Enter.tsx`) that
+  survive paging between holes, and reach the server only on Save. On a failed save the
+  drafts stay put, so a bad connection costs a second tap, never a hole.
+- **Phase 5 was split**: 5A is auth + write path + Enter; 5B is the admin RPCs and editors.
+
+## Admin path (Phase 5B) — the shape to reuse
+
+`/admin` is `src/routes/Admin.tsx`: `PinGate` when locked, a plain online-only banner when
+offline (`useOnlineStatus`), then four tabs — Rounds / Players / Courses / Settings — in
+`src/components/admin/`, plus an Export panel. Reads come from `useAdmin()` in
+`selectors.ts` → `buildAdmin()` in `compute.ts`, same rule as every other screen. Writes go
+through `src/lib/data/admin.ts`, which attaches the session token, maps failures into three
+genuinely different kinds (`locked` / `offline` / `refused`), and then **invalidates the
+`['hydrate']` query** rather than patching Dexie by hand — several tables move at once, so
+the one existing network→Dexie path refills them. `queryClient` lives in its own module
+(`src/lib/data/queryClient.ts`) so the non-React write path can reach it.
+
+RPCs are `supabase/migrations/20260819090000_admin_rpcs.sql`; every one is session-gated,
+asserted individually in `supabase/tests/admin_path.sql` and demonstrated over PostgREST by
+`scripts/verify-admin-path.sh` (which mutates the DB — `supabase db reset` afterwards).
+
+Things that will bite if forgotten:
+- **`data_is_placeholder = false` means "validated," not "nobody objected."** New courses
+  are created placeholder; **editing any hole sets the flag back to true** and stops scoring
+  until Validate & publish is re-run. Only `rpc_validate_and_publish_course` clears it.
+- **Publishing also requires a rating and slope on every tee** — not one of the brief's four
+  checks, but `fn_compute_handicap` falls back to slope 113 on null and every allocation
+  would be quietly wrong. `courseCardIssues()` mirrors it client-side.
+- **`fn_allocate_even_cents` / `fn_allocate_proportional_cents` mirror `money.ts`
+  line-for-line**, remainder placement included. Change one, change both, and assert the
+  same case in both languages.
+- **`round_money.championship_share_cents` is this round's share of the championship pot**,
+  not the whole pot — the four rows are additive.
+- **Admin `round_players` writes stamp the comparator columns** with sentinel client_id
+  `ffffffff-…-ffffffffffff`. Null would make a deliberate admin write lose to a stale cart write.
+- `rpc_upsert_settings` is a **whitelist** with a per-key shape check. Use
+  `jsonb_typeof(x) IS DISTINCT FROM 'number'` — a plain `<>` lets a MISSING key through.
+- PostgREST answers `28000` with **403**, not 401 (`42501` is the 401).
+- Phase 5B is still online-only. No outbox, no Realtime — Phase 6.
+- Itinerary / lodging RPCs exist but their editors are Phase 8; the purse figures feed
+  Phase 7's Money page.
