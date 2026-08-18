@@ -14,6 +14,32 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { formatDay, formatTeeTime } from '@/lib/format'
 import { Button, Field, Report, Section, inputClass, num, useAdminAction } from './kit'
 
+interface Assignment {
+  teeId: string
+  status: string
+  /** Held as typed. "-" and "10." are legitimate mid-typing states a number would eat. */
+  index: string
+}
+
+/**
+ * Why an index is refused, or null if it is fine. The column is numeric(4,1) and the
+ * server has no range check of its own, so a fat-fingered 108 for 10.8 would otherwise be
+ * accepted and quietly hand someone 18 strokes.
+ */
+function indexError(raw: string): string | null {
+  const n = num(raw)
+  if (n === null) return 'it needs to be a number'
+  if (n < -10 || n > 54) return 'it should be between -10 and 54'
+  if (Math.round(n * 10) !== n * 10) return 'only one decimal place is stored'
+  return null
+}
+
+/** True when the typed index is a valid number that differs from the player's trip index. */
+function differsFromTrip(raw: string | undefined, trip: number | undefined): boolean {
+  const n = num(raw ?? '')
+  return n !== null && trip !== undefined && n !== trip
+}
+
 /**
  * Round setup and the round lifecycle.
  *
@@ -25,6 +51,13 @@ import { Button, Field, Report, Section, inputClass, num, useAdminAction } from 
  *
  * The client sends INPUTS (index, allowance, cap, tee). The server owns the arithmetic, so
  * two phones can never disagree about who gets a stroke on the 7th.
+ *
+ * The index is editable HERE, per round, not just on the Players tab. Indexes get locked in
+ * the week before the trip and tees get decided standing on the first tee, so the moment
+ * that matters is this screen — type the number, pick the tee, and strokes recompute before
+ * anyone hits a ball. What you type is what this round uses; it does NOT change the
+ * player's trip-wide index (that is the Players tab), because a round's handicaps are a
+ * snapshot and are deliberately not retroactive.
  */
 export function RoundsEditor({
   rounds,
@@ -66,17 +99,23 @@ function RoundPanel({
   const setup = useAdminAction()
   const life = useAdminAction()
 
-  const indexOf = new Map(players.map((p) => [p.id, p.handicap_index]))
+  // The player's trip-wide index — the default, and the thing a per-round index is
+  // compared against so a divergence is visible rather than silent.
+  const tripIndexOf = new Map(players.map((p) => [p.id, p.handicap_index]))
 
-  // The form's own copy of the tee/status assignment, so the whole foursome saves in one
-  // request rather than four.
-  const [assign, setAssign] = useState<Record<string, { teeId: string; status: string }>>(() =>
+  // The form's own copy of the assignment, so the whole foursome saves in one request
+  // rather than four. The index lives here as a string: a half-typed "-" or "10." is a
+  // legitimate intermediate state that a number would swallow.
+  const [assign, setAssign] = useState<Record<string, Assignment>>(() =>
     Object.fromEntries(
       vm.participants.map((p) => [
         p.playerId,
         {
           teeId: p.row?.tee_id ?? vm.tees[0]?.id ?? '',
           status: p.row?.status ?? 'playing',
+          // Already saved for this round? That number wins — re-opening the screen must
+          // not silently propose reverting to a trip index that has since moved.
+          index: String(p.row?.index_used ?? tripIndexOf.get(p.playerId) ?? 0),
         },
       ]),
     ),
@@ -85,14 +124,18 @@ function RoundPanel({
   const [confirmAbandon, setConfirmAbandon] = useState(false)
 
   const unassigned = vm.participants.filter((p) => p.row === null)
-  const canSave = vm.tees.length > 0 && vm.participants.every((p) => assign[p.playerId]?.teeId)
+  const badIndexes = vm.participants.filter((p) => indexError(assign[p.playerId]?.index ?? '') !== null)
+  const canSave =
+    vm.tees.length > 0 &&
+    vm.participants.every((p) => assign[p.playerId]?.teeId) &&
+    badIndexes.length === 0
 
   function entries(): RoundPlayerInput[] {
     return vm.participants.map((p) => ({
       roundId: vm.round.id,
       playerId: p.playerId,
       teeId: assign[p.playerId].teeId,
-      indexUsed: indexOf.get(p.playerId) ?? 0,
+      indexUsed: num(assign[p.playerId].index) ?? 0,
       allowanceUsed: settings.allowance,
       capUsed: settings.handicapCap,
       status: assign[p.playerId].status === 'did_not_play' ? 'did_not_play' : 'playing',
@@ -124,13 +167,33 @@ function RoundPanel({
             <div className="flex items-baseline justify-between">
               <span className="font-semibold text-paper">{p.name}</span>
               <span className="text-[0.75rem] text-paper-faint tnum">
-                index {indexOf.get(p.playerId)}
-                {p.row ? ` · ${p.row.strokes_received} strokes` : ''}
+                {p.row ? `${p.row.strokes_received} strokes` : 'not set'}
                 {p.row?.cap_applied ? ' (capped)' : ''}
               </span>
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field
+                label="Index"
+                hint={
+                  differsFromTrip(assign[p.playerId]?.index, tripIndexOf.get(p.playerId))
+                    ? `Trip index is ${tripIndexOf.get(p.playerId)}`
+                    : undefined
+                }
+              >
+                <input
+                  className={inputClass}
+                  inputMode="decimal"
+                  value={assign[p.playerId]?.index ?? ''}
+                  disabled={disabled}
+                  onChange={(e) =>
+                    setAssign((a) => ({
+                      ...a,
+                      [p.playerId]: { ...a[p.playerId], index: e.target.value },
+                    }))
+                  }
+                />
+              </Field>
               <Field label="Tee">
                 <select
                   className={inputClass}
@@ -192,10 +255,17 @@ function RoundPanel({
         >
           {setup.busy ? 'Saving…' : 'Save tees & handicaps'}
         </Button>
+        {badIndexes.length > 0 ? (
+          <p className="mt-2 text-[0.82rem] text-gold-bright">
+            Check the index for {badIndexes.map((p) => p.name).join(', ')} —{' '}
+            {indexError(assign[badIndexes[0].playerId]?.index ?? '')}
+          </p>
+        ) : null}
         <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
           Saved at {Math.round(settings.allowance * 100)}% allowance, cap{' '}
           {settings.handicapCap}. The server recomputes course handicap, playing handicap and
-          strokes received from the tee — this form never sends them.
+          strokes received from the tee — this form never sends them. The index here applies to
+          this round only; the Players tab holds the trip-wide one.
         </p>
         <Report report={setup.report} />
       </div>
