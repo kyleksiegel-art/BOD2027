@@ -166,3 +166,45 @@ Things that will bite if forgotten:
 - Phase 5B is still online-only. No outbox, no Realtime — Phase 6.
 - Itinerary / lodging RPCs exist but their editors are Phase 8; the purse figures feed
   Phase 7's Money page.
+
+## Offline path (Phase 6a) — the shape to reuse
+
+`src/lib/sync/` holds the whole sync engine and nothing else imports its internals:
+
+- `comparator.ts` — **the** tuple ordering, and the only place it is written. Parses
+  timestamps to (epoch seconds, **microseconds**) because Postgres orders on microseconds
+  and `Date.parse` truncates to milliseconds; compares `client_id` lowercased, which equals
+  Postgres's uuid byte order.
+- `clock.ts` — `nextStamp()` = `max(Date.now(), lastIssued + 1)`, persisted in Dexie's
+  `sync_meta`. Never use `Date.now()` for a write stamp.
+- `outbox.ts` — enqueue (local row + queue entry in **one** transaction), coalesce
+  latest-per-key, batch by kind (36 cells/call, 4 calls in flight), settle, dead-letter,
+  `clearEchoed()`. `setTransport()` is the test seam.
+- `merge.ts` — comparator site 3, called by `hydrate.ts` after it flushes.
+- `realtime.ts` — comparator site 2. `applyScoreEvent` / `applyCtpEvent` are exported so
+  the tests can drive them without a socket.
+- `reachability.ts` — HEAD probe, 3 s timeout; two consecutive flush failures trip Offline.
+- `engine.ts` — the flush triggers and `useSyncSnapshot()`. Started once, from `Layout`.
+
+Things that will bite if forgotten:
+- **A failed-to-reach flush costs no attempts.** `OfflineError` stops the pass and
+  penalises nothing; only `TransportError` and server refusals count. Otherwise a long
+  dead zone dead-letters a whole round no server ever refused.
+- **`'stale'` is success, not failure.** The server's winner comes back in the same
+  response; the loser adopts it and the entry leaves the queue.
+- **Terminal refusals dead-letter on the first answer**, retryables after 8 attempts.
+  Nothing is ever deleted — `dead_letter` keeps payload, stamps, attempts and last error.
+- **An acknowledged row overwrites our optimistic row unconditionally** (same `client_id`
+  + same `raw`) — that is where the server's 5-minute clamp is adopted. Anything else goes
+  through the comparator.
+- **Dexie v5** adds `ctp_results` (keyed `[round_id+hole_number]`), `outbox` (`++seq`),
+  `dead_letter`, `sync_meta`. The hydrate `bulkPut`s only the uncontended tables; `scores`
+  and `ctp_results` go through `mergeStampedRows`.
+- **Save now always succeeds.** `saveCells()` returns false only if Dexie itself refused.
+  Enter clears its drafts on a queue, not on a server round-trip.
+- Tests: `npm run test:sync` (`fake-indexeddb`, a `FakeServer` in `src/test/`). The
+  SQL guard's own correctness is pgTAP's job — `comparator.test.ts` re-runs
+  `write_path.sql`'s exact verdict cases in TypeScript so the two languages are visibly
+  the same cases.
+- Phase 6a is **not** the whole of Phase 6: no service worker, no PWA install, no offline
+  PIN, no Diagnostics screen, no CSV export. Those are 6b.

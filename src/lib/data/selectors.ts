@@ -20,6 +20,7 @@ import {
   type RoundListItemVM,
 } from './compute'
 import { totalPoints } from '@/lib/scoring'
+import type { ScorePayload } from './types'
 import type { PlayerRow, RoundRow } from './types'
 
 /** Load the whole read model out of Dexie. Re-runs whenever any table changes. */
@@ -127,4 +128,24 @@ export function useRoundChoices(): { roundNumber: number; courseName: string; st
 export function useAdmin(): AdminVM | undefined {
   const data = useDbData()
   return useMemo(() => (data ? buildAdmin(data) : undefined), [data])
+}
+
+/**
+ * Holes in this round with a write still owed to the server. Read straight off the outbox
+ * through useLiveQuery, exactly like every other read — "unsynced" is durable state on the
+ * device, not something a component can hold in useState and lose on a re-mount.
+ */
+export function usePendingHoles(roundId: string | null): number[] {
+  return (
+    useLiveQuery(async () => {
+      if (!roundId) return []
+      const entries = await db.outbox.where('kind').equals('score').toArray()
+      const holes = new Set<number>()
+      for (const e of entries) {
+        const p = e.payload as ScorePayload
+        if (p.round_id === roundId) holes.add(p.hole_number)
+      }
+      return [...holes].sort((a, b) => a - b)
+    }, [roundId]) ?? []
+  )
 }

@@ -19,3 +19,11 @@ export function clientId(): string {
   cached = value
   return value
 }
+
+/**
+ * Test seam. The sync tests simulate two phones in one process, and a device identity
+ * cached in a module variable is exactly what stops that from being possible.
+ */
+export function resetClientIdCache(): void {
+  cached = null
+}

@@ -1,19 +1,49 @@
 # Handoff
 
-**Phase just finished:** 5B — the admin RPCs and the four admin editors. Branch `phase-4-read-ui` (Phases 4, 5A and 5B are all still uncommitted). Phase 5 is now complete. Nothing is stubbed.
+**Phase just finished:** 6a — the offline write queue and the comparator. Branch
+`phase-6-offline` (Phases 4–6a all still uncommitted to `main`). Nothing is stubbed; 6b is
+untouched.
 
-**Built:** migration `20260819090000_admin_rpcs.sql` — 18 session-gated `SECURITY DEFINER` RPCs (players, courses, tees, holes, yardages, validate-and-publish, rounds, round_players-admin, re-snapshot, start/finalize/abandon, manual override, settings, itinerary, lodging ×2, export) plus `fn_allocate_even_cents` / `fn_allocate_proportional_cents`, which mirror `money.ts` line-for-line so `round_money` and the Phase 7 Money page agree to the cent. Client: `src/lib/data/admin.ts` (token-bearing calls, three distinct failure kinds, then invalidate `['hydrate']` rather than hand-patching Dexie), `buildAdmin()` in `compute.ts` → `useAdmin()`, and `src/components/admin/*` behind `PinGate` with an online-only banner.
+**Built:** `src/lib/sync/` — `comparator.ts` (the one tuple ordering; microsecond-precision
+timestamps, lowercased uuid tie-break), `clock.ts` (monotonic, Dexie-persisted stamps),
+`outbox.ts` (enqueue in one transaction, coalesce latest-per-key, batch 36 × 4, settle,
+atomic dead-letter, `clearEchoed`), `merge.ts` (site 3), `realtime.ts` (site 2),
+`reachability.ts` (HEAD probe), `engine.ts` (flush triggers + `useSyncSnapshot`). Dexie v5
+adds `ctp_results`, `outbox`, `dead_letter`, `sync_meta`. `saveCells` now queues rather than
+posts; the badge shows the pending count.
 
-**Verified:** `supabase test db` → **232 pass** (106 new in `admin_path.sql`). `scripts/verify-admin-path.sh` shows all 18 RPCs refusing a forged token with the real argument list, Bone Valley refusing to publish with five specific reasons, R4 then refusing to start, field validation, the settings whitelist, finalize naming who is short, and the frozen money row — all over PostgREST with a real PIN token. Browser at 375 px: publish refusal rendered, one Bone Valley hole saved (DB row confirmed) and the issue list re-derived to 17 with no reload, finalize on R3 named three players and omitted the DNP, allowance 95% saved, offline banner disabled everything. `tsc -b`, `npm run build`, and 67 scoring tests clean. The script mutates the DB — `supabase db reset` after.
+**Verified:** `npm run test:sync` → **39 pass**; full `vitest run` → **106**; `supabase test
+db` → **232**, unchanged. Browser at 375 px against local Supabase: online save landed in
+Postgres; with the API failing, holes 15–17 × 3 players read "9 TO SYNC" and the footer
+advanced to thru 17 with **no** server rows; on reconnect all 9 landed carrying their
+original offline timestamps, no duplicates; with `supabase_kong` **stopped**, hole 18 was
+entered, the page cold-reloaded, standings rendered from Dexie, `attempts: 0`, and the queue
+drained when the container came back; a foreign Realtime write with a newer stamp landed
+live and the same row rewritten with a 2020 stamp was refused. DB reset afterwards.
 
-**Five deviations, all in `decisions.md` + the checklist:** `rpc_start_round` was added (nothing could move a round out of `upcoming`, yet Enter says "start it from admin"); publishing also requires rating + slope on every tee (null slope silently falls back to 113); a new course starts as a placeholder and **editing any hole un-publishes the card**; `round_money.championship_share_cents` is read as this round's share so the four rows are additive; `rpc_upsert_settings` is a whitelist with a per-key shape check.
+**Four deviations, all in `decisions.md` + the checklist:** offline costs **no** retry
+attempts (only an answer from the server does, or a dead zone dead-letters a whole round);
+our own acknowledged row overwrites the optimistic one unconditionally, which is how the
+server's 5-minute clamp gets adopted; `ctp_results` is mirrored and queueable before its
+Phase 7 UI; and `saveCells` now resolves on *queued*, not on *server has it*.
 
-**Settled in-session — the brief's par-3 claim.** Kyle supplied the resort's 2021 scorecard PDFs. The brief's *"Black has five par 3s"* is wrong; the Phase 2 seed was right (four par 3s, five par 5s, par 73). All three cards were transcribed and diffed against the database — **0 discrepancies across 54 hole pars, 54 stroke indexes, 12 tee rows and 216 yardages**, kept as `scripts/verify-card-data.py`. No seed data or scoring code changed; the brief carries a marked correction, and a `money.test.ts` fixture comment that had copied the error was fixed. Note for future phases: the brief pre-emptively said "do not correct this," which is what kept the error alive for three phases.
+**Note on the harness:** click injection timed out all session (`visibilityState: 'hidden'`),
+so browser taps were dispatched as DOM events to the same React handlers. Everything else in
+those tests was real. If a future session sees the same, don't chase it in the app.
 
-**Deploy state, checked 2026-08-17 — this blocks Phase 6's verification.** `origin/main` is still only the interim countdown page: **no phase work has ever merged to main.** `phase-1-scaffold`, `phase-2-schema` and `phase-3-scoring` are on origin (the older "push phase-1-scaffold" note was stale); `phase-4-read-ui`, which carries Phases 1–5B in 8 commits, is **not pushed**. There is **no hosted Supabase project** — `supabase/.temp` has no project ref, so everything to date runs against local Docker only. Phase 6's definition of done needs a real deployed URL and a real Supabase: an airplane-mode round on a phone, install-then-unlock, and two devices converging cannot be tested against localhost.
+**Kyle still owes (carried, unchanged):** real player indexes + who's assigned + each
+player's tee; the real 6-digit PIN as a Supabase secret; a hosted Supabase project +
+`supabase db push`; Netlify env vars; confirm the deploy preview + Lighthouse baseline.
+**`origin/main` is still only the countdown page — no phase work has ever merged**, and
+there is still no hosted Supabase. 6b's PWA/install verification needs a real HTTPS URL.
 
-**Kyle still owes (carried):** real player indexes + who's assigned + each player's tee; the real 6-digit PIN as a Supabase secret; a hosted Supabase project + `supabase db push`; Netlify env vars; confirm the deploy preview + Lighthouse baseline.
+**Local dev PIN is `271828`.** Run `supabase functions serve --env-file
+supabase/functions/.env --no-verify-jwt` alongside `supabase start`.
 
-**Local dev PIN is `271828`.** Run `supabase functions serve --env-file supabase/functions/.env --no-verify-jwt` alongside `supabase start`.
-
-**Next phase:** 6 — offline. Dexie outbox + dead-letter, the comparator in one file applied at all four sites (the SQL guard already exists), Realtime, `vite-plugin-pwa` with `registerType: 'prompt'`, reachability probe, offline PIN hash, Diagnostics screen, CSV export. Pre-committed split: 6a = outbox + comparator + tests, 6b = service worker + PWA + offline PIN + diagnostics. Read `CLAUDE.md`, `acceptance-checklist.md`, this file, and Phase 6 in `phase-plan.md`.
+**Next phase:** 6b — `vite-plugin-pwa` (`registerType: 'prompt'`, explicit `globPatterns`
+and `maximumFileSizeToCacheInBytes`, update toast suppressed while the outbox is non-empty),
+`navigator.storage.persist()` after unlock, offline PIN via bcrypt cost 10, the Diagnostics
+screen (`retryDeadLetter` / `lastSyncAt` / `useSyncSnapshot` already exist and are tested),
+admin CSV export, and `round_player` as the third outbox kind once the offline PIN exists.
+Read `CLAUDE.md` §"Offline path (Phase 6a)", `acceptance-checklist.md` §Phase 6a, this file,
+and Phase 6 in `phase-plan.md`.

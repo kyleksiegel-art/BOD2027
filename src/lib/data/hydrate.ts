@@ -3,7 +3,17 @@
 // Components subscribe to Dexie (useLiveQuery) and re-render when this bulkPut lands.
 //
 // This is deliberately a full-table pull, not a delta sync: the whole trip is a few
-// hundred rows, and the real incremental path (Realtime + comparator + outbox) is Phase 6.
+// hundred rows, and Realtime carries the incremental path.
+//
+// COMPARATOR SITE 3 (CLAUDE.md §"The four comparator sites"). Two rules, and the whole
+// airplane-mode scenario in the Definition of Done rests on them:
+//
+//   · FLUSH BEFORE FETCH. On regaining signal the outbox goes out first. Fetching first
+//     would pull the server's pre-trip rows and then merge them against local rows that
+//     are newer — survivable — but it also races the flush, and the ordering costs
+//     nothing to get right.
+//   · MERGE, NEVER OVERWRITE, for the two stamped tables. A routine refetch that
+//     bulkPut its way over `scores` is exactly how 18 holes of unsynced entry disappear.
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { db } from '@/lib/db'
@@ -17,7 +27,10 @@ import type {
   RoundPlayerRow,
   ScoreRow,
   SettingRow,
+  CtpResultRow,
 } from './types'
+import { flushOutbox } from '@/lib/sync/outbox'
+import { mergeStampedRows } from '@/lib/sync/merge'
 
 async function selectAll<T>(table: string): Promise<T[]> {
   const { data, error } = await supabase.from(table).select('*')
@@ -34,12 +47,15 @@ export interface HydratePayload {
   rounds: RoundRow[]
   round_players: RoundPlayerRow[]
   scores: ScoreRow[]
+  ctp_results: CtpResultRow[]
   settings: SettingRow[]
 }
 
 async function fetchAll(): Promise<HydratePayload> {
-  const [players, courses, tees, holes, hole_yardages, rounds, round_players, scores, settings] =
-    await Promise.all([
+  const [
+    players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results,
+    settings,
+  ] = await Promise.all([
       selectAll<PlayerRow>('players'),
       selectAll<CourseRow>('courses'),
       selectAll<TeeRow>('tees'),
@@ -48,9 +64,13 @@ async function fetchAll(): Promise<HydratePayload> {
       selectAll<RoundRow>('rounds'),
       selectAll<RoundPlayerRow>('round_players'),
       selectAll<ScoreRow>('scores'),
+      selectAll<CtpResultRow>('ctp_results'),
       selectAll<SettingRow>('settings'),
     ])
-  return { players, courses, tees, holes, hole_yardages, rounds, round_players, scores, settings }
+  return {
+    players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results,
+    settings,
+  }
 }
 
 async function writeToDexie(p: HydratePayload): Promise<void> {
@@ -65,12 +85,19 @@ async function writeToDexie(p: HydratePayload): Promise<void> {
       db.rounds,
       db.round_players,
       db.scores,
+      db.ctp_results,
       db.settings,
+      db.outbox,
     ],
     async () => {
       // bulkPut is an idempotent upsert on the primary key — a re-hydrate overwrites in
-      // place. (A true delete-then-reconcile belongs to the Phase 6 comparator, which must
-      // never blow away unsynced local writes; there are none in read-only Phase 4.)
+      // place. Safe for the reference tables: nothing on this device writes them, so the
+      // server is unconditionally right. `scores` and `ctp_results` are NOT in this list;
+      // they go through the comparator below.
+      //
+      // (`round_players` carries the comparator columns too, because an admin write stamps
+      // them — but no local path queues one yet. When Phase 6b puts tee changes in the
+      // outbox, this table joins the merged set.)
       await Promise.all([
         db.players.bulkPut(p.players),
         db.courses.bulkPut(p.courses),
@@ -79,9 +106,9 @@ async function writeToDexie(p: HydratePayload): Promise<void> {
         db.hole_yardages.bulkPut(p.hole_yardages),
         db.rounds.bulkPut(p.rounds),
         db.round_players.bulkPut(p.round_players),
-        db.scores.bulkPut(p.scores),
         db.settings.bulkPut(p.settings),
       ])
+      await mergeStampedRows(p)
     },
   )
 }
@@ -95,6 +122,8 @@ export function useHydrate() {
   return useQuery({
     queryKey: ['hydrate'],
     queryFn: async () => {
+      // Flush before fetch. Non-negotiable — see the header.
+      await flushOutbox()
       const payload = await fetchAll()
       await writeToDexie(payload)
       return { at: new Date().toISOString(), counts: countsOf(payload) }

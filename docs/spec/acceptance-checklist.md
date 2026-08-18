@@ -531,9 +531,113 @@ card is entered, and an abandoned round redistributes.
 
 ---
 
-## Phase 6 — Offline
+## Phase 6a — Offline: outbox and comparator
 
-_(To be filled in at end of Phase 6.)_
+Phase 6 was pre-committed to a split (`phase-plan.md`). **6a is this session:** Dexie
+tables, the outbox and dead-letter, the comparator in one file applied at all four sites,
+Realtime, the reachability probe, and the tests. **6b is not built:** service worker, PWA
+install, `navigator.storage.persist()`, offline PIN, Diagnostics, CSV export.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| Dexie schema mirroring the server tables; `ctp_results` added | `src/lib/db.ts` v5 — `ctp_results` keyed `[round_id+hole_number]`, mirroring its Postgres unique key; hydrate fetches it and anon can read it (`curl` → 200) |
+| Outbox and dead-letter tables; client UUID + local sequence number | `db.outbox` (`++seq`, the brief's local sequence number, also the flush tie-break), `db.dead_letter` keyed by the item's stable client UUID |
+| `client_id` persisted | `src/lib/clientId.ts` (localStorage, unchanged since Phase 5); observed as one stable uuid across every row written in the browser run below |
+| Monotonic, persisted timestamps | `src/lib/sync/clock.ts` — `max(Date.now(), lastIssued + 1)` in `sync_meta`. `clock.test.ts`: three stamps in one millisecond are distinct and increasing; a **backwards** clock jump still yields a larger stamp; the high-water mark survives `db.close()` + reopen |
+| Comparator in one file | `src/lib/sync/comparator.ts`. Nothing else defines an ordering; the other three sites import `incomingWins` / `compareStamps` |
+| Comparator applied at all four sites | 1 SQL guard (Phase 5A, `write_path.sql`); 2 `realtime.ts` `applyScoreEvent` / `applyCtpEvent`; 3 `merge.ts` `mergeStampedRows`, called by `hydrate.ts`; 4 `outbox.ts` `shieldAllows` — used by sites 2, 3 **and** by the write-back of acknowledged rows |
+| Whole-tuple replacement enforced | Payloads are whole cells (`gross_strokes` + `picked_up` together); coalescing keeps the latest entry per key and discards the rest, which is only safe *because* nothing is a delta. No `COALESCE` merge exists on either side |
+| Flush before refetch | `useHydrate()`'s `queryFn` awaits `flushOutbox()` before `fetchAll()` |
+| Realtime echo clears markers only when its timestamp is ≥ the newest pending | `outbox.ts` `clearEchoed()` — compares stamps, not `client_id` alone; the echo of an older write leaves a newer pending entry queued |
+| Reachability probe backing `navigator.onLine` | `src/lib/sync/reachability.ts` — HEAD `/rest/v1/`, 3 s timeout, two consecutive flush failures trip Offline. Proved in the browser: with the API container stopped and `navigator.onLine` still **true**, the badge read OFFLINE |
+| Flush triggers | `engine.ts`: `online` event, visibilitychange (guarded on `visible`), 60 s interval, Realtime `SUBSCRIBED`, and immediately after a save |
+| Pending count surfaced whenever the outbox is non-empty, gone when it drains | `ConnectionBadge` reads `useSyncSnapshot()` off Dexie; observed reading "9 TO SYNC" → "ONLINE" |
+| Poison items do not block the queue | `outbox.ts` — terminal refusals dead-letter on the first answer, retryables after 8 attempts, and the pass continues either way |
+| Never permanently delete an unsynced mutation | `transferToDeadLetter()` is an atomic move inside one transaction, keeping payload, both timestamps, attempt count and last error; `retryDeadLetter()` puts it back |
+
+### Automated tests
+
+`npm run test:sync` — **39 tests**, `fake-indexeddb` (real Dexie, real schema upgrades, real
+transactions) plus a `FakeServer` in `src/test/fakeServer.ts`. Full suite: `npx vitest run`
+→ **106 passed** (67 scoring + 39 sync). `npx supabase test db` → **232 passed**, unchanged.
+
+Covering the brief's list by name:
+
+| Brief's required test | Where |
+|---|---|
+| Queue survives a simulated app kill and replays in order | `outbox.test.ts` "the queue survives an app kill and replays in order" — `db.close()`/reopen between enqueue and flush; the wire order is `[1, 2, 3]` |
+| Replaying the same item twice produces one row, not two | same file — the replayed entry settles as `'stale'`; one server row, one Dexie row |
+| Poison item transfers to dead-letter with payload intact, and the queue continues | "moves a refused cell to dead-letter with its payload intact" — 1 dead-lettered, 2 of 3 holes still sent |
+| A stale self-echo does not clear the unsynced marker on a newer pending write | "the self-echo rule" ×3 — a covering echo clears, a stale echo leaves the newer entry, another device's write is not an echo at all |
+| Points and standings compute correctly with the network fully disabled | "standings compute from the local rows with the network fully disabled" — `buildStandings` over Dexie after an offline enqueue, `server.requests === 0` |
+| Two simulated devices editing the same hole offline converge to the same final state on both | "two devices editing the same hole while both offline" — two client_ids, two storages; the later write wins, the loser rolls onto the winner, nothing is retried or dead-lettered |
+| The LWW guard tested against real Postgres | Phase 5A `supabase/tests/write_path.sql` (stale rejected; exact tie loses; `client_id` tie-break; skew clamp). `comparator.test.ts` re-runs those **same four cases** in TypeScript so the two languages are visibly aligned |
+
+Also covered: microsecond-precision ordering (`Date.parse` truncation would silently drop a
+write), coalescing five stepper taps into one wire cell, an offline flush costing zero
+attempts across six passes, the clamp write-back, and a Realtime row landing mid-flight not
+being undone by the in-flight response.
+
+### Manual tests — browser at 375 px against local Supabase, 2026-08-18
+
+Input events were dispatched as DOM clicks: the harness's click injection timed out
+throughout this session (the pane reported `visibilityState: 'hidden'`), so taps were
+delivered to the same React handlers by `dispatchEvent`. Everything else — the app, the
+network, Postgres, the Realtime socket — is real.
+
+1. **Online save.** Hole 14 of R3, two players. Button went `Save hole 14` → `Saved`, badge
+   ONLINE, and Postgres held both rows with matching `client_updated_at_raw` /
+   `_effective` and one `client_id`.
+2. **Dead zone.** With Supabase requests failing, holes 15–17 × 3 players were entered and
+   saved. Badge read **9 TO SYNC**; the line under Save read "Saved on this phone — it'll
+   sync when you have signal. (3 holes waiting)"; the round footer advanced to **thru 17**
+   from local rows alone. `select … where hole_number in (15,16,17)` → **none**.
+3. **Reconnect.** All 9 landed — **carrying their original offline timestamps**
+   (06:01:40 / 06:01:43 / 06:01:46), not the flush time — with no duplicates.
+4. **Cold reopen while genuinely offline.** `docker stop supabase_kong_BOD2027`, hole 18
+   entered and saved, then a full page load. Standings rendered in full from Dexie, badge
+   read **2 TO SYNC**, both outbox entries were intact with **`attempts: 0`** and
+   `dead_letter` empty — offline had cost nothing. Restarting the container drained the
+   queue (Realtime `SUBSCRIBED` fired the flush) and hole 18 landed with its offline stamp.
+5. **Realtime in, winning.** A direct SQL write to R3 hole 14 with a newer stamp and a
+   foreign `client_id` appeared in Dexie within ~2 s with no reload. Its
+   `client_updated_at_effective` came back as `…T06:06:21.603907+00:00` — the microsecond
+   precision the comparator parses rather than truncates.
+6. **Realtime in, losing.** The same row rewritten with a 2020 stamp did **not** land; Dexie
+   kept the newer value. Comparator site 2 confirmed against a real socket.
+7. Database restored with `npx supabase db reset` (170 seed scores) and `supabase test db`
+   re-run: 232 pass.
+
+### Deferred requirements
+
+| Requirement | Phase | Why |
+|---|---|---|
+| `vite-plugin-pwa` + Workbox, `registerType: 'prompt'`, `globPatterns` / `maximumFileSizeToCacheInBytes` | 6b | The pre-committed split |
+| `navigator.storage.persist()` after unlock | 6b | Belongs with the PIN work it hangs off |
+| Offline PIN verification (bcrypt cost 10) | 6b | Same |
+| Diagnostics screen (client_id, session expiry, last sync, outbox, dead-letter with Retry / Export-JSON, copy-state-as-JSON) | 6b | `retryDeadLetter()`, `lastSyncAt()` and `useSyncSnapshot()` exist and are tested; 6b builds the screen over them |
+| Admin "export all scores" as CSV | 6b | JSON export shipped in 5B |
+| `round_player` as an outbox kind (the day-of tee change) | 6b | It is the one queued write that needs a **session token**, so it waits for the offline PIN. `decisions.md` §"Answer to the open question" is unchanged; the queue's `kind` discriminator is already in place |
+| Two real phones converging; iOS install-then-unlock | Manual, pre-trip | Cannot be automated. `handoff.md` carries them |
+
+### Deviations from the brief
+
+1. **Offline costs no retry attempts.** The brief says "after N attempts, move to
+   dead-letter." Applied literally to a network failure, a long dead zone would exhaust the
+   budget and dead-letter a round no server ever refused. Only an answer from the server
+   counts. `decisions.md` §"Offline costs no retry attempts".
+2. **An acknowledged row overwrites our optimistic row unconditionally** when it is our own
+   (same `client_id` + `raw`), rather than going through the comparator. This is how the
+   server's 5-minute clamp is adopted; the comparator still governs every other write-back.
+   `decisions.md` §"The server's row replaces our optimistic row".
+3. **`ctp_results` is mirrored and queueable before its UI exists** (Phase 7). The brief
+   requires the local store to cache every CTP result; building the second outbox kind now
+   is what keeps the queue general. `decisions.md` §"`ctp_results` mirrored into Dexie in 6a".
+4. **Save's contract changed.** It now resolves once the hole is durably queued, not once
+   the server has it — which is the whole point of the outbox, but it is a real change to
+   Phase 5A's behaviour and the copy under the button changed with it.
 
 ---
 
@@ -566,11 +670,11 @@ These are the final acceptance criteria. Every line needs verification evidence 
 - [ ] Handicaps verify by hand (Red, Blue, Black) against a manual calculation
 - [ ] Strokes-received hole list matches the printed scorecard's stroke index
 - [x] No playing handicap anywhere in the app exceeds 18 — enforced in the engine (Phase 3) and again server-side in `fn_compute_handicap`; pgTAP asserts index 30 → 18
-- [ ] Two phones open at once: a score on one appears on the other without a refresh
-- [ ] Airplane-mode test: 18 holes × 4 players entered offline, force-quit, cold reopen offline, then reconnect syncs without loss or duplication
-- [~] Admin screens clearly refuse to write while offline; score entry in the same session stays fully functional — the admin half is done (Phase 5B manual test 6: banner + every control disabled). The score-entry half needs the outbox, so it completes in Phase 6
-- [ ] Stale offline writes never clobber newer data; losing device rolls back to the winner
-- [ ] A refetch on reconnect never wipes unsynced local entry
+- [~] Two phones open at once: a score on one appears on the other without a refresh — the mechanism is proved (Phase 6a manual test 5: a foreign write reached the open page over a real Realtime socket in ~2 s, no reload). Two actual phones is a pre-trip manual test
+- [~] Airplane-mode test: 18 holes × 4 players entered offline, force-quit, cold reopen offline, then reconnect syncs without loss or duplication — done in the browser against a genuinely stopped API (Phase 6a manual tests 2–4: entry offline, cold reopen offline with standings intact and `attempts: 0`, reconnect landing every row with its original stamp and no duplicates). Still owed on a real phone in airplane mode, over a full round
+- [x] Admin screens clearly refuse to write while offline; score entry in the same session stays fully functional — admin half in Phase 5B manual test 6 (banner + every control disabled); score-entry half in Phase 6a manual tests 2–4 (holes 15–18 entered and kept with the API stopped)
+- [x] Stale offline writes never clobber newer data; losing device rolls back to the winner — `write_path.sql` (SQL guard, real Postgres), `outbox.test.ts` "two devices editing the same hole while both offline" (the loser adopts the winner), and Phase 6a manual test 6 (a 2020-stamped Realtime event refused on the open page)
+- [x] A refetch on reconnect never wipes unsynced local entry — `flushOutbox()` runs before `fetchAll()`, and `mergeStampedRows` applies comparator + shield per row; `outbox.test.ts` "a routine refetch never wipes unsynced local entry"
 - [x] Every server-side validation rule is enforced against a direct API call — `supabase/tests/write_path.sql` + `scripts/verify-write-path.sh` §8 (Phase 5A)
 - [~] Anon cannot write to any table without a valid PIN session — **superseded by the 2026-08-17 amendment.** What holds now, and is demonstrated in `scripts/verify-write-path.sh` §1–§3 and §7: anon can never write to a *table* directly (`42501`), can never mint a session, and can never reach a gated RPC without one — but `rpc_upsert_scores` / `rpc_upsert_ctp` are deliberately open. See `decisions.md` §"PIN removed from score entry"
 - [ ] Anon can read every public table and Realtime events actually arrive (demonstrate with `curl` and a socket client)

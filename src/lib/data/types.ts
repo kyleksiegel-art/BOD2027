@@ -90,6 +90,17 @@ export interface ScoreRow {
   client_id?: string
 }
 
+export interface CtpResultRow {
+  id: string
+  round_id: string
+  hole_number: number
+  player_id: string | null
+  distance_feet: number | null
+  client_updated_at_raw?: string
+  client_updated_at_effective?: string
+  client_id?: string
+}
+
 /** Local only — never synced. The PIN session token and its expiry. */
 export interface SessionRow {
   id: 'current'
@@ -99,6 +110,57 @@ export interface SessionRow {
 }
 
 export interface SettingRow {
+  key: string
+  value: unknown
+}
+
+// ── Local-only sync bookkeeping (Phase 6) ────────────────────────────────────
+// None of these mirror a server table; they are how a phone in a dead zone remembers what
+// it still owes the server.
+
+/** What an outbox entry carries. Whole-tuple state, never a delta — see the comparator. */
+export interface ScorePayload {
+  round_id: string
+  player_id: string
+  hole_number: number
+  gross_strokes: number | null
+  picked_up: boolean
+}
+
+export interface CtpPayload {
+  round_id: string
+  hole_number: number
+  player_id: string | null
+  distance_feet: number | null
+}
+
+export type OutboxKind = 'score' | 'ctp'
+
+export interface OutboxEntry {
+  /** Local sequence number, Dexie-assigned. The tie-break when two entries share a ts. */
+  seq?: number
+  /** Client-generated UUID. Stable across a dead-letter transfer, so an item is traceable. */
+  id: string
+  kind: OutboxKind
+  /** Canonical key: score = `round|player|hole`, ctp = `round|hole`. The shield indexes it. */
+  key: string
+  payload: ScorePayload | CtpPayload
+  /** Monotonic ISO timestamp — sent as client_updated_at_raw. */
+  ts: string
+  client_id: string
+  attempts: number
+  last_error: string | null
+  created_at: string
+}
+
+export interface DeadLetterEntry extends OutboxEntry {
+  failed_at: string
+  /** 'terminal' = the server refused it on its merits; 'exhausted' = N retries used up. */
+  reason: 'terminal' | 'exhausted'
+}
+
+/** One-row-per-key local scratch: the monotonic clock's high-water mark, last sync, etc. */
+export interface SyncMetaRow {
   key: string
   value: unknown
 }

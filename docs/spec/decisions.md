@@ -209,6 +209,58 @@ one (all six `points_table` bands present and numeric; `allowance` in (0, 1]; a 
 DISTINCT FROM 'number'` form — a plain `<>` returns NULL for a *missing* key and would let it
 through.
 
+### Offline costs no retry attempts (Phase 6a)
+
+A flush that fails because the request never reached the server does **not** count an
+attempt against any queued item, and stops the pass rather than penalising the rest of the
+batch. Without this, the brief's own scenario destroys itself: four hours in a dead zone
+with a 60-second flush interval burns an eight-attempt budget in eight minutes and
+dead-letters an entire round that no server ever refused. Only an answer *from* the server
+— a 5xx, or a refusal on the merits — is allowed to cost anything.
+
+The classification is `OfflineError` (never landed) vs `TransportError` (landed, went
+wrong) in `src/lib/sync/outbox.ts`, and offline is recognised by message shape because
+supabase-js hands fetch failures back as a returned error object rather than throwing.
+
+### The server's row replaces our optimistic row, clamp and all
+
+`enqueueScores()` writes the local row with `client_updated_at_effective = raw`, because the
+client cannot compute the server's `least(raw, now() + 5 min)` clamp. That guess must be
+corrected, or a phone whose clock is an hour fast keeps a local row that out-ranks every
+later write from every other phone forever.
+
+So an acknowledged row is written back **unconditionally when it is our own optimistic copy**
+(same `client_id`, same `client_updated_at_raw`), and through the comparator otherwise — a
+Realtime event from another device can land between the request leaving and the response
+arriving, and the response is then a snapshot of an older moment. Both cases are asserted in
+`src/lib/sync/outbox.test.ts`.
+
+### Retry budget: 8 attempts; terminal refusals skip it entirely
+
+The RPCs answer with a closed vocabulary of refusals (`round_upcoming`,
+`player_not_playing`, `gross_strokes_out_of_range`, …). Those are verdicts, not outages:
+retrying cannot change the answer, so the item transfers to `dead_letter` on the first one
+and the queue continues. Everything else gets 8 attempts. `'stale'` is neither — it is a
+**settled** outcome: the server's row is newer, it comes back in the same response, and the
+loser adopts it. A stale write is not a failed write.
+
+### `ctp_results` mirrored into Dexie in 6a, ahead of its UI
+
+The CTP entry screen is Phase 7, but `ctp_results` is now a Dexie table, is fetched by the
+hydrate, is merged through the comparator, and flows through the outbox as `kind: 'ctp'`.
+The brief requires the local store to cache "every score and CTP result for the trip", and
+building the second outbox kind while the first is being designed is what keeps the queue
+genuinely general instead of a scores queue with a `kind` column. It is covered by tests;
+what Phase 7 adds is the screen.
+
+### The pending-write shield is applied at hydration too, not just at Realtime
+
+The brief names the shield as its own site (4) alongside hydration (3). In practice hydrate
+needs both checks — beat the local row **and** beat anything still queued for that cell —
+because the local row and the queued entry can disagree after a rollback. `mergeStampedRows()`
+in `src/lib/sync/merge.ts` applies them together, and lives outside `hydrate.ts` so it can be
+tested with no network in the loop.
+
 ### `28000` answers 403, not 401
 
 Recorded in the Phase 5A checklist and repeated here because two source comments claimed 401:

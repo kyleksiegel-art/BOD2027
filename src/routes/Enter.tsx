@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { PlayerEntryRow } from '@/components/enter/PlayerEntryRow'
-import { useEnterHole, useRoundChoices } from '@/lib/data/selectors'
+import { useEnterHole, usePendingHoles, useRoundChoices } from '@/lib/data/selectors'
 import type { EnterDraft } from '@/lib/data/compute'
 import { saveCells, subscribeWriteState, getWriteState } from '@/lib/data/mutations'
 
@@ -43,6 +43,9 @@ export default function Enter() {
   }, [rounds, roundNumber])
 
   const { vm, loading } = useEnterHole(roundNumber ?? 1, hole, drafts[hole] ?? EMPTY)
+  // Holes recorded on this phone but not yet acknowledged by the server. Distinct from a
+  // draft: a draft is not recorded anywhere, a pending hole is recorded and merely owed.
+  const pendingHoles = usePendingHoles(vm?.round.id ?? null)
 
   function setDraft(playerId: string, draft: EnterDraft) {
     const forHole = { ...(draftsRef.current[hole] ?? {}), [playerId]: draft }
@@ -101,7 +104,8 @@ export default function Enter() {
         pickedUp: d.pickedUp,
       })),
     )
-    // On failure the edits stay put, so a bad connection costs nothing but a second tap.
+    // saveCells resolves true once the hole is durably queued — offline included. It is
+    // false only if this device could not record it at all, and then the edits stay put.
     if (!ok) return
     const rest = { ...draftsRef.current }
     delete rest[hole]
@@ -290,6 +294,12 @@ export default function Enter() {
               ) : dirtyHoles.length > 1 ? (
                 <span className="text-gold-bright">
                   Unsaved on {dirtyHoles.length} holes: {dirtyHoles.join(', ')}
+                </span>
+              ) : write.status === 'queued' && pendingHoles.length > 0 ? (
+                // Recorded, not lost — the calm colour is the point.
+                <span className="text-paper-dim">
+                  {write.message} ({pendingHoles.length} hole
+                  {pendingHoles.length === 1 ? '' : 's'} waiting)
                 </span>
               ) : null}
             </div>
