@@ -10,7 +10,9 @@
 
 **Settled in-session — the brief's par-3 claim.** Kyle supplied the resort's 2021 scorecard PDFs. The brief's *"Black has five par 3s"* is wrong; the Phase 2 seed was right (four par 3s, five par 5s, par 73). All three cards were transcribed and diffed against the database — **0 discrepancies across 54 hole pars, 54 stroke indexes, 12 tee rows and 216 yardages**, kept as `scripts/verify-card-data.py`. No seed data or scoring code changed; the brief carries a marked correction, and a `money.test.ts` fixture comment that had copied the error was fixed. Note for future phases: the brief pre-emptively said "do not correct this," which is what kept the error alive for three phases.
 
-**Kyle still owes (carried):** real player indexes + who's assigned + each player's tee; the real 6-digit PIN for `/admin`; push `phase-1-scaffold`; confirm Netlify deploy-preview + Lighthouse baseline; Netlify env vars.
+**Deploy state, checked 2026-08-17 — this blocks Phase 6's verification.** `origin/main` is still only the interim countdown page: **no phase work has ever merged to main.** `phase-1-scaffold`, `phase-2-schema` and `phase-3-scoring` are on origin (the older "push phase-1-scaffold" note was stale); `phase-4-read-ui`, which carries Phases 1–5B in 8 commits, is **not pushed**. There is **no hosted Supabase project** — `supabase/.temp` has no project ref, so everything to date runs against local Docker only. Phase 6's definition of done needs a real deployed URL and a real Supabase: an airplane-mode round on a phone, install-then-unlock, and two devices converging cannot be tested against localhost.
+
+**Kyle still owes (carried):** real player indexes + who's assigned + each player's tee; the real 6-digit PIN as a Supabase secret; a hosted Supabase project + `supabase db push`; Netlify env vars; confirm the deploy preview + Lighthouse baseline.
 
 **Local dev PIN is `271828`.** Run `supabase functions serve --env-file supabase/functions/.env --no-verify-jwt` alongside `supabase start`.
 
