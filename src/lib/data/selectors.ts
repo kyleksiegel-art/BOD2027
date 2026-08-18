@@ -1,0 +1,130 @@
+// Read-only hooks the screens use. Each subscribes to Dexie via useLiveQuery and runs the
+// pure assembly in compute.ts. Screens import ONLY from here — never Dexie or scoring
+// directly — so the data-layering rule stays enforceable by grep.
+import { useMemo } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '@/lib/db'
+import {
+  buildStandings,
+  buildRoundDetail,
+  buildRoundsList,
+  buildChampionships,
+  buildEnterHole,
+  buildAdmin,
+  type AdminVM,
+  type Db,
+  type EnterVM,
+  type EnterDraft,
+  type StandingsVM,
+  type RoundDetailVM,
+  type RoundListItemVM,
+} from './compute'
+import { totalPoints } from '@/lib/scoring'
+import type { PlayerRow, RoundRow } from './types'
+
+/** Load the whole read model out of Dexie. Re-runs whenever any table changes. */
+function useDbData(): Db | undefined {
+  return useLiveQuery(async () => {
+    const [players, courses, tees, holes, hole_yardages, rounds, round_players, scores, settings] =
+      await Promise.all([
+        db.players.toArray(),
+        db.courses.toArray(),
+        db.tees.toArray(),
+        db.holes.toArray(),
+        db.hole_yardages.toArray(),
+        db.rounds.toArray(),
+        db.round_players.toArray(),
+        db.scores.toArray(),
+        db.settings.toArray(),
+      ])
+    return {
+      players, courses, tees, holes, hole_yardages, rounds, round_players, scores, settings,
+    } satisfies Db
+  }, [])
+}
+
+/** Read a single settings value from Dexie (e.g. the assigned-index footnote). */
+export function useSetting<T = unknown>(key: string): T | undefined {
+  return useLiveQuery(async () => {
+    const row = await db.settings.get(key)
+    return row?.value as T | undefined
+  }, [key])
+}
+
+export function useStandings(): StandingsVM | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildStandings(data) : undefined), [data])
+}
+
+export function useRoundsList(): RoundListItemVM[] | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildRoundsList(data) : undefined), [data])
+}
+
+export function useRoundDetail(roundNumber: number): { vm: RoundDetailVM | null; loading: boolean } {
+  const data = useDbData()
+  const vm = useMemo(() => (data ? buildRoundDetail(roundNumber, data) : null), [data, roundNumber])
+  return { vm, loading: data === undefined }
+}
+
+export interface PlayerCardVM {
+  player: PlayerRow
+  championshipTotal: number
+}
+
+export function usePlayers(): PlayerCardVM[] | undefined {
+  const data = useDbData()
+  return useMemo(() => {
+    if (!data) return undefined
+    const champs = buildChampionships(data)
+    const totalById = new Map(champs.map((c) => [c.playerId, totalPoints(c.byRound)]))
+    return data.players
+      .slice()
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((player) => ({ player, championshipTotal: totalById.get(player.id) ?? 0 }))
+  }, [data])
+}
+
+/**
+ * The Enter screen's view model for one hole of one round. Like every other selector it
+ * reads Dexie and runs pure assembly — the write path puts the server's rows back into
+ * Dexie, so a saved score re-renders here with no extra plumbing.
+ */
+export function useEnterHole(
+  roundNumber: number,
+  holeNumber: number,
+  drafts: Record<string, EnterDraft> = {},
+): { vm: EnterVM | null; loading: boolean } {
+  const data = useDbData()
+  const vm = useMemo(
+    () => (data ? buildEnterHole(roundNumber, holeNumber, data, drafts) : null),
+    [data, roundNumber, holeNumber, drafts],
+  )
+  return { vm, loading: data === undefined }
+}
+
+/** Every round, in play order — the Enter screen's round picker. */
+export function useRoundChoices(): { roundNumber: number; courseName: string; status: RoundRow['status'] }[] | undefined {
+  const data = useDbData()
+  return useMemo(() => {
+    if (!data) return undefined
+    const byId = new Map(data.courses.map((c) => [c.id, c]))
+    return data.rounds
+      .slice()
+      .sort((a, b) => a.round_number - b.round_number)
+      .map((r) => ({
+        roundNumber: r.round_number,
+        courseName: byId.get(r.course_id)?.name ?? 'Course',
+        status: r.status,
+      }))
+  }, [data])
+}
+
+/**
+ * The /admin view model. Same rule as every other screen: Dexie in, pure assembly out.
+ * Admin writes invalidate the hydrate query, which refills Dexie, which re-runs this.
+ */
+export function useAdmin(): AdminVM | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildAdmin(data) : undefined), [data])
+}

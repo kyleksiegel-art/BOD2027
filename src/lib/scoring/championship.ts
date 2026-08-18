@@ -10,8 +10,10 @@ export interface RoundPointsEntry {
   roundNumber: number
   status: RoundStatus
   points: number // the player's counted points for the round (0 for a DNP)
-  /** True when the round contributes to the championship: `final` counts; `abandoned`,
-   *  `upcoming`, and `in_progress` do not. */
+  /** True when the round contributes to the cumulative total. The CALLER decides which
+   *  statuses count and sets this flag; the engine just sums where it is true. The app
+   *  counts `final` and the live `in_progress` round (the overall board is inclusive of
+   *  the round in play) and never `upcoming`/`abandoned` — see src/lib/data/compute.ts. */
   counts: boolean
 }
 

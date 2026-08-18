@@ -1,6 +1,7 @@
 import { Outlet, ScrollRestoration } from 'react-router-dom'
 import { TopBar } from './TopBar'
 import { BottomTabBar } from './BottomTabBar'
+import { HydrationGate } from './HydrationGate'
 
 /**
  * App shell: persistent top bar + bottom tab bar with the routed page between.
@@ -12,7 +13,9 @@ export function Layout() {
     <div className="flex min-h-[100dvh] flex-col">
       <TopBar />
       <main className="flex-1 overflow-x-hidden">
-        <Outlet />
+        <HydrationGate>
+          <Outlet />
+        </HydrationGate>
       </main>
       <BottomTabBar />
       <ScrollRestoration />

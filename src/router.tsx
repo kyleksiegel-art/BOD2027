@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout'
 import Home from '@/routes/Home'
 import Standings from '@/routes/Standings'
 import Rounds from '@/routes/Rounds'
+import RoundDetail from '@/routes/RoundDetail'
 import Enter from '@/routes/Enter'
 import Money from '@/routes/Money'
 import Admin from '@/routes/Admin'
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <Home /> },
       { path: '/standings', element: <Standings /> },
       { path: '/rounds', element: <Rounds /> },
+      { path: '/rounds/:roundNumber', element: <RoundDetail /> },
       { path: '/enter', element: <Enter /> },
       { path: '/money', element: <Money /> },
       {
