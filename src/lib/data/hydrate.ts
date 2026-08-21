@@ -92,12 +92,10 @@ async function writeToDexie(p: HydratePayload): Promise<void> {
     async () => {
       // bulkPut is an idempotent upsert on the primary key — a re-hydrate overwrites in
       // place. Safe for the reference tables: nothing on this device writes them, so the
-      // server is unconditionally right. `scores` and `ctp_results` are NOT in this list;
-      // they go through the comparator below.
-      //
-      // (`round_players` carries the comparator columns too, because an admin write stamps
-      // them — but no local path queues one yet. When Phase 6b puts tee changes in the
-      // outbox, this table joins the merged set.)
+      // server is unconditionally right. `scores`, `ctp_results` and now `round_players`
+      // are NOT in this list; they carry the comparator columns and go through the merge
+      // below (Phase 6b puts day-of tee changes in the outbox, so a refetch must not
+      // overwrite an unsynced tee change).
       await Promise.all([
         db.players.bulkPut(p.players),
         db.courses.bulkPut(p.courses),
@@ -105,7 +103,6 @@ async function writeToDexie(p: HydratePayload): Promise<void> {
         db.holes.bulkPut(p.holes),
         db.hole_yardages.bulkPut(p.hole_yardages),
         db.rounds.bulkPut(p.rounds),
-        db.round_players.bulkPut(p.round_players),
         db.settings.bulkPut(p.settings),
       ])
       await mergeStampedRows(p)

@@ -52,12 +52,15 @@ cp supabase/functions/.env.example supabase/functions/.env
 supabase functions serve --env-file supabase/functions/.env --no-verify-jwt
 ```
 
-The committed `.env.example` carries the hash of the **local development PIN `2718`**.
-It is not the trip PIN. Generate a hash for a real one and set it as a secret:
+The committed `.env.example` carries the hashes of the **trip PIN `1922`** (argon2 for the
+online check, bcrypt for the offline check). The repo is private and the PIN is a weak,
+deliberately-recoverable gate, so committing the hash is an accepted tradeoff. To rotate the
+PIN — or to keep it out of git and set it only as a production secret — regenerate both hashes:
 
 ```bash
-npx tsx scripts/hash-pin.ts 314159
+npx tsx scripts/hash-pin.ts 1922
 supabase secrets set APP_PIN_ARGON2_HASH='$argon2id$v=19$...'
+supabase secrets set APP_PIN_BCRYPT_HASH='$2b$10$...'
 ```
 
 Changing the PIN does **not** invalidate tokens already issued — call

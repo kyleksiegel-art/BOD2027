@@ -17,8 +17,9 @@
 // Nothing here writes Dexie by hand, and nothing renders from a promise.
 import { supabase } from '@/lib/supabase'
 import { readToken, lock } from '@/lib/auth/session'
+import { enqueueRoundPlayer, flushOutbox } from '@/lib/sync/outbox'
 import { queryClient } from './queryClient'
-import type { HoleRow } from './types'
+import type { HoleRow, RoundPlayerPayload } from './types'
 
 export type AdminFailure = 'locked' | 'offline' | 'refused'
 
@@ -184,9 +185,53 @@ export interface RoundPlayerInput {
   allowanceUsed: number
   capUsed: number
   status: 'playing' | 'did_not_play'
+  /** Preserved across a tee change so it is not silently cleared; queued path only. */
+  manualOverride?: number | null
 }
 
-/** Batch: one request sets the whole foursome's tees and handicaps for a round. */
+/**
+ * Day-of tee/handicap change — the ONE admin mutation that rides the offline outbox
+ * (docs/spec/decisions.md §"Answer to the open question"). Tees get decided standing on the
+ * first tee, which may have no signal, so this queues like a score instead of failing when
+ * offline. A local optimistic row is computed immediately (enqueueRoundPlayer) so strokes
+ * recompute before anyone hits a ball; the server owns the authoritative arithmetic on flush.
+ *
+ * `manualOverride` is carried through so a tee change does NOT silently wipe an override the
+ * captain set earlier — the online admin variant (`saveRoundPlayers`) never sent it, which
+ * cleared it; queuing it preserves it. The flush needs a session token; if this device only
+ * unlocked offline, the change is kept and syncs after the next online unlock.
+ */
+export async function saveRoundPlayersQueued(entries: RoundPlayerInput[]): Promise<CheckedResult> {
+  const payloads: RoundPlayerPayload[] = entries.map((e) => ({
+    round_id: e.roundId,
+    player_id: e.playerId,
+    tee_id: e.teeId,
+    index_used: e.indexUsed,
+    allowance_used: e.allowanceUsed,
+    cap_used: e.capUsed,
+    status: e.status,
+    manual_override: e.manualOverride ?? null,
+  }))
+
+  try {
+    await enqueueRoundPlayer(payloads)
+  } catch (e) {
+    return { ok: false, errors: [(e as Error)?.message ?? 'Could not record on this device.'] }
+  }
+
+  // Best-effort flush. Queued is already durable; a refusal is reported, offline is not an error.
+  const report = await flushOutbox().catch(() => null)
+  if (report && report.deadLettered > 0) {
+    return { ok: false, errors: [report.message ?? 'The server refused the change.'] }
+  }
+  return { ok: true, errors: [] }
+}
+
+/**
+ * The ONLINE admin variant — a direct, session-gated RPC that stamps a sentinel client_id.
+ * Retained for the SQL test surface (`admin_path.sql`) and as the hard-reset path; the
+ * editor uses `saveRoundPlayersQueued` so a tee change works at the first tee with no signal.
+ */
 export async function saveRoundPlayers(entries: RoundPlayerInput[]): Promise<CheckedResult> {
   const results = await call<{ applied: boolean; error: string | null }[]>(
     'rpc_upsert_round_player_admin',

@@ -1,13 +1,21 @@
-// Generate the argon2id hash the pin-verify Edge Function checks against.
+// Generate the two PIN hashes the app checks against.
 //
 //   npx tsx scripts/hash-pin.ts 1922
 //
-// Then set it as a Supabase secret (production) or put it in supabase/functions/.env
-// (local). The PIN itself is never stored anywhere -- only this hash.
+// Prints TWO secrets:
+//   APP_PIN_ARGON2_HASH  — the online check inside the pin-verify Edge Function.
+//   APP_PIN_BCRYPT_HASH  — the OFFLINE fallback (Phase 6b). The Edge Function returns this
+//                          to a caller who just unlocked, so their device can re-unlock with
+//                          no signal (docs/spec/decisions.md §"PIN size and hash"). bcrypt
+//                          cost 10, verified in the browser by bcryptjs.
 //
-// Parameters are OWASP's second recommended argon2id configuration (m=19 MiB, t=3, p=1),
+// Set BOTH as Supabase secrets (production) or put both in supabase/functions/.env (local).
+// The PIN itself is never stored anywhere -- only these hashes.
+//
+// argon2 params are OWASP's second recommended argon2id configuration (m=19 MiB, t=3, p=1),
 // which is what the Edge Function's memory budget comfortably allows.
 import { argon2id } from 'hash-wasm'
+import { hashSync } from 'bcryptjs'
 
 const pin = process.argv[2]
 if (!pin || !/^\d{4,8}$/.test(pin)) {
@@ -18,7 +26,7 @@ if (!pin || !/^\d{4,8}$/.test(pin)) {
 const salt = new Uint8Array(16)
 crypto.getRandomValues(salt)
 
-const hash = await argon2id({
+const argonHash = await argon2id({
   password: pin,
   salt,
   parallelism: 1,
@@ -28,4 +36,7 @@ const hash = await argon2id({
   outputType: 'encoded',
 })
 
-console.log(hash)
+const bcryptHash = hashSync(pin, 10)
+
+console.log(`APP_PIN_ARGON2_HASH='${argonHash}'`)
+console.log(`APP_PIN_BCRYPT_HASH='${bcryptHash}'`)

@@ -21,6 +21,8 @@
 import { db } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { clientId } from '@/lib/clientId'
+import { readToken } from '@/lib/auth/session'
+import { computeHandicap } from '@/lib/scoring'
 import { nextStamp } from './clock'
 import { incomingWins, compareStamps, stampOf, type Stamp } from './comparator'
 import type {
@@ -29,6 +31,8 @@ import type {
   DeadLetterEntry,
   OutboxEntry,
   OutboxKind,
+  RoundPlayerPayload,
+  RoundPlayerRow,
   ScorePayload,
   ScoreRow,
 } from '@/lib/data/types'
@@ -54,6 +58,10 @@ const TERMINAL_ERRORS = new Set([
   'gross_strokes_out_of_range',
   'picked_up_requires_null_gross',
   'distance_negative',
+  // round_player (rpc_upsert_round_player) refusals.
+  'player_not_found',
+  'tee_not_found',
+  'tee_not_on_round_course',
 ])
 
 // ── Keys ─────────────────────────────────────────────────────────────────────
@@ -68,14 +76,21 @@ export function ctpKey(roundId: string, holeNumber: number): string {
   return `ctp|${roundId}|${holeNumber}`
 }
 
+export function rpKey(roundId: string, playerId: string): string {
+  return `rp|${roundId}|${playerId}`
+}
+
 // ── Transport ────────────────────────────────────────────────────────────────
 
 export interface RpcResult {
   key: Record<string, unknown>
   applied: boolean
   error: string | null
-  row: (ScoreRow & CtpResultRow) | ScoreRow | CtpResultRow | null
+  row: ScoreRow | CtpResultRow | RoundPlayerRow | null
 }
+
+type ServerRow = ScoreRow | CtpResultRow | RoundPlayerRow
+type RpcFn = 'rpc_upsert_scores' | 'rpc_upsert_ctp' | 'rpc_upsert_round_player'
 
 /** Thrown when the request never reached the server. Costs no attempt. */
 export class OfflineError extends Error {
@@ -94,7 +109,7 @@ export class TransportError extends Error {
 }
 
 export interface Transport {
-  call(fn: 'rpc_upsert_scores' | 'rpc_upsert_ctp', args: Record<string, unknown>): Promise<RpcResult[]>
+  call(fn: RpcFn, args: Record<string, unknown>): Promise<RpcResult[]>
 }
 
 function looksOffline(message: string): boolean {
@@ -215,6 +230,71 @@ export async function enqueueCtp(results: CtpPayload[]): Promise<OutboxEntry[]> 
   return entries
 }
 
+/**
+ * Queue a day-of tee/handicap change. Unlike the score/ctp enqueues, the optimistic local
+ * row must be COMPUTED: the payload carries inputs only, but the screen has to show the new
+ * strokes-received immediately, offline, before any flush. So the same pure engine the
+ * server mirrors (fn_compute_handicap ⇔ computeHandicap) runs here against the tee cached in
+ * Dexie. The server recomputes authoritatively on flush and its row replaces this one.
+ *
+ * The flush needs a session token; enqueueing does not. A change made on an offline-only
+ * session is kept and simply waits for an online unlock to mint one (see drain()).
+ */
+export async function enqueueRoundPlayer(payloads: RoundPlayerPayload[]): Promise<OutboxEntry[]> {
+  if (payloads.length === 0) return []
+  const ts = await nextStamp()
+  const cid = clientId()
+  const entries: OutboxEntry[] = payloads.map((payload) => ({
+    id: crypto.randomUUID(),
+    kind: 'round_player' as const,
+    key: rpKey(payload.round_id, payload.player_id),
+    payload,
+    ts,
+    client_id: cid,
+    attempts: 0,
+    last_error: null,
+    created_at: new Date().toISOString(),
+  }))
+
+  await db.transaction('rw', [db.round_players, db.tees, db.outbox], async () => {
+    for (const entry of entries) {
+      const p = entry.payload as RoundPlayerPayload
+      const tee = await db.tees.get(p.tee_id)
+      // Mirror fn_compute_handicap. Without the tee (shouldn't happen — it's cached) fall
+      // back to the raw index so the row is at least present and the round is scorable.
+      const calc = tee
+        ? computeHandicap({
+            index: p.index_used,
+            rating: tee.rating,
+            slope: tee.slope,
+            par: tee.par,
+            allowancePct: p.allowance_used,
+            cap: p.cap_used,
+          })
+        : null
+      await db.round_players.put({
+        round_id: p.round_id,
+        player_id: p.player_id,
+        tee_id: p.tee_id,
+        index_used: p.index_used,
+        allowance_used: p.allowance_used,
+        cap_used: p.cap_used,
+        course_handicap: calc?.courseHandicapUnrounded ?? p.index_used,
+        playing_handicap: calc?.playingHandicap ?? Math.round(p.index_used),
+        cap_applied: calc?.capApplied ?? false,
+        strokes_received: calc?.strokesReceived ?? Math.round(p.index_used),
+        manual_override: p.manual_override,
+        status: p.status,
+        client_updated_at_raw: ts,
+        client_updated_at_effective: ts,
+        client_id: cid,
+      })
+    }
+    await db.outbox.bulkAdd(entries)
+  })
+  return entries
+}
+
 // ── The pending-write shield (comparator site 4) ─────────────────────────────
 
 /** The newest pending stamp per key. One Dexie read serves a whole batch of decisions. */
@@ -310,8 +390,19 @@ async function drain(): Promise<FlushReport> {
     byKind.set(e.kind, list)
   }
 
+  // round_player is the one kind whose RPC needs a session token. Read it once. With no
+  // token — an offline-only unlock, or no session at all — those entries are DEFERRED, not
+  // failed: they stay queued at zero cost and go out after the next online unlock. Score
+  // and ctp take no token and are unaffected.
+  const token = await readToken()
+  let deferredRoundPlayer = 0
+
   const batches: { kind: OutboxKind; entries: OutboxEntry[] }[] = []
   for (const [kind, entries] of byKind) {
+    if (kind === 'round_player' && !token) {
+      deferredRoundPlayer += entries.length
+      continue
+    }
     for (let i = 0; i < entries.length; i += CHUNK) {
       batches.push({ kind, entries: entries.slice(i, i + CHUNK) })
     }
@@ -331,7 +422,7 @@ async function drain(): Promise<FlushReport> {
       if (i >= batches.length) return
       const batch = batches[i]
       try {
-        const results = await transport.call(rpcFor(batch.kind), argsFor(batch))
+        const results = await transport.call(rpcFor(batch.kind), argsFor(batch, token))
         const outcome = await settle(batch.entries, results)
         sent += outcome.sent
         deadLettered += outcome.deadLettered
@@ -353,34 +444,46 @@ async function drain(): Promise<FlushReport> {
 
   if (sent > 0) await db.sync_meta.put({ key: LAST_SYNC_KEY, value: new Date().toISOString() })
 
-  const remaining = await db.outbox.count()
-  return {
-    status: offline ? 'offline' : message !== null ? 'error' : 'idle',
-    sent,
-    deadLettered,
-    remaining,
-    message,
+  // Status reflects real outcomes only; a deferred tee change is neither offline nor error.
+  const status: FlushReport['status'] = offline ? 'offline' : message !== null ? 'error' : 'idle'
+
+  // A tee change queued on an offline-only session couldn't be sent — surface it plainly
+  // rather than as silence, but it is not an error: it goes out on the next online unlock.
+  if (!offline && message === null && deferredRoundPlayer > 0) {
+    message = 'A tee change is waiting to sync — unlock on wifi to send it.'
   }
+
+  const remaining = await db.outbox.count()
+  return { status, sent, deadLettered, remaining, message }
 }
 
-function rpcFor(kind: OutboxKind): 'rpc_upsert_scores' | 'rpc_upsert_ctp' {
-  return kind === 'score' ? 'rpc_upsert_scores' : 'rpc_upsert_ctp'
+function rpcFor(kind: OutboxKind): RpcFn {
+  if (kind === 'score') return 'rpc_upsert_scores'
+  if (kind === 'ctp') return 'rpc_upsert_ctp'
+  return 'rpc_upsert_round_player'
 }
 
-function argsFor(batch: { kind: OutboxKind; entries: OutboxEntry[] }): Record<string, unknown> {
+function argsFor(
+  batch: { kind: OutboxKind; entries: OutboxEntry[] },
+  token: string | null,
+): Record<string, unknown> {
   const wire = batch.entries.map((e) => ({
     ...e.payload,
     client_updated_at_raw: e.ts,
     client_id: e.client_id,
   }))
-  return batch.kind === 'score' ? { cells: wire } : { results: wire }
+  if (batch.kind === 'score') return { cells: wire }
+  if (batch.kind === 'ctp') return { results: wire }
+  // round_player is the only session-gated kind; drain() guarantees a token before it batches.
+  return { session_token: token, entries: wire }
 }
 
 /** Rebuild the canonical key from the key the RPC echoed back, so results match entries. */
 function keyOfResult(kind: OutboxKind, key: Record<string, unknown>): string {
-  return kind === 'score'
-    ? scoreKey(String(key.round_id), String(key.player_id), Number(key.hole_number))
-    : ctpKey(String(key.round_id), Number(key.hole_number))
+  if (kind === 'score')
+    return scoreKey(String(key.round_id), String(key.player_id), Number(key.hole_number))
+  if (kind === 'ctp') return ctpKey(String(key.round_id), Number(key.hole_number))
+  return rpKey(String(key.round_id), String(key.player_id))
 }
 
 interface Settlement {
@@ -394,7 +497,7 @@ interface Settlement {
 async function settle(entries: OutboxEntry[], results: RpcResult[]): Promise<Settlement> {
   const byKey = new Map(entries.map((e) => [e.key, e]))
   const settled: number[] = []
-  const rows: { kind: OutboxKind; row: ScoreRow | CtpResultRow }[] = []
+  const rows: { kind: OutboxKind; row: ServerRow }[] = []
   const dead: { entry: OutboxEntry; error: string; reason: DeadLetterEntry['reason'] }[] = []
   const retry: { entry: OutboxEntry; error: string }[] = []
 
@@ -421,7 +524,7 @@ async function settle(entries: OutboxEntry[], results: RpcResult[]): Promise<Set
   let deadLettered = dead.length
   await db.transaction(
     'rw',
-    [db.outbox, db.dead_letter, db.scores, db.ctp_results],
+    [db.outbox, db.dead_letter, db.scores, db.ctp_results, db.round_players],
     async () => {
       if (settled.length > 0) await db.outbox.bulkDelete(settled)
       for (const { entry, error, reason } of dead) await transferToDeadLetter(entry, error, reason)
@@ -497,7 +600,7 @@ async function transferToDeadLetter(
  *    land between the request leaving and the response arriving; the response is then a
  *    snapshot of an older moment and must not win on recency alone.
  */
-async function applyServerRows(rows: { kind: OutboxKind; row: ScoreRow | CtpResultRow }[]): Promise<void> {
+async function applyServerRows(rows: { kind: OutboxKind; row: ServerRow }[]): Promise<void> {
   if (rows.length === 0) return
   const pending = await pendingStamps()
   for (const { kind, row } of rows) {
@@ -508,13 +611,20 @@ async function applyServerRows(rows: { kind: OutboxKind; row: ScoreRow | CtpResu
       const local = await db.scores.get([r.round_id, r.player_id, r.hole_number])
       if (!isOwnOptimistic(local, r) && !incomingWins(r, local)) continue
       await db.scores.put(r)
-    } else {
+    } else if (kind === 'ctp') {
       const r = row as CtpResultRow
       const key = ctpKey(r.round_id, r.hole_number)
       if (!shieldAllows(key, stampOf(r), pending)) continue
       const local = await db.ctp_results.get([r.round_id, r.hole_number])
       if (!isOwnOptimistic(local, r) && !incomingWins(r, local)) continue
       await db.ctp_results.put(r)
+    } else {
+      const r = row as RoundPlayerRow
+      const key = rpKey(r.round_id, r.player_id)
+      if (!shieldAllows(key, stampOf(r), pending)) continue
+      const local = await db.round_players.get([r.round_id, r.player_id])
+      if (!isOwnOptimistic(local, r) && !incomingWins(r, local)) continue
+      await db.round_players.put(r)
     }
   }
 }

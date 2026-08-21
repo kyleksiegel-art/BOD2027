@@ -208,3 +208,50 @@ Things that will bite if forgotten:
   the same cases.
 - Phase 6a is **not** the whole of Phase 6: no service worker, no PWA install, no offline
   PIN, no Diagnostics screen, no CSV export. Those are 6b.
+
+## Offline path (Phase 6b) — the shape to reuse
+
+The rest of Phase 6: the PWA, the offline PIN, the day-of tee change, Diagnostics, CSV.
+
+- **Service worker:** `vite-plugin-pwa` v1 in `vite.config.ts`, `registerType: 'prompt'`,
+  `injectRegister: false`. Registration + the update prompt are React (`useRegisterSW` in
+  `src/components/PwaUpdatePrompt.tsx`, mounted in `Layout`); the prompt renders `null` while
+  `useSyncSnapshot().pending > 0`, so a reload never interrupts a flush. `globPatterns` and
+  `maximumFileSizeToCacheInBytes` (4 MiB) are explicit; the build precaches the shell, JS/CSS,
+  both fonts, the icons and the hero (~1.2 MiB). Icons live in `public/` (`icon.svg` +
+  `sips`-rasterised PNGs); `index.html` carries the apple-touch/favicon links, the manifest link
+  is injected. **Install/update needs a real HTTPS origin — pre-trip manual check.**
+- **`navigator.storage.persist()`** — `src/lib/storage.ts` `requestPersistentStorage()`, called
+  after any unlock and once on cold-start if a session exists (`ensurePersistedIfUnlocked` in
+  `Layout`). Best-effort, guarded, never throws.
+- **Offline PIN** — `pin-verify` returns `pin_bcrypt_hash` (bcrypt cost 10, env
+  `APP_PIN_BCRYPT_HASH`) on a successful unlock; `session.ts` caches it in `sync_meta` and
+  `unlockOffline()` verifies against it with `bcryptjs`. An offline session has `offline: true`
+  and an **empty token**, so `readToken()` returns null and token-gated writes wait for an online
+  unlock. `PinGate` falls back to the local check only on `UnlockError.networkFailed`. The cached
+  hash survives `lock()`.
+- **`round_player` = the third outbox kind.** `enqueueRoundPlayer` computes the optimistic row
+  with `computeHandicap` (so strokes are right offline), key `rp|round|player`. The Rounds
+  editor's "Save tees & handicaps" always queues (`saveRoundPlayersQueued`), enabled offline;
+  the flush attaches `readToken()` and **defers** (no attempt, no error) when there is none.
+  `round_player` now flows through all four comparator sites — merge (`merge.ts`), a dedicated
+  `applyRoundPlayerEvent` (`realtime.ts`), and the shield/write-back (`outbox.ts`); it is no
+  longer in the hydrate `bulkPut` or the realtime invalidate loop.
+- **Diagnostics** — `/diagnostics` (`src/routes/Diagnostics.tsx`, linked from `/admin`).
+  PIN-gated, **not** connection-gated. Shows client_id, session, reachability, last sync, the
+  outbox and dead-letter (Retry / Export-JSON per item, "Copy state as JSON" — token redacted).
+- **CSV export** — `src/lib/data/csv.ts` `scoresToCsv()`, wired into the admin Export panel
+  beside JSON; both copy to clipboard.
+
+Things that will bite if forgotten:
+- **An offline unlock cannot mint a server token.** A tee change queued on an offline-only
+  session is kept and syncs after the next *online* unlock — do not expect it to flush offline.
+- **`mergeStampedRows` now takes `round_players`** (optional). `hydrate.ts` no longer bulkPuts
+  that table; a routine refetch must not overwrite an unsynced tee change.
+- **The editor uses `saveRoundPlayersQueued`, not `saveRoundPlayers`.** The latter (online admin
+  RPC, sentinel client_id) is retained for `admin_path.sql` and as a hard reset, but is unused by
+  the UI; the queued path preserves `manual_override`, the admin one cleared it.
+- Tests: `npm run test:sync` now 46 (adds `roundplayer.test.ts`); plus `session.test.ts` and
+  `csv.test.ts`. Full `vitest run` → 122. `supabase test db` unchanged (no migration changed —
+  only the Edge Function, which pgTAP doesn't cover; its contract is checked by
+  `verify-write-path.sh` and a live curl).

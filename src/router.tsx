@@ -7,6 +7,7 @@ import RoundDetail from '@/routes/RoundDetail'
 import Enter from '@/routes/Enter'
 import Money from '@/routes/Money'
 import Admin from '@/routes/Admin'
+import Diagnostics from '@/routes/Diagnostics'
 import NotFound from '@/routes/NotFound'
 import InfoLayout from '@/routes/info/InfoLayout'
 import Itinerary from '@/routes/info/Itinerary'
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
         ],
       },
       { path: '/admin', element: <Admin /> },
+      { path: '/diagnostics', element: <Diagnostics /> },
       { path: '*', element: <NotFound /> },
     ],
   },

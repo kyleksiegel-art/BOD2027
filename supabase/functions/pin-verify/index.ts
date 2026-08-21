@@ -118,5 +118,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   })
   if (sessionError) return json({ error: 'Could not start a session.' }, 503)
 
-  return json({ token, expires_at: expiresAt }, 200)
+  // Hand back the LOCAL-offline PIN hash (bcrypt, cost 10 — see docs/spec/decisions.md
+  // §"PIN size and hash") so a device that has unlocked online once can re-unlock with no
+  // signal (the iOS install-then-unlock case). It is disclosed only to a caller who just
+  // proved they know the PIN, and its threat model already says "brute-forceable — accepted
+  // tradeoff." Absent secret ⇒ offline unlock simply stays unavailable; online is unaffected.
+  const offlineHash = Deno.env.get('APP_PIN_BCRYPT_HASH') ?? null
+
+  return json({ token, expires_at: expiresAt, pin_bcrypt_hash: offlineHash }, 200)
 })

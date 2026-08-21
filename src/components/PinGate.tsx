@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
-import { unlock, UnlockError } from '@/lib/auth/session'
+import { useEffect, useState, type FormEvent } from 'react'
+import { unlock, unlockOffline, hasOfflineHash, UnlockError } from '@/lib/auth/session'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 
 /**
  * The PIN unlock panel.
@@ -27,6 +28,13 @@ export function PinGate({ purpose }: { purpose: string }) {
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [offlineAvailable, setOfflineAvailable] = useState(false)
+  const online = useOnlineStatus()
+
+  // Whether this device has ever unlocked online (so an offline unlock is possible at all).
+  useEffect(() => {
+    void hasOfflineHash().then(setOfflineAvailable)
+  }, [])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -34,7 +42,24 @@ export function PinGate({ purpose }: { purpose: string }) {
     setBusy(true)
     setError(null)
     try {
-      await unlock(pin)
+      // With a link, try the server (mints a real token). With no link, verify locally
+      // against the cached hash. If the server attempt fails on the network specifically,
+      // fall back to the local check so a captive-portal false-positive still lets you in.
+      if (online) {
+        try {
+          await unlock(pin)
+        } catch (err) {
+          // Only a genuine connection failure falls back to the local check — a server
+          // "Incorrect PIN" or a throttle is a real answer and must stand.
+          if (err instanceof UnlockError && err.networkFailed && offlineAvailable) {
+            await unlockOffline(pin)
+          } else {
+            throw err
+          }
+        }
+      } else {
+        await unlockOffline(pin)
+      }
       setPin('')
     } catch (err) {
       const message = err instanceof UnlockError ? err.message : 'Could not unlock.'
@@ -80,6 +105,13 @@ export function PinGate({ purpose }: { purpose: string }) {
       {error ? (
         <p role="alert" className="mt-3 text-[0.9rem] text-gold-bright">
           {error}
+        </p>
+      ) : null}
+
+      {!online && offlineAvailable ? (
+        <p className="mt-3 text-[0.82rem] leading-relaxed text-paper-dim">
+          No signal — this device will unlock from the PIN it saved the last time it was
+          online. Changes that need the server still wait for a connection.
         </p>
       ) : null}
 

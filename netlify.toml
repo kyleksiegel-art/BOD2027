@@ -23,17 +23,25 @@
 # --- Caching -------------------------------------------------------------- #
 
 # App shell must revalidate on every load so a new deploy is picked up at once,
-# never served stale from the CDN edge. (Also covers the future Phase 6 SW flow.)
+# never served stale from the CDN edge. The service worker precaches a hashed copy
+# of the shell too; this header governs the network copy the SW updates against.
 [[headers]]
   for = "/index.html"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
-# Service worker script (Phase 6): never cache, so updates are prompted.
+# Service worker script (vite-plugin-pwa, registerType: 'prompt'): never cache, so a new
+# deploy's sw.js is fetched every load and the update prompt can fire.
 [[headers]]
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"
+
+# The web manifest changes rarely and only with a deploy; revalidate rather than pin.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 # Content-addressed build output — filename changes on every content change,
 # so it is safe to cache forever.

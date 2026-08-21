@@ -353,6 +353,76 @@ Grouped by `(round_id, player_id, hole_number)` key, latest-per-key wins. Differ
 
 `registerType: 'prompt'`. No `skipWaiting`. No `clientsClaim`. New-version toast lives in the persistent top bar and is **suppressed when `outbox.length > 0`** — never fire a page reload mid-flush.
 
+**Implemented in Phase 6b (`vite-plugin-pwa` v1, Workbox `generateSW`):**
+`globPatterns` and `maximumFileSizeToCacheInBytes` are set **explicitly** (the brief), not left
+to Workbox defaults: the hero photo is ~360 KB and the default 2 MiB cap would drop anything
+larger silently, so we precache `**/*.{js,css,html,woff2,svg,png,jpg,ico,webmanifest}` with a
+4 MiB ceiling (22 entries, ~1.2 MiB total — the shell, JS/CSS, both fonts, the icons, and the
+hero). `injectRegister: false` because registration and the prompt are driven from React
+(`useRegisterSW` in `PwaUpdatePrompt.tsx`); the prompt renders `null` while `pending > 0`, so
+the waiting worker stays waiting until the queue drains. `navigateFallback: '/index.html'` so a
+deep link opened offline still boots the SPA. **PWA install itself cannot be verified without a
+real HTTPS origin** (a SW needs a secure context), so install/update is a pre-trip manual check;
+what Phase 6b verifies is that the build emits `sw.js` + `manifest.webmanifest` and precaches the
+right set.
+
+### App icons (Phase 6b)
+
+Generated from `public/icon.svg` (a serif "BOD·27" monogram in the brand palette) with macOS
+`sips` — the only rasteriser on the build host, and it handles SVG→PNG. Committed PNGs:
+`pwa-192x192`, `pwa-512x512`, `pwa-maskable-512x512` (extra safe-area padding, no frame),
+`apple-touch-icon` (180, iOS reads it from `index.html`, not the manifest), `favicon-32`. Regenerate
+by re-running `sips` against the SVG if the mark changes.
+
+### Offline PIN: hash delivered on unlock, not shipped in the bundle (Phase 6b)
+
+The local bcrypt hash (cost 10) is **returned by the `pin-verify` Edge Function on a successful
+unlock** and cached in Dexie `sync_meta`, rather than baked into the JS bundle. It is disclosed
+only to a caller who just proved they know the PIN, so it never sits in a public artifact — while
+still giving a device that has unlocked online once the ability to re-unlock with no signal (the
+iOS install-then-unlock case). `unlockOffline` verifies against it with `bcryptjs`. The cached hash
+**survives `lock()`** on purpose: locking a device must not disable its offline re-unlock. Set both
+hashes with `scripts/hash-pin.ts` (it now prints `APP_PIN_ARGON2_HASH` and `APP_PIN_BCRYPT_HASH`).
+
+**An offline unlock grants a session with an EMPTY server token** (`SessionRow.offline = true`). It
+unlocks the UI and lets a tee change queue, but `readToken()` returns null for it, so every
+token-gated write (admin RPCs, the round_player flush) waits for the next online unlock. The PIN
+gate falls back to the local check only on a genuine *connection* failure (`UnlockError.networkFailed`),
+never on a server "Incorrect PIN" or a throttle — those are real answers and must stand.
+
+### `round_player` is the third outbox kind; the editor's tee-save always queues (Phase 6b)
+
+Per §"Answer to the open question", a day-of tee/handicap change rides the outbox. In Phase 6b the
+Rounds editor's **"Save tees & handicaps" button always goes through the outbox**
+(`saveRoundPlayersQueued` → `enqueueRoundPlayer` → `rpc_upsert_round_player`), online and offline
+alike, so it works standing on the first tee with no signal and stays enabled while the rest of
+`/admin` is disabled offline. The optimistic local `round_players` row is **computed on enqueue**
+by the same `computeHandicap` the server mirrors, so strokes-received are right immediately offline;
+the server's authoritative row replaces it on flush. `round_players` therefore joins `scores`/`ctp`
+at all four comparator sites (SQL guard already existed; added: the merge, a dedicated Realtime
+handler, and the shield). The flush **defers** round_player batches (no attempt, no error) when
+there is no session token, and sends them after the next online unlock.
+
+Two smaller calls: the online admin variant `rpc_upsert_round_player_admin` (sentinel client_id) is
+**retained** for its SQL test surface and as a hard-reset path, but the editor no longer uses it; and
+the queued path **carries the existing `manual_override`** so a tee change no longer silently clears
+an override the way the online variant did (it never sent the field).
+
+### CSV export shape (Phase 6b)
+
+The brief's "export all scores as CSV/JSON". JSON stays the faithful dump; the CSV
+(`src/lib/data/csv.ts`) is the human one: one row per entered score, names resolved, sorted
+round → player → hole, RFC-4180 quoting, derived entirely from the same `rpc_export_all_scores`
+payload so the two can't disagree. Both are copy-to-clipboard in the admin Export panel.
+
+### Diagnostics is PIN-gated but not connection-gated (Phase 6b)
+
+`/diagnostics` (linked from `/admin`) shows client_id, session expiry/kind, reachability, last sync,
+the outbox, and the dead-letter siding (Retry / Export-JSON per item, plus "Copy state as JSON").
+It requires the PIN (it exposes sync internals) but **not** a connection — the whole point is to read
+the local queue in a dead zone, which the offline PIN makes reachable. The "Copy state as JSON"
+snapshot **omits the session token** deliberately: it gets pasted into chats.
+
 ### Fonts
 
 Fraunces (variable, 300–700, italic + roman) for display + figures; Inter (variable) for UI/body. Self-hosted from Google Fonts CDN download, subsetted to Latin. Target ≤80 KB total font payload.

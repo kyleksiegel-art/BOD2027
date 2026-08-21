@@ -641,6 +641,75 @@ network, Postgres, the Realtime socket — is real.
 
 ---
 
+## Phase 6b — Offline: PWA, offline PIN, day-of tee change, Diagnostics, CSV
+
+The back half of Phase 6, on branch `phase-6-offline` (Phases 4–6 all still uncommitted to
+`main`). Nothing here is stubbed. Deps added: `vite-plugin-pwa` (dev), `bcryptjs`.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| `vite-plugin-pwa` + Workbox, `registerType: 'prompt'`, no `skipWaiting`/`clientsClaim` | `vite.config.ts`. `npm run build` emits `dist/sw.js`, `dist/workbox-*.js`, `dist/manifest.webmanifest`; PWA log: `generateSW`, precache **22 entries (1230 KiB)** |
+| `globPatterns` and `maximumFileSizeToCacheInBytes` set **explicitly** (the brief) | `workbox.globPatterns` = `**/*.{js,css,html,woff2,svg,png,jpg,ico,webmanifest}`, `maximumFileSizeToCacheInBytes` = 4 MiB. The built `sw.js` precache list includes `assets/hero.jpg` (~360 KB, over Workbox's 2 MiB default would-be cap only if larger — set high deliberately), both fonts, all icons, the manifest and the shell |
+| Update toast in the top bar, **suppressed while `outbox.length > 0`** | `src/components/PwaUpdatePrompt.tsx` (`useRegisterSW`); renders `null` when `useSyncSnapshot().pending > 0`. `injectRegister: false` — React owns registration, so there is no second auto-register |
+| `navigator.storage.persist()` after unlock | `src/lib/storage.ts` `requestPersistentStorage()`, called by `unlock`/`unlockOffline` and once on cold-start if a session exists (`ensurePersistedIfUnlocked` in `Layout`). Guarded, best-effort |
+| Offline PIN verification via a stored bcrypt hash (cost 10) | `pin-verify` returns `pin_bcrypt_hash` on success (env `APP_PIN_BCRYPT_HASH`); `session.ts` caches it in `sync_meta`, `unlockOffline()` verifies with `bcryptjs`. **Live:** a real curl unlock with PIN `2718` returned `"pin_bcrypt_hash":"$2b$10$…"`; in the browser after unlocking, Dexie `sync_meta` held the `$2b$10$` hash and the session row was `{offline:false, token:…}` |
+| Offline unlock grants UI access but no server token | `SessionRow.offline`; `readToken()` returns null for an offline session. `session.test.ts`: right PIN → `offline:true`, `token:''`, `readToken()` null; wrong PIN rejected; hash survives `lock()` |
+| Diagnostics screen | `src/routes/Diagnostics.tsx` at `/diagnostics`, linked from `/admin`. PIN-gated, **not** connection-gated. **Live (375 px):** unlocked with `2718`, rendered client_id, "Server token held", "Session expires Mon, Feb 8", reachability `online`, last sync, "Outbox — 0 waiting", "Dead letter — 0 stuck", "Copy state as JSON". No console errors |
+| Diagnostics: outbox, dead-letter with Retry / Export-JSON, copy-state-as-JSON | Reads `db.outbox`/`db.dead_letter` via `useLiveQuery`; each dead item has Retry (`retryDeadLetter`) and Export JSON; "Copy state as JSON" assembles a snapshot with the **session token omitted** |
+| `round_player` as the third outbox kind | `enqueueRoundPlayer` (optimistic row via `computeHandicap`), key `rp|round|player`, flushed via `rpc_upsert_round_player` with a token. Applied at all four comparator sites (SQL guard existed; added merge, `applyRoundPlayerEvent`, shield/write-back). `roundplayer.test.ts` (7): optimistic compute offline, recompute on tee change, flush with token, **defer without a token then send after one appears**, offline-only-session defer, shield holds a stale server row, self-echo clears |
+| Day-of tee change works offline; the rest of `/admin` does not | Rounds editor's "Save tees & handicaps" → `saveRoundPlayersQueued`, enabled while offline; the banner now carves out the exception. **Live against real Postgres:** `rpc_upsert_round_player` accepted the client's exact wire payload for R3/Jon on the Black tee → `applied:true`, `strokes_received` recomputed 13→**10** (CH 10.38), row carried our `client_id` and the effective stamp |
+| Admin "export all scores" as CSV/JSON | JSON (5B) kept; CSV added — `src/lib/data/csv.ts` `scoresToCsv()`, wired into the Export panel. `csv.test.ts` (3): names resolved, sorted round→player→hole, comma-quoting, empty-safe |
+| Dark / tabular / 44px / no console errors | New screens use the Phase 1 tokens; Diagnostics verified at 375 px with no console errors |
+
+### Automated tests
+
+- `npm run test:sync` → **46** (adds `roundplayer.test.ts`, 7).
+- `npx vitest run --reporter=dot` → **122** (67 scoring + 46 sync + 6 auth `session.test.ts`
+  + 3 `csv.test.ts`). Was 106.
+- `npx tsc -b --noEmit` clean; `npm run build` clean (708 KB JS / 213 KB gzip — over Vite's
+  500 KB warning, unchanged posture; code-splitting is Phase 9).
+- `supabase test db` → **232**, unchanged: no migration changed. The one server edit is the
+  `pin-verify` Edge Function (returns the bcrypt hash), which pgTAP does not cover; its contract
+  is checked live (curl above) and by `scripts/verify-write-path.sh`.
+
+### Manual tests — browser at 375 px against the local stack, 2026-08-21
+
+Input events were dispatched to the same React handlers via `dispatchEvent`; the harness's click
+injection timed out again (`visibilityState: 'hidden'`), exactly as the Phase 6a handoff warned.
+Everything else — the app, the Edge Function, Postgres — is real.
+
+1. **Build → PWA artifacts.** `sw.js` + `workbox-*.js` + `manifest.webmanifest` generated; precache
+   list confirmed to include the hero, fonts, icons, manifest and shell.
+2. **Online unlock caches the offline hash.** curl unlock returned `pin_bcrypt_hash`; in the browser,
+   after unlocking on `/diagnostics`, Dexie `sync_meta` held `$2b$10$…` and the session was online.
+3. **Diagnostics renders** the device panel, outbox and dead-letter sections, unlocked with `2718`.
+4. **round_player over real Postgres:** `rpc_upsert_round_player` accepted the client payload,
+   recomputed strokes 13→10, returned the stamped row. DB restored with `supabase db reset`.
+
+### Deferred / not verifiable this session
+
+| Item | Why |
+|---|---|
+| PWA **install** + the update prompt firing on a real deploy | A service worker needs a secure (HTTPS) context; there is no hosted origin yet. Pre-trip manual: install on iPhone, unlock inside the installed app, confirm the update toast waits while the outbox is non-empty |
+| Two real phones; a full airplane-mode round | Cannot be automated; carried on the definition-of-done tracker |
+| `round_player` flush from an **offline-only** session | By design it waits for an online unlock to mint a token; covered in `roundplayer.test.ts` but not on hardware |
+
+### Deviations from the brief
+
+1. **The offline bcrypt hash is delivered by the Edge Function on unlock, not shipped in the
+   bundle.** Stronger than "a stored hash" — it never sits in a public artifact. `decisions.md`
+   §"Offline PIN: hash delivered on unlock".
+2. **An offline unlock carries no server token**, so token-gated writes (admin RPCs, the
+   round_player flush) wait for an online unlock. The brief did not anticipate the two-tier session.
+   `decisions.md`.
+3. **The editor's tee-save always goes through the outbox** (online and offline), replacing the
+   online-only admin variant for that one button; the admin RPC is retained for tests/hard-reset.
+   The queued path also preserves `manual_override`, which the admin variant cleared. `decisions.md`.
+
+---
+
 ## Phase 7 — Money
 
 _(To be filled in at end of Phase 7.)_

@@ -76,6 +76,11 @@ export interface RoundPlayerRow {
   strokes_received: number
   manual_override: number | null
   status: RpStatusRow
+  // Present once a day-of tee change has gone through the write path (Phase 6b outbox).
+  // The seed leaves them null; the comparator treats an unstamped row as oldest.
+  client_updated_at_raw?: string
+  client_updated_at_effective?: string
+  client_id?: string
 }
 
 export interface ScoreRow {
@@ -104,9 +109,16 @@ export interface CtpResultRow {
 /** Local only — never synced. The PIN session token and its expiry. */
 export interface SessionRow {
   id: 'current'
+  /** The server session token, or '' for an offline unlock (which cannot mint one). */
   token: string
   expires_at: string
   unlocked_at: string
+  /**
+   * True when this session was granted by the LOCAL bcrypt check with no signal. It unlocks
+   * the UI, but carries no server token — so `readToken()` returns null for it and any
+   * token-gated write (admin RPCs, the round_player outbox) waits for an online unlock.
+   */
+  offline?: boolean
 }
 
 export interface SettingRow {
@@ -134,7 +146,24 @@ export interface CtpPayload {
   distance_feet: number | null
 }
 
-export type OutboxKind = 'score' | 'ctp'
+/**
+ * A day-of tee/handicap change — the one admin mutation carved into the outbox
+ * (docs/spec/decisions.md §"Answer to the open question"). INPUTS only: the server owns the
+ * handicap arithmetic, so two phones can never disagree about who gets a stroke. The local
+ * optimistic row is computed by the same pure engine so it reads right offline until flush.
+ */
+export interface RoundPlayerPayload {
+  round_id: string
+  player_id: string
+  tee_id: string
+  index_used: number
+  allowance_used: number
+  cap_used: number
+  status: RpStatusRow
+  manual_override: number | null
+}
+
+export type OutboxKind = 'score' | 'ctp' | 'round_player'
 
 export interface OutboxEntry {
   /** Local sequence number, Dexie-assigned. The tie-break when two entries share a ts. */
@@ -142,9 +171,9 @@ export interface OutboxEntry {
   /** Client-generated UUID. Stable across a dead-letter transfer, so an item is traceable. */
   id: string
   kind: OutboxKind
-  /** Canonical key: score = `round|player|hole`, ctp = `round|hole`. The shield indexes it. */
+  /** Canonical key: score `round|player|hole`, ctp `round|hole`, rp `round|player`. */
   key: string
-  payload: ScorePayload | CtpPayload
+  payload: ScorePayload | CtpPayload | RoundPlayerPayload
   /** Monotonic ISO timestamp — sent as client_updated_at_raw. */
   ts: string
   client_id: string

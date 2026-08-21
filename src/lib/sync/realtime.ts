@@ -18,8 +18,8 @@ import { supabase } from '@/lib/supabase'
 import { db } from '@/lib/db'
 import { queryClient } from '@/lib/data/queryClient'
 import { incomingWins, stampOf } from './comparator'
-import { clearEchoed, ctpKey, flushOutbox, pendingStamps, scoreKey, shieldAllows } from './outbox'
-import type { CtpResultRow, ScoreRow } from '@/lib/data/types'
+import { clearEchoed, ctpKey, flushOutbox, pendingStamps, rpKey, scoreKey, shieldAllows } from './outbox'
+import type { CtpResultRow, RoundPlayerRow, ScoreRow } from '@/lib/data/types'
 
 // Supabase types a change payload over `Record<string, unknown>`; our row interfaces have
 // no index signature, so they are widened here rather than polluted with one.
@@ -69,6 +69,32 @@ export async function applyCtpEvent(payload: Change<CtpResultRow>): Promise<void
   await db.ctp_results.put(row)
 }
 
+/**
+ * Apply one `round_players` event. Contended now that day-of tee changes are queued: a
+ * remote tee change must clear this device's matching pending entry (self-echo) and beat
+ * both the local row and anything still owed for that (round, player). Points re-derive
+ * automatically — compute.ts reads round_players from Dexie through useLiveQuery.
+ */
+export async function applyRoundPlayerEvent(payload: Change<RoundPlayerRow>): Promise<void> {
+  if (payload.eventType === 'DELETE') {
+    const old = payload.old as Partial<RoundPlayerRow>
+    if (old.round_id && old.player_id) {
+      await db.round_players.delete([old.round_id, old.player_id])
+    }
+    return
+  }
+
+  const row = payload.new as RoundPlayerRow
+  const key = rpKey(row.round_id, row.player_id)
+  await clearEchoed(key, stampOf(row))
+
+  const pending = await pendingStamps()
+  const local = await db.round_players.get([row.round_id, row.player_id])
+  if (!incomingWins(row, local)) return
+  if (!shieldAllows(key, stampOf(row), pending)) return
+  await db.round_players.put(row)
+}
+
 let channel: RealtimeChannel | null = null
 
 /**
@@ -88,11 +114,14 @@ export function startRealtime(): () => void {
   ch.on('postgres_changes', { event: '*', schema: 'public', table: 'ctp_results' }, (p) => {
     void applyCtpEvent(p as Change<CtpResultRow>)
   })
+  ch.on('postgres_changes', { event: '*', schema: 'public', table: 'round_players' }, (p) => {
+    void applyRoundPlayerEvent(p as Change<RoundPlayerRow>)
+  })
 
-  // Uncontended tables. A change to any of them can move handicaps, the points table, or a
-  // round's status, so the whole read model is refetched rather than patched by hand — the
-  // same one network→Dexie path the admin write path uses.
-  for (const table of ['rounds', 'settings', 'players', 'round_players'] as const) {
+  // Uncontended tables. A change to any of them can move the points table or a round's
+  // status, so the whole read model is refetched rather than patched by hand — the same one
+  // network→Dexie path the admin write path uses.
+  for (const table of ['rounds', 'settings', 'players'] as const) {
     ch.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
       void queryClient.invalidateQueries({ queryKey: ['hydrate'] })
     })

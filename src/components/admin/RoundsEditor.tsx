@@ -3,7 +3,7 @@ import {
   abandonRound,
   finalizeRound,
   resnapshotRound,
-  saveRoundPlayers,
+  saveRoundPlayersQueued,
   setManualOverride,
   startRound,
   type RoundPlayerInput,
@@ -139,6 +139,8 @@ function RoundPanel({
       allowanceUsed: settings.allowance,
       capUsed: settings.handicapCap,
       status: assign[p.playerId].status === 'did_not_play' ? 'did_not_play' : 'playing',
+      // Carry the existing override so a tee change does not wipe it.
+      manualOverride: p.row?.manual_override ?? null,
     }))
   }
 
@@ -185,7 +187,6 @@ function RoundPanel({
                   className={inputClass}
                   inputMode="decimal"
                   value={assign[p.playerId]?.index ?? ''}
-                  disabled={disabled}
                   onChange={(e) =>
                     setAssign((a) => ({
                       ...a,
@@ -198,7 +199,7 @@ function RoundPanel({
                 <select
                   className={inputClass}
                   value={assign[p.playerId]?.teeId ?? ''}
-                  disabled={disabled || vm.tees.length === 0}
+                  disabled={vm.tees.length === 0}
                   onChange={(e) =>
                     setAssign((a) => ({
                       ...a,
@@ -218,7 +219,6 @@ function RoundPanel({
                 <select
                   className={inputClass}
                   value={assign[p.playerId]?.status ?? 'playing'}
-                  disabled={disabled}
                   onChange={(e) =>
                     setAssign((a) => ({
                       ...a,
@@ -248,9 +248,9 @@ function RoundPanel({
       <div className="mt-4">
         <Button
           tone="primary"
-          disabled={disabled || setup.busy || !canSave}
+          disabled={setup.busy || !canSave}
           onClick={() =>
-            void setup.run('Tees and handicaps saved.', () => saveRoundPlayers(entries()))
+            void setup.run('Tees and handicaps saved.', () => saveRoundPlayersQueued(entries()))
           }
         >
           {setup.busy ? 'Saving…' : 'Save tees & handicaps'}
@@ -265,7 +265,11 @@ function RoundPanel({
           Saved at {Math.round(settings.allowance * 100)}% allowance, cap{' '}
           {settings.handicapCap}. The server recomputes course handicap, playing handicap and
           strokes received from the tee — this form never sends them. The index here applies to
-          this round only; the Players tab holds the trip-wide one.
+          this round only; the Players tab holds the trip-wide one.{' '}
+          <strong className="text-paper-dim">
+            Tee changes queue like scores and work with no signal
+          </strong>{' '}
+          — strokes recompute on this phone straight away and sync when you have a connection.
         </p>
         <Report report={setup.report} />
       </div>

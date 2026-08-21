@@ -8,18 +8,26 @@
 // and it deserves a test that doesn't depend on Supabase being up.
 import { db } from '@/lib/db'
 import { incomingWins, stampOf } from './comparator'
-import { ctpKey, pendingStamps, scoreKey, shieldAllows } from './outbox'
-import type { CtpResultRow, ScoreRow } from '@/lib/data/types'
+import { ctpKey, pendingStamps, rpKey, scoreKey, shieldAllows } from './outbox'
+import type { CtpResultRow, RoundPlayerRow, ScoreRow } from '@/lib/data/types'
 
 export interface MergeReport {
   applied: number
   skipped: number
 }
 
-/** Merge fetched `scores` and `ctp_results` into Dexie. Never a bulkPut. */
+/**
+ * Merge the fetched stamped tables into Dexie. Never a bulkPut.
+ *
+ * `round_players` joins `scores` and `ctp_results` here in Phase 6b: a day-of tee change is
+ * now a queued write, so a routine refetch must not overwrite an unsynced local tee change
+ * any more than it may overwrite an unsynced hole. Unstamped rows (the seed) still land
+ * unconditionally — incomingWins() treats an unstamped local row as oldest.
+ */
 export async function mergeStampedRows(payload: {
   scores: ScoreRow[]
   ctp_results: CtpResultRow[]
+  round_players?: RoundPlayerRow[]
 }): Promise<MergeReport> {
   const pending = await pendingStamps()
   let applied = 0
@@ -44,6 +52,17 @@ export async function mergeStampedRows(payload: {
       continue
     }
     await db.ctp_results.put(row)
+    applied += 1
+  }
+
+  for (const row of payload.round_players ?? []) {
+    const local = await db.round_players.get([row.round_id, row.player_id])
+    const key = rpKey(row.round_id, row.player_id)
+    if (!incomingWins(row, local) || !shieldAllows(key, stampOf(row), pending)) {
+      skipped += 1
+      continue
+    }
+    await db.round_players.put(row)
     applied += 1
   }
 

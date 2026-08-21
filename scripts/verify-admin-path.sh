@@ -16,7 +16,7 @@ set -uo pipefail
 
 API_URL="${API_URL:-http://127.0.0.1:54321}"
 ANON_KEY="${ANON_KEY:-$(supabase status -o json 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["ANON_KEY"])')}"
-PIN="${PIN:-271828}"
+PIN="${PIN:-1922}"
 
 RED=c0000000-0000-4000-8000-000000000001
 BONE=c0000000-0000-4000-8000-000000000004

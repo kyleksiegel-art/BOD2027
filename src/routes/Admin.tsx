@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { PinGate } from '@/components/PinGate'
@@ -10,6 +11,7 @@ import { Button, Report, useAdminAction } from '@/components/admin/kit'
 import { useAdmin } from '@/lib/data/selectors'
 import { useSession, lock } from '@/lib/auth/session'
 import { exportAll } from '@/lib/data/admin'
+import { scoresToCsv } from '@/lib/data/csv'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { formatDay } from '@/lib/format'
 
@@ -76,11 +78,14 @@ export default function Admin() {
         }
       />
 
-      {/* Online-only, said plainly. Not a toast — it stays up as long as it is true. */}
+      {/* Online-only, said plainly. Not a toast — it stays up as long as it is true. The one
+          exception is the day-of tee/handicap change, which queues like a score. */}
       {!online ? (
         <p className="mt-5 rounded-md border border-gold/40 bg-gold/10 p-3 text-[0.88rem] leading-relaxed text-paper">
-          <strong>No connection.</strong> Admin changes go straight to the server — they are
-          not queued like scores are. Nothing here will save until you have a signal.
+          <strong>No connection.</strong> Most admin changes go straight to the server and will
+          not save until you have a signal. The exception is <strong>Rounds → tees &amp;
+          handicaps</strong>, which queues like scores do — set a tee at the first tee with no
+          signal and it syncs later.
         </p>
       ) : null}
 
@@ -114,7 +119,7 @@ export default function Admin() {
 
       <ExportPanel disabled={disabled} />
 
-      <div className="mt-8 border-t border-hair pt-4">
+      <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-hair pt-4">
         <button
           type="button"
           onClick={() => void lock()}
@@ -122,6 +127,12 @@ export default function Admin() {
         >
           Lock admin on this device
         </button>
+        <Link
+          to="/diagnostics"
+          className="tap text-[0.85rem] text-paper-faint underline underline-offset-4"
+        >
+          Diagnostics &amp; sync queue
+        </Link>
       </div>
     </Page>
   )
@@ -136,13 +147,15 @@ export default function Admin() {
 function ExportPanel({ disabled }: { disabled: boolean }) {
   const { busy, report, run } = useAdminAction()
   const [json, setJson] = useState<string | null>(null)
+  const [csv, setCsv] = useState<string | null>(null)
 
   return (
     <section className="mt-8 rounded-lg border border-hair bg-black/20 p-4">
       <h3 className="font-display text-xl text-paper">Export</h3>
       <p className="mt-2 text-[0.85rem] leading-relaxed text-paper-dim">
         Every score, handicap snapshot, CTP result, frozen money row and setting — enough to
-        reproduce any number in the app after the fact.
+        reproduce any number in the app after the fact. JSON is the faithful dump; CSV is one
+        row per entered score, names resolved, for a spreadsheet.
       </p>
       <div className="mt-3 flex flex-wrap gap-3">
         <Button
@@ -151,20 +164,24 @@ function ExportPanel({ disabled }: { disabled: boolean }) {
             void run('Exported.', async () => {
               const data = await exportAll()
               setJson(JSON.stringify(data, null, 2))
+              setCsv(scoresToCsv(data as Parameters<typeof scoresToCsv>[0]))
             })
           }
         >
-          {busy ? 'Exporting…' : 'Export all scores (JSON)'}
+          {busy ? 'Exporting…' : 'Export all scores'}
         </Button>
         {json ? (
           <Button onClick={() => void navigator.clipboard?.writeText(json)}>Copy JSON</Button>
         ) : null}
+        {csv ? (
+          <Button onClick={() => void navigator.clipboard?.writeText(csv)}>Copy CSV</Button>
+        ) : null}
       </div>
       <Report report={report} />
-      {json ? (
+      {csv ? (
         <pre className="mt-3 max-h-64 overflow-auto rounded-md border border-hair bg-ground p-3 text-[0.7rem] leading-snug text-paper-dim">
-          {json.slice(0, 4000)}
-          {json.length > 4000 ? '\n…' : ''}
+          {csv.slice(0, 4000)}
+          {csv.length > 4000 ? '\n…' : ''}
         </pre>
       ) : null}
     </section>

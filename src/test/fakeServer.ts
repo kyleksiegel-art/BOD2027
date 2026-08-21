@@ -9,7 +9,7 @@
 // server that behaves as specified.
 import { incomingWins } from '@/lib/sync/comparator'
 import { OfflineError, TransportError, type RpcResult, type Transport } from '@/lib/sync/outbox'
-import type { CtpResultRow, ScoreRow } from '@/lib/data/types'
+import type { CtpResultRow, RoundPlayerRow, ScoreRow } from '@/lib/data/types'
 
 type Cell = {
   round_id: string
@@ -24,6 +24,9 @@ type Cell = {
 export class FakeServer {
   scores = new Map<string, ScoreRow>()
   ctp = new Map<string, CtpResultRow>()
+  roundPlayers = new Map<string, RoundPlayerRow>()
+  /** The session token the last round_player call carried, if any. */
+  lastToken: string | null = null
 
   /** No route to the server. Requests never land; nothing may be counted against them. */
   offline = false
@@ -42,9 +45,10 @@ export class FakeServer {
       this.requests += 1
       if (this.offline) throw new OfflineError('Failed to fetch')
       if (this.failing) throw new TransportError('500 internal server error')
-      return fn === 'rpc_upsert_scores'
-        ? this.upsertScores((args.cells ?? []) as Cell[])
-        : this.upsertCtp((args.results ?? []) as never[])
+      if (fn === 'rpc_upsert_scores') return this.upsertScores((args.cells ?? []) as Cell[])
+      if (fn === 'rpc_upsert_ctp') return this.upsertCtp((args.results ?? []) as never[])
+      this.lastToken = (args.session_token as string | null) ?? null
+      return this.upsertRoundPlayer((args.entries ?? []) as RpEntry[])
     },
   }
 
@@ -129,8 +133,61 @@ export class FakeServer {
     return out
   }
 
+  private upsertRoundPlayer(entries: RpEntry[]): RpcResult[] {
+    const out: RpcResult[] = []
+    for (const e of entries) {
+      const k = `${e.round_id}|${e.player_id}`
+      const key = { round_id: e.round_id, player_id: e.player_id }
+      const refusal = this.refusals.get(k)
+      if (refusal) {
+        out.push({ key, applied: false, error: refusal, row: null })
+        continue
+      }
+      // The FakeServer does not re-run the handicap math (that is fn_compute_handicap's job,
+      // asserted in pgTAP) — it echoes inputs, which is all the comparator/queue tests need.
+      const incoming: RoundPlayerRow = {
+        round_id: e.round_id,
+        player_id: e.player_id,
+        tee_id: e.tee_id,
+        index_used: e.index_used,
+        allowance_used: e.allowance_used,
+        cap_used: e.cap_used,
+        course_handicap: e.index_used,
+        playing_handicap: Math.round(e.index_used),
+        cap_applied: false,
+        strokes_received: Math.round(e.index_used),
+        manual_override: e.manual_override ?? null,
+        status: e.status,
+        client_updated_at_raw: e.client_updated_at_raw,
+        client_updated_at_effective: this.clamp(e.client_updated_at_raw),
+        client_id: e.client_id,
+      }
+      const existing = this.roundPlayers.get(k)
+      if (incomingWins(incoming, existing)) {
+        this.roundPlayers.set(k, incoming)
+        out.push({ key, applied: true, error: null, row: incoming })
+      } else {
+        out.push({ key, applied: false, error: 'stale', row: existing! })
+      }
+    }
+    return out
+  }
+
   /** The rows a fresh hydrate would fetch. */
   scoreRows(): ScoreRow[] {
     return [...this.scores.values()]
   }
+}
+
+type RpEntry = {
+  round_id: string
+  player_id: string
+  tee_id: string
+  index_used: number
+  allowance_used: number
+  cap_used: number
+  status: RoundPlayerRow['status']
+  manual_override: number | null
+  client_updated_at_raw: string
+  client_id: string
 }
