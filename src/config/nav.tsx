@@ -60,10 +60,19 @@ export const TABS: NavItem[] = [
   { to: '/info', label: 'Info', Icon: Info },
 ]
 
-/** Info section sub-pages. Empty scaffolds until their build phase. */
+/**
+ * Info section sub-pages. Empty scaffolds until their build phase.
+ *
+ * Admin is the odd one out: it is a top-level route (`/admin`), not an `/info/*` sub-page,
+ * so tapping it leaves the Info section and lands on the PIN gate. It lives here only as a
+ * discoverable entry point — there is deliberately no Admin bottom tab, since it is for
+ * trip setup, not day-of use. It is PIN-gated regardless, so surfacing the link costs
+ * nothing.
+ */
 export const INFO_SUBNAV: { to: string; label: string }[] = [
   { to: '/info/itinerary', label: 'Itinerary' },
   { to: '/info/courses', label: 'Courses' },
   { to: '/info/players', label: 'Players' },
   { to: '/info/rules', label: 'Rules' },
+  { to: '/admin', label: 'Admin' },
 ]
