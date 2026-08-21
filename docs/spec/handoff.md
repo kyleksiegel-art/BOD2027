@@ -1,7 +1,8 @@
 # Handoff
 
-**Phase just finished:** 6b — the rest of offline. **Phase 6 is now complete.** Branch
-`phase-6-offline` (Phases 4–6 all still uncommitted to `main`). Nothing is stubbed.
+**Phase just finished:** 6b — the rest of offline. **Phase 6 is now complete.** Committed and
+pushed: `origin/phase-6-offline` @ `2cb3724` carries Phases 4–6b. **Nothing is merged to `main`**
+(still only the countdown page) — that is Kyle's call. Nothing is stubbed.
 
 **Built:** `vite-plugin-pwa` (`registerType:'prompt'`, `injectRegister:false`, explicit
 `globPatterns` + 4 MiB cap; update toast `PwaUpdatePrompt.tsx` suppressed while the outbox is
