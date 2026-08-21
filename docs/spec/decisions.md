@@ -302,7 +302,7 @@ an error is most expensive, because it disables the normal check.
 
 ### PIN size and hash
 
-6-digit PIN (per brief). Server-side hash: **argon2id**, moderate params (memory 64 MiB, iterations 3, parallelism 1). Chosen over bcrypt so Edge Function CPU stays cheap on hotel wifi during PIN unlocks.
+4-digit PIN (Kyle's call — see "PIN length is 4, not 6" below; the brief said 6). Server-side hash: **argon2id**, moderate params (memory 64 MiB, iterations 3, parallelism 1). Chosen over bcrypt so Edge Function CPU stays cheap on hotel wifi during PIN unlocks.
 
 Local offline PIN hash: **bcrypt cost 10**, not argon2. Argon2 needs WASM and adds ~200 KB to the bundle; local verification is a fallback and its threat model already says "brute-forceable — accepted tradeoff." Server hash stays argon2.
 
@@ -313,6 +313,29 @@ Comes from the Edge Function's platform-provided source IP, not `x-forwarded-for
 ### Session storage
 
 **Dexie only.** Not `localStorage`, not `sessionStorage`. Dexie already has to survive force-quit; using two mechanisms creates a bug where one exists and the other doesn't.
+
+### PIN length is 4, not 6
+
+**Kyle's decision, 2026-08-18**, overriding the brief's explicit *"Use 6 digits, not 4. Two
+extra taps, 100× the search space."* He was shown the cost before deciding.
+
+The number that matters is not the search space on its own but the space divided by the
+rate the throttle permits. The global brake (25 failures in 10 minutes → 60-second pause)
+is the hard ceiling regardless of how many IPs an attacker spreads across: **~1,400
+attempts a day.** So 10,000 combinations is ~3–4 days of *continuous* automated attack to
+expect a hit; 1,000,000 is ~a year.
+
+Accepted because of what is behind the PIN. Score entry is open by design (§"PIN removed
+from score entry"), so a successful guess reaches `/admin` — the points table, handicap
+snapshots, course cards, round lifecycle. Every one of those is an *input*: leaderboards
+re-derive from stored gross scores, so correcting a malicious edit restores the standings
+exactly. Nothing is destroyed, and the site is unlisted and used by four people.
+
+**Implementation note:** `PIN_LENGTH` in `src/components/PinGate.tsx` is the only
+client-side constant, and the Edge Function checks `/^\d{4,8}$/` — a well-formedness gate
+so a garbage body never costs an argon2 verify, deliberately a range rather than a fixed
+length. The stored hash is what actually decides. Changing PIN length later is a new hash
+plus that one constant, with no Edge Function redeploy.
 
 ### Reachability probe
 

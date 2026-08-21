@@ -9,10 +9,20 @@ import { unlock, UnlockError } from '@/lib/auth/session'
  * table or a handicap snapshot silently re-derives every leaderboard. Wired up in
  * Phase 5B along with the admin editors.
  *
- * A single numeric field rather than six boxes: `inputMode="numeric"` brings up the phone
- * keypad, one-handed, and there is nothing to tab between. The 16px font size is load
+ * A single numeric field rather than one box per digit: `inputMode="numeric"` brings up the
+ * phone keypad, one-handed, and there is nothing to tab between. The 16px font size is load
  * bearing — anything smaller and iOS zooms the page on focus.
  */
+
+/**
+ * PIN length. Changing this is the only client-side edit a new PIN length needs — the
+ * label, the placeholder, the input cap and the submit rule all read it. The server checks
+ * well-formedness over a range and lets argon2 be the real gate, so it needs no change.
+ *
+ * Kyle chose 4 (2026-08-18), overriding the brief's "use 6, not 4". See
+ * docs/spec/decisions.md §"PIN length is 4, not 6".
+ */
+export const PIN_LENGTH = 4
 export function PinGate({ purpose }: { purpose: string }) {
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
@@ -20,7 +30,7 @@ export function PinGate({ purpose }: { purpose: string }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (pin.length !== 6 || busy) return
+    if (pin.length !== PIN_LENGTH || busy) return
     setBusy(true)
     setError(null)
     try {
@@ -44,7 +54,7 @@ export function PinGate({ purpose }: { purpose: string }) {
 
       <form onSubmit={submit} className="mt-4">
         <label htmlFor="pin" className="sr-only">
-          Six-digit PIN
+          {PIN_LENGTH}-digit PIN
         </label>
         <input
           id="pin"
@@ -52,15 +62,15 @@ export function PinGate({ purpose }: { purpose: string }) {
           inputMode="numeric"
           autoComplete="one-time-code"
           pattern="[0-9]*"
-          maxLength={6}
+          maxLength={PIN_LENGTH}
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          placeholder="••••••"
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH))}
+          placeholder={'•'.repeat(PIN_LENGTH)}
           className="tap w-full rounded-md border border-hair-strong bg-ground px-4 py-3 text-center text-2xl tracking-[0.4em] text-paper tnum placeholder:text-paper-faint focus:border-gold focus:outline-none"
         />
         <button
           type="submit"
-          disabled={pin.length !== 6 || busy}
+          disabled={pin.length !== PIN_LENGTH || busy}
           className="tap mt-3 w-full rounded-md bg-gold px-4 py-3 font-semibold text-ground disabled:opacity-40"
         >
           {busy ? 'Checking…' : 'Unlock'}

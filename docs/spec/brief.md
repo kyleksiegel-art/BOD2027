@@ -596,7 +596,17 @@ In the migration:
 > **shared PIN** — anyone with it can enter and edit scores for **all players**, not just
 > their own. **Use 6 digits, not 4.** Two extra taps, 100× the search space.
 
-Everything is publicly viewable. **`/admin`** sits behind a **shared PIN** — anyone with it can edit every mutable thing in the trip. **Use 6 digits, not 4.** Two extra taps, 100× the search space. **Score entry is open** and requires an explicit Save per hole.
+> **AMENDED 2026-08-18 (Kyle): the PIN is 4 digits, not 6.** Kyle chose a 4-digit PIN
+> after being shown the cost: the throttle's global brake caps guessing at roughly 1,400
+> attempts a day, so a 10,000-wide space is ~3–4 days of continuous automated attack
+> against ~a year for a 1,000,000-wide one. What sits behind it is `/admin` only, and every
+> leaderboard re-derives from stored gross scores, so the damage a successful guess could
+> do is recoverable. See `docs/spec/decisions.md` §"PIN length is 4, not 6". Reverting is a
+> new hash and one constant.
+>
+> ~~Original text:~~ …**Use 6 digits, not 4.** Two extra taps, 100× the search space.
+
+Everything is publicly viewable. **`/admin`** sits behind a **shared PIN** — anyone with it can edit every mutable thing in the trip. ~~**Use 6 digits, not 4.**~~ **4 digits, per the amendment above.** **Score entry is open** and requires an explicit Save per hole.
 
 **Reads:** RLS on with **explicit permissive SELECT policies for `anon`** on every publicly-readable table (`CREATE POLICY ... FOR SELECT TO anon USING (true)`). Not optional — with RLS enabled and no SELECT policy the tables are readable by nobody, fetches return `[]`, and **Realtime silently delivers zero events** with no error, failing the two-phones requirement invisibly. `sessions` and `pin_attempts` are the exceptions: RLS on, zero policies, `REVOKE ALL FROM anon`.
 

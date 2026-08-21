@@ -1,6 +1,6 @@
 // Generate the argon2id hash the pin-verify Edge Function checks against.
 //
-//   npx tsx scripts/hash-pin.ts 271828
+//   npx tsx scripts/hash-pin.ts 1922
 //
 // Then set it as a Supabase secret (production) or put it in supabase/functions/.env
 // (local). The PIN itself is never stored anywhere -- only this hash.
@@ -10,8 +10,8 @@
 import { argon2id } from 'hash-wasm'
 
 const pin = process.argv[2]
-if (!pin || !/^\d{6}$/.test(pin)) {
-  console.error('Usage: npx tsx scripts/hash-pin.ts <six-digit-pin>')
+if (!pin || !/^\d{4,8}$/.test(pin)) {
+  console.error('Usage: npx tsx scripts/hash-pin.ts <pin>   (4-8 digits)')
   process.exit(1)
 }
 

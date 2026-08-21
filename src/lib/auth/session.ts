@@ -1,6 +1,6 @@
 // The PIN session: unlock, lock, and read the token.
 //
-// THREAT MODEL, stated plainly (brief §Auth): a single shared six-digit PIN gates score
+// THREAT MODEL, stated plainly (brief §Auth): a single shared 4-digit PIN gates score
 // entry and /admin for a four-person golf trip. Verification happens server-side in the
 // pin-verify Edge Function (argon2id + per-IP throttling); the browser never sees the
 // PIN hash. What is stored here is an opaque 256-bit session token whose digest -- not

@@ -32,12 +32,12 @@ so browser taps were dispatched as DOM events to the same React handlers. Everyt
 those tests was real. If a future session sees the same, don't chase it in the app.
 
 **Kyle still owes (carried, unchanged):** real player indexes + who's assigned + each
-player's tee; the real 6-digit PIN as a Supabase secret; a hosted Supabase project +
+player's tee; the real 4-digit PIN as a Supabase secret; a hosted Supabase project +
 `supabase db push`; Netlify env vars; confirm the deploy preview + Lighthouse baseline.
 **`origin/main` is still only the countdown page — no phase work has ever merged**, and
 there is still no hosted Supabase. 6b's PWA/install verification needs a real HTTPS URL.
 
-**Local dev PIN is `271828`.** Run `supabase functions serve --env-file
+**Local dev PIN is `2718`.** Run `supabase functions serve --env-file
 supabase/functions/.env --no-verify-jwt` alongside `supabase start`.
 
 **Next phase:** 6b — `vite-plugin-pwa` (`registerType: 'prompt'`, explicit `globPatterns`

@@ -52,7 +52,7 @@ cp supabase/functions/.env.example supabase/functions/.env
 supabase functions serve --env-file supabase/functions/.env --no-verify-jwt
 ```
 
-The committed `.env.example` carries the hash of the **local development PIN `271828`**.
+The committed `.env.example` carries the hash of the **local development PIN `2718`**.
 It is not the trip PIN. Generate a hash for a real one and set it as a secret:
 
 ```bash
@@ -143,8 +143,10 @@ Re-gating is a one-line change if that judgement turns out wrong.
 
 ## The `/admin` PIN, stated honestly
 
-`/admin` sits behind a single **shared six-digit PIN**. Anyone with it can edit every
-mutable thing in the trip; that is the intent, not a weakness.
+`/admin` sits behind a single **shared four-digit PIN**. Anyone with it can edit every
+mutable thing in the trip; that is the intent, not a weakness. (The brief specified six;
+Kyle chose four on 2026-08-18 — `docs/spec/decisions.md` §"PIN length is 4, not 6" carries
+the arithmetic behind that call.)
 
 - Verification happens server-side in the `pin-verify` Edge Function using **argon2id** at
   OWASP's recommended parameters (m = 19 MiB, t = 3, p = 1). The browser never sees the
@@ -158,12 +160,16 @@ mutable thing in the trip; that is the intent, not a weakness.
   session that has already been issued.**
 - Sessions are 256 bits of CSPRNG output. The server stores only a SHA-256 digest, so a
   leaked `sessions` table grants nothing. They expire at the end of the trip.
-- **This is not high security, and should not be described as such.** Six digits is a
-  million-wide space; the throttling is what makes online guessing impractical. When
-  offline PIN verification lands in Phase 6, a hash of the PIN will also be stored on the
-  device: *local offline PIN verification prevents casual unauthorized access. It does not
-  resist an attacker who obtains the device's local storage, since a six-digit PIN space
-  is brute-forceable offline. That is an accepted tradeoff for a four-person golf trip.*
+- **This is not high security, and should not be described as such.** Four digits is a
+  10,000-wide space, and the throttling is the whole of what makes online guessing
+  impractical: the global brake caps guessing at roughly 1,400 attempts a day, so the
+  space is ~3–4 days of continuous automated attack. That is accepted because everything
+  behind the PIN is an *input* — leaderboards re-derive from stored gross scores, so a
+  malicious edit is corrected, not recovered from a backup. When offline PIN verification
+  lands in Phase 6, a hash of the PIN will also be stored on the device: *local offline PIN
+  verification prevents casual unauthorized access. It does not resist an attacker who
+  obtains the device's local storage, since a four-digit PIN space is brute-forceable
+  offline. That is an accepted tradeoff for a four-person golf trip.*
 - **Recovery:** there is no reset flow, by design. Regenerate the hash with
   `scripts/hash-pin.ts`, set the secret, and call `rpc_revoke_all_sessions`.
 

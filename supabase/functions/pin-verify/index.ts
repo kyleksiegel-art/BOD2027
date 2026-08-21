@@ -4,7 +4,7 @@
 // limiting inside the database would be theater. Here the platform sets the header at
 // the edge, so throttling has something real to count.
 //
-// THREAT MODEL, stated honestly: a shared six-digit PIN gates score entry and /admin for
+// THREAT MODEL, stated honestly: a shared 4-digit PIN gates /admin for
 // a four-person golf trip. argon2id at OWASP's recommended parameters plus layered
 // throttling makes online guessing impractical. It is not, and is not described as,
 // resistance against someone who obtains the server secret or a device's local storage.
@@ -93,7 +93,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     pin = undefined
   }
 
-  const wellFormed = typeof pin === 'string' && /^\d{6}$/.test(pin)
+  // Well-formedness only — a cheap gate so a garbage body never costs an argon2 verify.
+  // Deliberately a RANGE, not a fixed length: the stored hash is what actually decides,
+  // so changing the PIN's length is a client constant plus a new hash, never a redeploy
+  // of this function. See docs/spec/decisions.md §"PIN length is 4, not 6".
+  const wellFormed = typeof pin === 'string' && /^\d{4,8}$/.test(pin)
   const ok = wellFormed ? await argon2Verify({ password: pin as string, hash: pinHash }) : false
 
   await admin.rpc('rpc_record_pin_attempt', { p_ip: ip, p_success: ok })
