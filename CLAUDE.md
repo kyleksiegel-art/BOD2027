@@ -128,6 +128,11 @@ Things that will bite if forgotten:
 - **Nothing auto-saves.** Edits live in per-hole drafts (`DraftsByHole` in `Enter.tsx`) that
   survive paging between holes, and reach the server only on Save. On a failed save the
   drafts stay put, so a bad connection costs a second tap, never a hole.
+- **A hole can't be saved until every *playing* player has a score on it** (Kyle,
+  2026-08-21 feedback). Save is gated on `allEntered` in `Enter.tsx` — computed from
+  `vm.players` (drafts already overlaid), a gross or a pick-up counts, DNP players are
+  excluded, so the required count is `playing.length` (3 when someone sat out), not a
+  hardcoded 4. Editing one cell of an already-complete hole still saves.
 - **Phase 5 was split**: 5A is auth + write path + Enter; 5B is the admin RPCs and editors.
 
 ## Admin path (Phase 5B) — the shape to reuse

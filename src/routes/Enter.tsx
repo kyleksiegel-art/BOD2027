@@ -79,6 +79,14 @@ export default function Enter() {
     .sort((a, b) => a - b)
   const holeIsDirty = Object.keys(holeDrafts).length > 0
 
+  // A hole isn't saved until every playing player has a score on it — a gross or a pick-up.
+  // Drafts are already overlaid into vm.players (buildEnterHole), so this counts unsaved
+  // edits alongside cells saved earlier: editing one player of an already-complete hole
+  // still passes, but a fresh hole stays locked until the fourth score is in.
+  const playing = vm.players.filter((p) => p.status === 'playing')
+  const stillNeed = playing.filter((p) => p.gross === null && !p.pickedUp).map((p) => p.name)
+  const allEntered = playing.length > 0 && stillNeed.length === 0
+
   /** A stepper tap. `stored` is the value on screen; an unsaved edit outranks it. */
   function step(playerId: string, delta: number, stored: number) {
     const current = draftsRef.current[hole]?.[playerId]?.grossStrokes ?? stored
@@ -275,22 +283,29 @@ export default function Enter() {
           <div className="mt-5">
             <button
               type="button"
-              disabled={!holeIsDirty || write.status === 'saving'}
+              disabled={!holeIsDirty || !allEntered || write.status === 'saving'}
               onClick={() => void saveHole()}
               className="tap w-full rounded-md bg-gold px-4 py-3 font-semibold text-ground disabled:bg-transparent disabled:text-paper-faint disabled:outline disabled:outline-1 disabled:outline-hair"
             >
               {write.status === 'saving'
                 ? 'Saving…'
-                : holeIsDirty
-                  ? `Save hole ${hole}`
-                  : justSaved === hole
+                : !holeIsDirty
+                  ? justSaved === hole
                     ? 'Saved'
-                    : 'No changes'}
+                    : 'No changes'
+                  : allEntered
+                    ? `Save hole ${hole}`
+                    : `All ${playing.length} scores needed`}
             </button>
 
             <div className="mt-2 min-h-[1.25rem] text-[0.82rem] tnum" aria-live="polite">
               {write.status === 'error' ? (
                 <span className="text-gold-bright">{write.message}</span>
+              ) : holeIsDirty && !allEntered ? (
+                // The hole can't be saved until the whole group is in — say who's left.
+                <span className="text-gold-bright">
+                  Enter every score to save — still need {stillNeed.join(', ')}.
+                </span>
               ) : dirtyHoles.length > 1 ? (
                 <span className="text-gold-bright">
                   Unsaved on {dirtyHoles.length} holes: {dirtyHoles.join(', ')}
