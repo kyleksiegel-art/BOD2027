@@ -498,3 +498,51 @@ The brief says "one phase per branch, merged to main when I sign off." The repo 
 ### Phase 0 committed before verbal sign-off
 
 Kyle asked "how do I link the repo I made" and shared a screenshot of Netlify blocking on an empty repo. Interpreting that as go-signal for the write step. If any of the docs are wrong, the fix is a follow-up commit — nothing built on top of them yet.
+
+---
+
+## Phase 7 — Money
+
+### The Money page derives live; `round_money` is a verification mirror, not the source
+
+`src/lib/data/money.ts` `buildMoney()` derives every figure on the fly from `settings` +
+each round's par-3 count (brief §Money, and the §"`round_money` is created only at
+finalization" decision above). The frozen `round_money` row written by `rpc_finalize_round`
+must agree to the cent — the SQL mirrors `computePurse`/`fn_allocate_*` — but the page never
+reads it, so the app shows correct money offline before any round is finalized. A one-cent
+disagreement is a bug, asserted in both languages (`admin_path.sql` and `money.test.ts`).
+
+### A cut-off par 3's CTP slice folds into the last played par 3
+
+A shortened round can leave a par 3 past its counted cutoff — Black finalized at 15 holes
+leaves hole 17 unplayable. Its CTP slice (every par 3 is worth the same, so it is a real
+slice of the round's pot) can never be won. Rather than let those cents vanish, `buildMoney`
+adds them to the **last played** par 3's pot, where the carry/return rule resolves them.
+Keeps every played par 3 worth the same and keeps the ledger whole (reconciles to the cent).
+`money.test.ts` §"shortened round" locks it.
+
+### CTP entry lives inside the round detail, offline, with no PIN
+
+Closest-to-pin is entered on `/rounds/:n` (`CtpEntry.tsx`), not a separate screen — it is
+recorded in the same cart, at the same moment, as scores. It flows through the **same
+outbox** as scores (`kind: 'ctp'`, built in Phase 6a) and takes no session token, matching
+the score-entry amendment (decisions.md §"PIN removed from score entry"). A `null` winner
+records the explicit "no winner / carry" row the Money page's carry logic reads; only a
+`playing` participant is offered as a winner.
+
+### Champion and round-winner payouts run the real tiebreak chain
+
+The championship pot goes to the overall leader; on a points tie `resolveChampion` walks the
+brief's chain (best single round → most holes won → countback preference order → declared
+tie) reusing the engine's `tallyHolesWon`/`compareCountback`, and a genuine unbreakable tie
+splits with the remainder cent to the better single round. A round purse goes to the round
+winner; on a tie it is broken by a countback on that round, else split. This is the same
+resolution the standings page will eventually surface, kept in one place.
+
+### Settlement is shown only once every round is final
+
+Greedy `settle()` needs the net balances to sum to zero. Mid-trip, money is still reserved
+for undecided rounds/holes (the "pending" bucket), so the balances don't sum to zero and a
+settlement would be misleading. The Money page shows transfers only when every non-abandoned
+round is `final` and nothing is pending; until then it says settlement isn't available yet.
+Voided/returned CTP pots are refunded evenly to all contributors (everyone who bought in).

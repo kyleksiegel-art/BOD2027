@@ -712,7 +712,76 @@ Everything else — the app, the Edge Function, Postgres — is real.
 
 ## Phase 7 — Money
 
-_(To be filled in at end of Phase 7.)_
+Built on branch `phase-7-money` (off `phase-6-offline`; Phases 4–7 remain unmerged). No
+migration and no new RPC — the tables (`ctp_results`, `round_money`), `rpc_upsert_ctp` and
+`rpc_finalize_round` all shipped in Phases 5–6. Phase 7 is the pure compute layer
+(`src/lib/data/money.ts`), the CTP entry UI, and the Money page. Nothing is stubbed.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| Money page — per-round pot breakdown, running totals, buy-in reconciliation warning | `src/routes/Money.tsx` via `useMoney()` → `buildMoney()`. Browser at 375 px against local Supabase (buy-in $100 × 4): total purse **$400**, championship $160 / round winners $120 / CTP $120; a card per round with championship share, round winner, CTP pot + per-hole lines |
+| Pots derive live from `settings` + par-3 count; nothing derived stored | `buildMoney` reads `purse_mode`/`purse_weights`/`purse_amounts`/`ctp_carry_mode` and each round's par-3 count, calls `computePurse`. `round_money` is **not** hydrated or read by the client (`decisions.md` §"The Money page derives live") |
+| CTP entry within Rounds detail — par-3 rows, distance in feet with decimal, no-winner + carry | `src/components/round/CtpEntry.tsx` in `/rounds/:n` (`useRoundCtp`). Browser R3: par 3s 5/7/10/16, winner chips for the three **playing** players (DNP Chris excluded), "No winner", a decimal feet input, per-hole Save |
+| CTP write path is real and offline-first | Selected Jon on R3 hole 5, entered 14.5 ft, Saved → `saveCtp` → `enqueueCtp` (same outbox as scores, `kind: 'ctp'`, no PIN) → `rpc_upsert_ctp`. DB row confirmed over REST: `hole_number 5, player_id d0…0001, distance_feet 14.5`. The Money page then showed "Hole 5 · Jon Aronson · 14.5 ft · $10.00" and awarded moved $330 → $340, pending $70 → $60 |
+| Greedy settlement with integer-cent arithmetic | `settle()` (Phase 3 engine) wired in `buildMoney`; shown only when every non-abandoned round is `final` and nothing is pending (zero-sum requirement). `money.test.ts` "awards … reconciles to the cent" asserts one transfer P2→P1 $100 on a fully-final round |
+| Remainder-cent rules encoded | Championship/round remainder → higher standing (`orderByStanding` + `allocateEvenCents`); CTP remainder → last par 3 (`allocateEvenCentsRemainderLast`, engine). Stated in the Money page footnotes |
+| Buy-in vs fixed toggle in admin | Already shipped in `SettingsEditor.tsx` (Phase 5B); `money.test.ts` "fixed mode" asserts `buildMoney` honours explicit pot amounts and skips buy-in reconciliation |
+| Round-money snapshotting on `rpc_finalize_round` | Shipped + asserted in Phase 5B (`admin_path.sql`). `money.test.ts` "frozen-figure parity" mirrors that split in TypeScript (additive per-round shares from the same `allocate*` helpers) |
+| Buy-in reconciliation to the cent | Browser: Collected $400 = Awarded $340 + Pending $60, "Reconciles to the cent". `money.test.ts` "reconciliation" and "carry returns to contributors" both assert `balanced` with the pot fully distributed |
+
+### Automated tests
+
+`npx vitest run --reporter=dot` → **131 passed** (was 122; **+9** in `src/lib/data/money.test.ts`).
+`npx tsc -b --noEmit` clean; `npm run build` clean (precache 22 entries). `supabase test db`
+unchanged — **no migration changed** (232 as of Phase 5B).
+
+`money.test.ts` covers: the 40/30/30 pot split summing back to buy-ins; championship + round +
+CTP payouts with reconciliation to the cent and a one-payment settlement; **carry returns to
+contributors at the last par 3** (all-no-winner round → void $60 refunded evenly); void carry
+mode; the **shortened-round fold** (a cut-off par 3's slice folds into the last played par 3, no
+cents vanish); **abandoned round redistributes** (its shares go to the remaining rounds);
+pending money before finalization (awarded + pending === buy-ins, no settlement yet); fixed mode.
+
+### Manual tests
+
+Browser at 375 px, dark, against local Supabase (Phase-4 seed: R1/R2 final — R2 shortened at
+15 — R3 in progress, R4 Bone Valley upcoming; buy-in $100 × 4):
+
+1. `/money`: pot breakdown, per-round cards, per-player ledger, settlement gated ("last round
+   still in play"), footnotes. No console errors.
+2. **Reconciliation bug caught and fixed live:** the first render warned "payouts don't
+   reconcile" — R2's 4th par 3 (hole 17) was past its 15-hole cutoff and its $10 CTP slice was
+   dropped. Fixed by folding cut-off slices into the last played par 3; the page then read
+   Collected $400 = Awarded $330 + Pending $70 and "Reconciles to the cent." Locked by a test.
+3. `/rounds/3`: CTP entry rendered, DNP excluded, a real save landed in the DB and flowed back
+   through to the Money page (see the write-path row above).
+
+### Deferred requirements
+
+- **Manual admin buy-in settlement of a DNP player's round** (brief: "Not eligible for a round
+  purse unless I manually settle it in admin") — no UI; DNP players are excluded from winning as
+  specified, but an admin override to hand a DNP player a round purse is not built. Small, and
+  no scenario needs it yet.
+- **Live two-phone / real settlement at trip's end** — same pre-trip manual bucket as the rest.
+
+### Deviations from the brief
+
+1. **A cut-off par 3's CTP slice folds into the last played par 3** so a shortened round's pot
+   still reconciles. The brief doesn't name this case. `decisions.md` §"A cut-off par 3's CTP
+   slice folds into the last played par 3".
+2. **Settlement is hidden until every round is final** (zero-sum requirement of greedy
+   settle). `decisions.md` §"Settlement is shown only once every round is final".
+3. **CTP entry lives inside the round detail, not a separate screen**, and takes no PIN (same
+   posture as score entry). `decisions.md` §"CTP entry lives inside the round detail".
+
+### Note
+
+A single demo `ctp_results` row (R3 hole 5) was left in the **local** fake-data DB by the
+write-path verification — the service role lacks a direct DELETE grant and a full `db reset`
+would disrupt another active session on the same local stack. It is inconsequential (all
+scores on that DB are fake) and clears on the next `supabase db reset`.
 
 ---
 
@@ -748,6 +817,6 @@ These are the final acceptance criteria. Every line needs verification evidence 
 - [~] Anon cannot write to any table without a valid PIN session — **superseded by the 2026-08-17 amendment.** What holds now, and is demonstrated in `scripts/verify-write-path.sh` §1–§3 and §7: anon can never write to a *table* directly (`42501`), can never mint a session, and can never reach a gated RPC without one — but `rpc_upsert_scores` / `rpc_upsert_ctp` are deliberately open. See `decisions.md` §"PIN removed from score entry"
 - [ ] Anon can read every public table and Realtime events actually arrive (demonstrate with `curl` and a socket client)
 - [x] Failed PIN attempts on one device never lock out a device that already holds a valid session — `scripts/verify-write-path.sh` §10: unlock 429 while the live session writes 200 (Phase 5A)
-- [ ] Buy-in mode reconciles to the cent
+- [x] Buy-in mode reconciles to the cent — `money.test.ts` (awarded + pending === buy-ins across the pot split, payouts, carry-to-contributors, void, shortened-fold and pending cases) and the live Money page (Collected $400 = Awarded + Pending, "Reconciles to the cent"). A pre-trip real-settlement run at trip's end is still owed on real phones
 - [ ] Lighthouse mobile performance and accessibility both above 90
 - [ ] Deployed and reachable at a live Netlify URL

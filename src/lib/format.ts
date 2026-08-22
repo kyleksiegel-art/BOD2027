@@ -40,3 +40,17 @@ export const roundStatusLabel = (s: string): string => ROUND_STATUS_LABEL[s] ?? 
 export function formatGap(gap: number): string {
   return gap === 0 ? '—' : `-${gap}`
 }
+
+const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+
+/** Integer cents → "$12.50". The ledger is always in cents; round only here (brief §Money). */
+export function formatMoney(cents: number): string {
+  return usd.format(cents / 100)
+}
+
+/** Signed money for a net line: "+$40.00", "−$40.00", "$0.00". */
+export function formatMoneySigned(cents: number): string {
+  if (cents === 0) return usd.format(0)
+  const s = usd.format(Math.abs(cents) / 100)
+  return cents > 0 ? `+${s}` : `−${s}`
+}

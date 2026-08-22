@@ -495,7 +495,7 @@ describe('CTP flows through the same queue', () => {
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
 async function readDb() {
-  const [players, courses, tees, holes, hole_yardages, rounds, round_players, scores, settings] =
+  const [players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results, settings] =
     await Promise.all([
       db.players.toArray(),
       db.courses.toArray(),
@@ -505,9 +505,10 @@ async function readDb() {
       db.rounds.toArray(),
       db.round_players.toArray(),
       db.scores.toArray(),
+      db.ctp_results.toArray(),
       db.settings.toArray(),
     ])
-  return { players, courses, tees, holes, hole_yardages, rounds, round_players, scores, settings }
+  return { players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results, settings }
 }
 
 /** The smallest trip that scores: one course of par 4s, one tee, one in-progress round. */

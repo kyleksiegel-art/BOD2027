@@ -19,14 +19,15 @@ import {
   type RoundDetailVM,
   type RoundListItemVM,
 } from './compute'
+import { buildMoney, type MoneyVM } from './money'
 import { totalPoints } from '@/lib/scoring'
-import type { ScorePayload } from './types'
+import type { ScorePayload, CtpPayload } from './types'
 import type { PlayerRow, RoundRow } from './types'
 
 /** Load the whole read model out of Dexie. Re-runs whenever any table changes. */
 function useDbData(): Db | undefined {
   return useLiveQuery(async () => {
-    const [players, courses, tees, holes, hole_yardages, rounds, round_players, scores, settings] =
+    const [players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results, settings] =
       await Promise.all([
         db.players.toArray(),
         db.courses.toArray(),
@@ -36,10 +37,11 @@ function useDbData(): Db | undefined {
         db.rounds.toArray(),
         db.round_players.toArray(),
         db.scores.toArray(),
+        db.ctp_results.toArray(),
         db.settings.toArray(),
       ])
     return {
-      players, courses, tees, holes, hole_yardages, rounds, round_players, scores, settings,
+      players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results, settings,
     } satisfies Db
   }, [])
 }
@@ -84,6 +86,41 @@ export function usePlayers(): PlayerCardVM[] | undefined {
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((player) => ({ player, championshipTotal: totalById.get(player.id) ?? 0 }))
   }, [data])
+}
+
+/** The whole money ledger — pots, per-round breakdown, payouts, settlement, reconciliation. */
+export function useMoney(): MoneyVM | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildMoney(data) : undefined), [data])
+}
+
+/**
+ * CTP entry within a round: the round detail plus the current CTP row for each par 3, keyed
+ * by hole number. Reads Dexie, so a queued CTP result re-renders here with no extra plumbing.
+ */
+export function useRoundCtp(roundNumber: number): {
+  vm: RoundDetailVM | null
+  ctpByHole: Map<number, CtpPayload>
+  loading: boolean
+} {
+  const data = useDbData()
+  return useMemo(() => {
+    if (!data) return { vm: null, ctpByHole: new Map(), loading: true }
+    const vm = buildRoundDetail(roundNumber, data)
+    const ctpByHole = new Map<number, CtpPayload>()
+    if (vm) {
+      for (const c of data.ctp_results) {
+        if (c.round_id !== vm.round.id) continue
+        ctpByHole.set(c.hole_number, {
+          round_id: c.round_id,
+          hole_number: c.hole_number,
+          player_id: c.player_id,
+          distance_feet: c.distance_feet,
+        })
+      }
+    }
+    return { vm, ctpByHole, loading: false }
+  }, [data, roundNumber])
 }
 
 /**

@@ -4,13 +4,14 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { Leaderboard } from '@/components/round/Leaderboard'
 import { Scorecard } from '@/components/round/Scorecard'
 import { HandicapWorksheet } from '@/components/round/HandicapWorksheet'
-import { useRoundDetail } from '@/lib/data/selectors'
+import { CtpEntry } from '@/components/round/CtpEntry'
+import { useRoundCtp } from '@/lib/data/selectors'
 import { formatDay, formatTeeTime } from '@/lib/format'
 
 export default function RoundDetail() {
   const { roundNumber } = useParams()
   const n = Number(roundNumber)
-  const { vm, loading } = useRoundDetail(n)
+  const { vm, ctpByHole, loading } = useRoundCtp(n)
 
   if (loading) {
     return (
@@ -74,6 +75,7 @@ export default function RoundDetail() {
         <>
           <Leaderboard vm={vm} />
           <Scorecard vm={vm} />
+          <CtpEntry vm={vm} ctpByHole={ctpByHole} />
           <HandicapWorksheet vm={vm} />
         </>
       )}

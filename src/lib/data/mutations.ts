@@ -11,8 +11,8 @@
 // Saving is still EXPLICIT: the Enter screen holds edits locally and calls saveCells()
 // when the scorer taps Save. One hole is one enqueue — the coalescing the brief asked for
 // arrives at flush time, where the outbox sends only the latest entry per cell.
-import { enqueueScores, flushOutbox, type FlushReport } from '@/lib/sync/outbox'
-import type { ScorePayload } from './types'
+import { enqueueScores, enqueueCtp, flushOutbox, type FlushReport } from '@/lib/sync/outbox'
+import type { ScorePayload, CtpPayload } from './types'
 
 export interface ScoreCellInput {
   roundId: string
@@ -84,6 +84,45 @@ export async function saveCells(cells: ScoreCellInput[]): Promise<boolean> {
   try {
     report = await flushOutbox()
   } catch (e) {
+    publish({ status: 'queued', message: PENDING_NOTE })
+    return true
+  }
+
+  if (report.deadLettered > 0) {
+    publish({
+      status: 'error',
+      message: `The server refused ${report.deadLettered} entr${report.deadLettered === 1 ? 'y' : 'ies'} (${report.message ?? 'see Diagnostics'}). Kept — nothing was lost.`,
+    })
+  } else if (report.status === 'offline' || report.remaining > 0) {
+    publish({ status: 'queued', message: PENDING_NOTE })
+  } else {
+    publish({ status: 'idle', message: null })
+  }
+  return true
+}
+
+/**
+ * Record one closest-to-pin result. Same offline-first path as saveCells: the row is written
+ * to Dexie and appended to the outbox in one transaction (enqueueCtp), then the flush is
+ * best-effort. Like score entry, CTP entry takes no session token. A `null` player_id records
+ * "no winner yet / carry" — the same row the carry logic reads on the Money page.
+ */
+export async function saveCtp(result: CtpPayload): Promise<boolean> {
+  publish({ status: 'saving', message: null })
+  try {
+    await enqueueCtp([result])
+  } catch (e) {
+    publish({
+      status: 'error',
+      message: `Couldn’t record that on this phone: ${e instanceof Error ? e.message : String(e)}`,
+    })
+    return false
+  }
+
+  let report: FlushReport
+  try {
+    report = await flushOutbox()
+  } catch {
     publish({ status: 'queued', message: PENDING_NOTE })
     return true
   }

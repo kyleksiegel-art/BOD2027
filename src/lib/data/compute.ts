@@ -31,6 +31,7 @@ import type {
   RoundRow,
   RoundPlayerRow,
   ScoreRow,
+  CtpResultRow,
   SettingRow,
 } from './types'
 
@@ -44,6 +45,7 @@ export interface Db {
   rounds: RoundRow[]
   round_players: RoundPlayerRow[]
   scores: ScoreRow[]
+  ctp_results: CtpResultRow[]
   settings: SettingRow[]
 }
 

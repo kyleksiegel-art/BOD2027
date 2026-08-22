@@ -255,3 +255,47 @@ Things that will bite if forgotten:
   `csv.test.ts`. Full `vitest run` → 122. `supabase test db` unchanged (no migration changed —
   only the Edge Function, which pgTAP doesn't cover; its contract is checked by
   `verify-write-path.sh` and a live curl).
+
+## Money path (Phase 7) — the shape to reuse
+
+The money ledger, assembled the same way every other screen is: Dexie rows → pure compute →
+`useLiveQuery`. **No migration and no new RPC** — the tables (`ctp_results`, `round_money`),
+`rpc_upsert_ctp` and `rpc_finalize_round` all shipped earlier; Phase 7 is the compute layer
+and the UI.
+
+- **`src/lib/data/money.ts` `buildMoney(dbData) → MoneyVM`** is the whole ledger, pure and
+  offline-identical. It reads `settings` (purse mode/weights/amounts, `ctp_carry_mode`) + each
+  round's par-3 count, calls `computePurse`/`settle`/`allocate*Cents` from `@/lib/scoring`, and
+  orchestrates the payouts. Everything is **integer cents**; round only at display
+  (`formatMoney`/`formatMoneySigned` in `format.ts`).
+- **Derive live; never read `round_money` on the client.** The frozen snapshot is a
+  verification mirror — it must agree to the cent (both `admin_path.sql` and `money.test.ts`
+  assert the split) but the page derives so money is right offline before finalization.
+- **`ctp_results` is now in the `Db` interface** and `useDbData` loads it (it was already a
+  Dexie table + hydrated + merged since 6a). `round_money` is deliberately **not** hydrated.
+- **CTP entry: `src/components/round/CtpEntry.tsx`, inside `/rounds/:n`** (via `useRoundCtp`).
+  One row per **played** par 3, winner chips (playing players only) + "No winner" + a feet
+  input, per-hole Save. Writes through `saveCtp` (`mutations.ts`) → `enqueueCtp` → the **same
+  outbox** as scores, no PIN. A `null` winner is the explicit carry row.
+- **Money page: `src/routes/Money.tsx`** (`useMoney`). Total purse + 40/30/30 breakdown,
+  buy-in reconciliation line, per-round cards (championship share / round winner / CTP pot with
+  per-hole won·carry·void·pending), per-player ledger, settlement, remainder-cent footnotes.
+
+Things that will bite if forgotten:
+- **A cut-off par 3's CTP slice folds into the last *played* par 3.** A round finalized at 15
+  holes (Black) leaves hole 17 unplayable; its slice must not vanish — `buildMoney` adds it to
+  the last played par 3's pot so the ledger reconciles. (`money.test.ts` §"shortened round".)
+- **Reconciliation is a tripwire, not a status.** `awarded + pending === buy-ins` holds by
+  construction; the loud warning fires only on a real bug. Mid-trip, undecided rounds/holes sit
+  in `pending` — that is expected, not an imbalance.
+- **Settlement shows only when every non-abandoned round is `final` and nothing is pending** —
+  `settle()` needs zero-sum balances. Voided/returned CTP pots refund evenly to all buy-in
+  contributors.
+- **Champion/round-winner ties run the real chain** (`resolveChampion`/`resolveRoundWinner`
+  reuse `tallyHolesWon`/`compareCountback`); a genuine tie splits, remainder cent to the better
+  single round / higher standing.
+- **The buy-in vs fixed toggle already exists** in `SettingsEditor.tsx` (Phase 5B). Phase 7 did
+  not touch admin.
+- Tests: `money.test.ts` (9) covers the pot split, payouts+reconciliation, carry-to-contributors,
+  void mode, the shortened-round fold, abandoned redistribution, pending, fixed mode, and
+  frozen-figure parity. Full `vitest run` → **131**. `supabase test db` unchanged (no migration).
