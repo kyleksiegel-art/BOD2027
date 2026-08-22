@@ -85,8 +85,13 @@ function PlayerWorksheet({ player }: { player: PlayerRoundVM }) {
           </span>
         </div>
       )}
+      {w.fieldLowest !== 0 && (
+        <Line label={`− Low handicap in field (${w.ownStrokes} − ${w.fieldLowest})`} value={`−${w.fieldLowest}`} />
+      )}
       <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-hair pt-2">
-        <span className="text-[0.8rem] font-semibold text-paper">Strokes received</span>
+        <span className="text-[0.8rem] font-semibold text-paper">
+          Strokes received{w.fieldLowest !== 0 ? ' (off the low)' : ''}
+        </span>
         <span className="tnum font-display text-[1.1rem] font-semibold text-gold-bright">
           {w.strokesReceivedFinal}
         </span>

@@ -86,7 +86,9 @@ function scoreMap(scores: ScoreRow[], roundId: string, playerId: string): Map<nu
 export interface Worksheet {
   result: HandicapResult
   overrideApplied: boolean
-  strokesReceivedFinal: number // what strokes were actually allocated (override wins)
+  strokesReceivedFinal: number // strokes actually allocated: own strokes minus the field low
+  ownStrokes: number // this player's own strokes (post cap/override), before the low subtraction
+  fieldLowest: number // the round field's lowest strokes, subtracted from everyone (low = scratch)
 }
 
 export interface PlayerRoundVM {
@@ -129,19 +131,17 @@ export function buildRoundDetail(roundNumber: number, dbData: Db): RoundDetailVM
   const playersById = new Map(dbData.players.map((p) => [p.id, p]))
   const teesById = new Map(dbData.tees.map((t) => [t.id, t]))
 
-  const players: PlayerRoundVM[] = rps.map((rp) => {
+  // Pass 1 — each player's OWN strokes received. The handicap worksheet is re-derived from
+  // the stored inputs (index/allowance/cap + tee rating/slope/par), reproducing the snapshot
+  // exactly — audit trail, not a second source of truth. A manual override replaces it.
+  const prelim = rps.map((rp) => {
     const player = playersById.get(rp.player_id)
     const tee = teesById.get(rp.tee_id) as TeeRow | undefined
-    const name = player?.name ?? 'Unknown'
-    const sortOrder = player?.sort_order ?? 999
-
-    // The handicap worksheet is re-derived from the stored inputs (index/allowance/cap +
-    // tee rating/slope/par), reproducing the snapshot exactly — audit trail, not a second
-    // source of truth. A manual override replaces the allocated strokes.
-    let worksheet: Worksheet | null = null
-    let strokesReceived = rp.strokes_received
+    let result: HandicapResult | null = null
+    let ownStrokes = rp.strokes_received
+    let overrideApplied = false
     if (tee) {
-      const result = computeHandicap({
+      result = computeHandicap({
         index: rp.index_used,
         rating: tee.rating,
         slope: tee.slope,
@@ -150,9 +150,26 @@ export function buildRoundDetail(roundNumber: number, dbData: Db): RoundDetailVM
         cap: rp.cap_used,
       })
       const resolved = resolveStrokesReceived(result.strokesReceived, rp.manual_override)
-      strokesReceived = resolved.value
-      worksheet = { result, overrideApplied: resolved.overrideApplied, strokesReceivedFinal: resolved.value }
+      ownStrokes = resolved.value
+      overrideApplied = resolved.overrideApplied
     }
+    return { rp, player, tee, result, ownStrokes, overrideApplied }
+  })
+
+  // This trip plays off the low handicap: the field's lowest strokes is scratch and everyone
+  // else receives only the difference (Kyle 2026-08-22 — see decisions.md §"Play off the low
+  // handicap"). Computed over PLAYING players only; DNP takes no strokes and doesn't set the
+  // floor. Applied here, at the one round-level allocation, so points/standings/money agree.
+  const playingStrokes = prelim.filter((x) => x.rp.status === 'playing').map((x) => x.ownStrokes)
+  const fieldLowest = playingStrokes.length > 0 ? Math.min(...playingStrokes) : 0
+
+  const players: PlayerRoundVM[] = prelim.map(({ rp, player, tee, result, ownStrokes, overrideApplied }) => {
+    const name = player?.name ?? 'Unknown'
+    const sortOrder = player?.sort_order ?? 999
+    const playedOff = Math.max(0, ownStrokes - fieldLowest)
+    const worksheet: Worksheet | null = result
+      ? { result, overrideApplied, strokesReceivedFinal: playedOff, ownStrokes, fieldLowest }
+      : null
 
     if (!holes || rp.status === 'did_not_play') {
       return {
@@ -169,7 +186,7 @@ export function buildRoundDetail(roundNumber: number, dbData: Db): RoundDetailVM
       }
     }
 
-    const alloc = allocateStrokes(strokesReceived, holes)
+    const alloc = allocateStrokes(playedOff, holes)
     const scores = scoreMap(dbData.scores, round.id, rp.player_id)
     const rr = computePlayerRound({
       holes,
@@ -229,45 +246,32 @@ export interface RoundColumn {
   counts: boolean
 }
 
-/** A player's counted points for one round (0 for DNP / unfinished). */
-function roundPointsFor(round: RoundRow, playerId: string, dbData: Db, table: PointsTable): number {
-  const rp = dbData.round_players.find((r) => r.round_id === round.id && r.player_id === playerId)
-  if (!rp || rp.status === 'did_not_play') return 0
-  const course = dbData.courses.find((c) => c.id === round.course_id)
-  if (!course) return 0
-  const holes = holeInfosOf(course.id, dbData.holes)
-  if (!holes) return 0
-  const resolved = resolveStrokesReceived(rp.strokes_received, rp.manual_override)
-  const alloc = allocateStrokes(resolved.value, holes)
-  const scores = scoreMap(dbData.scores, round.id, playerId)
-  return computePlayerRound({
-    holes,
-    scores,
-    strokesByHole: alloc,
-    status: 'playing',
-    pointsTable: table,
-    holesCounted: round.holes_counted,
-  }).totalPoints
-}
-
 export function buildChampionships(dbData: Db): PlayerChampionship[] {
-  const table = pointsTableOf(dbData.settings)
   const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
+  // Build each round once and read points from it, so the cumulative board uses the SAME
+  // low-handicap allocation as the round screen and the money page (one source of truth).
+  const detailByRound = new Map<number, RoundDetailVM | null>()
+  for (const round of rounds) detailByRound.set(round.round_number, buildRoundDetail(round.round_number, dbData))
+
   return dbData.players
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((p) => {
-      const byRound: RoundPointsEntry[] = rounds.map((round) => ({
-        roundNumber: round.round_number,
-        status: round.status,
-        points: roundPointsFor(round, p.id, dbData, table),
-        // The overall board is INCLUSIVE of the round in play: the live `in_progress`
-        // round's points count toward the cumulative total as they currently stand
-        // (Kyle, Phase 4 feedback — overrides the Phase 3 "final only" default). Nothing
-        // jumps when it finalizes; the points were already there. Upcoming/abandoned never
-        // count.
-        counts: round.status === 'final' || round.status === 'in_progress',
-      }))
+      const byRound: RoundPointsEntry[] = rounds.map((round) => {
+        const detail = detailByRound.get(round.round_number) ?? null
+        const pr = detail?.players.find((x) => x.playerId === p.id)
+        return {
+          roundNumber: round.round_number,
+          status: round.status,
+          points: pr && pr.status === 'playing' ? pr.totalPoints : 0,
+          // The overall board is INCLUSIVE of the round in play: the live `in_progress`
+          // round's points count toward the cumulative total as they currently stand
+          // (Kyle, Phase 4 feedback — overrides the Phase 3 "final only" default). Nothing
+          // jumps when it finalizes; the points were already there. Upcoming/abandoned never
+          // count.
+          counts: round.status === 'final' || round.status === 'in_progress',
+        }
+      })
       return { playerId: p.id, byRound }
     })
 }

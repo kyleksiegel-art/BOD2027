@@ -6,6 +6,28 @@ The brief is the source of truth. This file explains the gaps the brief left ope
 
 ---
 
+## Play off the low handicap (amends the brief's full-handicap Stableford)
+
+**Kyle 2026-08-22.** Strokes are allocated **relative to the round field's lowest playing
+handicap**: the low player is scratch and everyone else receives only the difference (Adam 8 /
+Kyle 12 → Adam 0, Kyle 4, on stroke index 1–4). This **overrides** the brief's full-handicap
+net Stableford (brief §Handicaps, "100% allowance", and §"Do not build … match play") — the
+brief allocated each player's full playing handicap.
+
+- Still net **Stableford** and still cumulative; only the per-round stroke allocation changed.
+- Computed **per round** over **playing** players only — a DNP player neither sets the floor nor
+  receives strokes. The cap (18) and any manual override apply to a player's OWN strokes first,
+  then the field low is subtracted; the low is never negative in effect (max(0, own − low)).
+- Implemented once, in `buildRoundDetail` (`compute.ts`), which is the single round-level
+  allocation feeding the round screen, the Enter screen, round winners, the champion chain, and
+  the money page. `buildChampionships` now reads its points from `buildRoundDetail` (was a
+  separate `roundPointsFor` allocation) so the cumulative board uses the same numbers.
+- The worksheet shows the subtraction ("− Low handicap in field"); the Rules page states it.
+- Purely a compute change — no migration, no re-entry of scores; points re-derive from stored
+  gross. Covered by `relative-strokes.test.ts`.
+
+---
+
 ## Answer to the open question — day-of tee changes
 
 **(a) — carve tee/handicap changes into the outbox as the single offline-capable admin mutation.**

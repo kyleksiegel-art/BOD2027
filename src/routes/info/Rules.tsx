@@ -64,6 +64,12 @@ export default function Rules() {
           Strokes fall on holes by the course’s stroke index. Handicaps are locked in per round; a
           later index change doesn’t rewrite a round already played.
         </p>
+        <p>
+          We <strong className="font-semibold text-paper">play off the low handicap</strong>: in
+          each round the lowest playing handicap in the group plays as scratch, and everyone else
+          gets only the difference. If Adam is an 8 and Kyle a 12, Adam gets 0 strokes and Kyle gets
+          4 — on the four hardest holes.
+        </p>
       </Section>
 
       <Section title="The money">
