@@ -723,7 +723,7 @@ export function buildAdmin(dbData: Db): AdminVM {
         ctp: 0.3,
       }),
       purseAmounts: settingValue(dbData.settings, 'purse_amounts', {}),
-      ctpCarryMode: settingValue(dbData.settings, 'ctp_carry_mode', 'carry'),
+      ctpCarryMode: settingValue(dbData.settings, 'ctp_carry_mode', 'return'),
       assignedIndexFootnote: settingValue(dbData.settings, 'assigned_index_footnote', ''),
     },
   }

@@ -92,7 +92,7 @@ All arithmetic in integer cents; remainder cents per the brief (last par 3 of th
 
 ### CTP defaults
 
-Default `ctp_carry_mode = 'carry'`. Last par 3 of a round with an unclaimed pot returns to contributors per the brief. Encoded as: carry within round, void at round-end.
+Default `ctp_carry_mode = 'return'` (Kyle 2026-08-22, "you either get it or you don't"). Every par 3 is decided on its own hole: won by the closest player, or, with no winner, its pot returns to the buy-in contributors — never carried forward. **Amended from the original `'carry'` default** (which rolled an unclaimed pot to the round's next par 3 and only returned it at the round's last par 3). Migration `20260822090100_ctp_no_carry_default.sql` flips already-seeded databases; the code defaults (`money.ts`, `compute.ts`) match. `buildMoney` treats any mode other than `'carry'` as return-to-contributors.
 
 ### DNP contributions
 

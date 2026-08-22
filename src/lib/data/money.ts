@@ -29,7 +29,9 @@ import type { RoundRow, SettingRow } from './types'
 
 // ── Settings → PurseConfig ────────────────────────────────────────────────────
 
-export type CtpCarryMode = 'carry' | 'void'
+// The stored/validated values are 'carry' | 'return' (see rpc_upsert_settings). Anything
+// other than 'carry' means an unclaimed pot is returned to contributors on that hole.
+export type CtpCarryMode = 'carry' | 'return'
 
 function settingValue<T>(settings: SettingRow[], key: string, fallback: T): T {
   const row = settings.find((s) => s.key === key)
@@ -279,7 +281,7 @@ function resolveChampion(dbData: Db, details: Map<number, RoundDetailVM>): Winne
 
 export function buildMoney(dbData: Db): MoneyVM {
   const config = purseConfigOf(dbData)
-  const carryMode = settingValue<CtpCarryMode>(dbData.settings, 'ctp_carry_mode', 'carry')
+  const carryMode = settingValue<CtpCarryMode>(dbData.settings, 'ctp_carry_mode', 'return')
   const playerCount = dbData.players.length
 
   const coursesById = new Map(dbData.courses.map((c) => [c.id, c]))
