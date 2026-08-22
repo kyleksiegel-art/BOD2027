@@ -5,7 +5,6 @@ import type {
   CourseRow,
   TeeRow,
   HoleRow,
-  RoundRow,
   RoundPlayerRow,
   ScoreRow,
   SettingRow,
