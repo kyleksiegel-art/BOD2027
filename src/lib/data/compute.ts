@@ -131,9 +131,11 @@ export function buildRoundDetail(roundNumber: number, dbData: Db): RoundDetailVM
   const playersById = new Map(dbData.players.map((p) => [p.id, p]))
   const teesById = new Map(dbData.tees.map((t) => [t.id, t]))
 
-  // Pass 1 — each player's OWN strokes received. The handicap worksheet is re-derived from
-  // the stored inputs (index/allowance/cap + tee rating/slope/par), reproducing the snapshot
-  // exactly — audit trail, not a second source of truth. A manual override replaces it.
+  // Pass 1 — each player's OWN strokes received. The handicap index is read LIVE from the
+  // player (not a per-round snapshot): editing a player's index applies everywhere at once,
+  // which is the whole point of the simplified Players/Rounds screens. Allowance and cap are
+  // still the values captured on the round_players row. `rp.index_used` remains only as the
+  // fallback when a player row is somehow missing.
   const prelim = rps.map((rp) => {
     const player = playersById.get(rp.player_id)
     const tee = teesById.get(rp.tee_id) as TeeRow | undefined
@@ -142,7 +144,7 @@ export function buildRoundDetail(roundNumber: number, dbData: Db): RoundDetailVM
     let overrideApplied = false
     if (tee) {
       result = computeHandicap({
-        index: rp.index_used,
+        index: player?.handicap_index ?? rp.index_used,
         rating: tee.rating,
         slope: tee.slope,
         par: tee.par,

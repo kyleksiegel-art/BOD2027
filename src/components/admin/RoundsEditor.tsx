@@ -2,9 +2,7 @@ import { useState } from 'react'
 import {
   abandonRound,
   finalizeRound,
-  resnapshotRound,
   saveRoundPlayersQueued,
-  setManualOverride,
   startRound,
   type RoundPlayerInput,
 } from '@/lib/data/admin'
@@ -14,50 +12,18 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { formatDay, formatTeeTime } from '@/lib/format'
 import { Button, Field, Report, Section, inputClass, num, useAdminAction } from './kit'
 
-interface Assignment {
-  teeId: string
-  status: string
-  /** Held as typed. "-" and "10." are legitimate mid-typing states a number would eat. */
-  index: string
-}
-
 /**
- * Why an index is refused, or null if it is fine. The column is numeric(4,1) and the
- * server has no range check of its own, so a fat-fingered 108 for 10.8 would otherwise be
- * accepted and quietly hand someone 18 strokes.
- */
-function indexError(raw: string): string | null {
-  const n = num(raw)
-  if (n === null) return 'it needs to be a number'
-  if (n < -10 || n > 54) return 'it should be between -10 and 54'
-  if (Math.round(n * 10) !== n * 10) return 'only one decimal place is stored'
-  return null
-}
-
-/** True when the typed index is a valid number that differs from the player's trip index. */
-function differsFromTrip(raw: string | undefined, trip: number | undefined): boolean {
-  const n = num(raw ?? '')
-  return n !== null && trip !== undefined && n !== trip
-}
-
-/**
- * Round setup and the round lifecycle.
+ * Round setup and the round lifecycle — deliberately small.
  *
- * This is the pre-flight screen the brief asks for: before a round can start, every player
- * needs a tee, and a tee is what turns an index into strokes received. Without a
- * round_players row a device cannot compute a stroke allocation at all — offline least of
- * all — so the Enter screen refuses to score that player, and this is where that gets
- * fixed.
+ * The only per-player choice here is the TEE. A player's handicap index lives on the Players
+ * tab and is read live, so there is nothing per-round to snapshot, no allowance/cap knob, no
+ * override, and no re-snapshot: pick each player's tee, save, start the round, go. The server
+ * still owns the arithmetic — the client sends the tee (plus the current index) and the RPC
+ * computes course handicap, playing handicap and strokes received, so two phones can never
+ * disagree about who gets a stroke on the 7th.
  *
- * The client sends INPUTS (index, allowance, cap, tee). The server owns the arithmetic, so
- * two phones can never disagree about who gets a stroke on the 7th.
- *
- * The index is editable HERE, per round, not just on the Players tab. Indexes get locked in
- * the week before the trip and tees get decided standing on the first tee, so the moment
- * that matters is this screen — type the number, pick the tee, and strokes recompute before
- * anyone hits a ball. What you type is what this round uses; it does NOT change the
- * player's trip-wide index (that is the Players tab), because a round's handicaps are a
- * snapshot and are deliberately not retroactive.
+ * A round_players row is still what lets a device score a player at all (offline included), so
+ * "pick the tee and save" remains the gate before a round can start.
  */
 export function RoundsEditor({
   rounds,
@@ -99,48 +65,32 @@ function RoundPanel({
   const setup = useAdminAction()
   const life = useAdminAction()
 
-  // The player's trip-wide index — the default, and the thing a per-round index is
-  // compared against so a divergence is visible rather than silent.
+  // The player's live trip index — read straight off the Players tab, snapshotted into the
+  // round only so the server can compute strokes. Nothing per-round to edit here.
   const tripIndexOf = new Map(players.map((p) => [p.id, p.handicap_index]))
 
-  // The form's own copy of the assignment, so the whole foursome saves in one request
-  // rather than four. The index lives here as a string: a half-typed "-" or "10." is a
-  // legitimate intermediate state that a number would swallow.
-  const [assign, setAssign] = useState<Record<string, Assignment>>(() =>
+  // The form holds one tee choice per player and saves the whole foursome in one request.
+  const [teeById, setTeeById] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      vm.participants.map((p) => [
-        p.playerId,
-        {
-          teeId: p.row?.tee_id ?? vm.tees[0]?.id ?? '',
-          status: p.row?.status ?? 'playing',
-          // Already saved for this round? That number wins — re-opening the screen must
-          // not silently propose reverting to a trip index that has since moved.
-          index: String(p.row?.index_used ?? tripIndexOf.get(p.playerId) ?? 0),
-        },
-      ]),
+      vm.participants.map((p) => [p.playerId, p.row?.tee_id ?? vm.tees[0]?.id ?? '']),
     ),
   )
   const [holesCounted, setHolesCounted] = useState('')
   const [confirmAbandon, setConfirmAbandon] = useState(false)
 
   const unassigned = vm.participants.filter((p) => p.row === null)
-  const badIndexes = vm.participants.filter((p) => indexError(assign[p.playerId]?.index ?? '') !== null)
-  const canSave =
-    vm.tees.length > 0 &&
-    vm.participants.every((p) => assign[p.playerId]?.teeId) &&
-    badIndexes.length === 0
+  const canSave = vm.tees.length > 0 && vm.participants.every((p) => teeById[p.playerId])
 
   function entries(): RoundPlayerInput[] {
     return vm.participants.map((p) => ({
       roundId: vm.round.id,
       playerId: p.playerId,
-      teeId: assign[p.playerId].teeId,
-      indexUsed: num(assign[p.playerId].index) ?? 0,
+      teeId: teeById[p.playerId],
+      indexUsed: tripIndexOf.get(p.playerId) ?? 0,
       allowanceUsed: settings.allowance,
       capUsed: settings.handicapCap,
-      status: assign[p.playerId].status === 'did_not_play' ? 'did_not_play' : 'playing',
-      // Carry the existing override so a tee change does not wipe it.
-      manualOverride: p.row?.manual_override ?? null,
+      status: 'playing',
+      manualOverride: null,
     }))
   }
 
@@ -162,85 +112,38 @@ function RoundPanel({
         </p>
       ) : null}
 
-      {/* ── Tees and handicaps ─────────────────────────────────────────────── */}
+      {/* ── Tees ───────────────────────────────────────────────────────────── */}
       <div className="mt-4 space-y-3">
         {vm.participants.map((p) => (
-          <div key={p.playerId} className="rounded-md border border-hair p-3">
-            <div className="flex items-baseline justify-between">
-              <span className="font-semibold text-paper">{p.name}</span>
-              <span className="text-[0.75rem] text-paper-faint tnum">
-                {p.row ? `${p.row.strokes_received} strokes` : 'not set'}
-                {p.row?.cap_applied ? ' (capped)' : ''}
-              </span>
+          <div
+            key={p.playerId}
+            className="flex items-center gap-3 rounded-md border border-hair p-3"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-paper">{p.name}</div>
+              <div className="text-[0.75rem] text-paper-faint tnum">
+                index {tripIndexOf.get(p.playerId) ?? '—'}
+                {p.row ? ` · ${p.row.strokes_received} strokes` : ''}
+              </div>
             </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Field
-                label="Index"
-                hint={
-                  differsFromTrip(assign[p.playerId]?.index, tripIndexOf.get(p.playerId))
-                    ? `Trip index is ${tripIndexOf.get(p.playerId)}`
-                    : undefined
+            <div className="w-40">
+              <select
+                aria-label={`Tee for ${p.name}`}
+                className={inputClass}
+                value={teeById[p.playerId] ?? ''}
+                disabled={vm.tees.length === 0}
+                onChange={(e) =>
+                  setTeeById((t) => ({ ...t, [p.playerId]: e.target.value }))
                 }
               >
-                <input
-                  className={inputClass}
-                  inputMode="decimal"
-                  value={assign[p.playerId]?.index ?? ''}
-                  onChange={(e) =>
-                    setAssign((a) => ({
-                      ...a,
-                      [p.playerId]: { ...a[p.playerId], index: e.target.value },
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Tee">
-                <select
-                  className={inputClass}
-                  value={assign[p.playerId]?.teeId ?? ''}
-                  disabled={vm.tees.length === 0}
-                  onChange={(e) =>
-                    setAssign((a) => ({
-                      ...a,
-                      [p.playerId]: { ...a[p.playerId], teeId: e.target.value },
-                    }))
-                  }
-                >
-                  {vm.tees.length === 0 ? <option value="">No tees on this course</option> : null}
-                  {vm.tees.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Status">
-                <select
-                  className={inputClass}
-                  value={assign[p.playerId]?.status ?? 'playing'}
-                  onChange={(e) =>
-                    setAssign((a) => ({
-                      ...a,
-                      [p.playerId]: { ...a[p.playerId], status: e.target.value },
-                    }))
-                  }
-                >
-                  <option value="playing">Playing</option>
-                  <option value="did_not_play">Did not play</option>
-                </select>
-              </Field>
+                {vm.tees.length === 0 ? <option value="">No tees on this course</option> : null}
+                {vm.tees.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            {p.row ? (
-              <ManualOverride
-                roundId={vm.round.id}
-                playerId={p.playerId}
-                computed={p.row.strokes_received}
-                current={p.row.manual_override}
-                disabled={disabled}
-              />
-            ) : null}
           </div>
         ))}
       </div>
@@ -249,27 +152,15 @@ function RoundPanel({
         <Button
           tone="primary"
           disabled={setup.busy || !canSave}
-          onClick={() =>
-            void setup.run('Tees and handicaps saved.', () => saveRoundPlayersQueued(entries()))
-          }
+          onClick={() => void setup.run('Tees saved.', () => saveRoundPlayersQueued(entries()))}
         >
-          {setup.busy ? 'Saving…' : 'Save tees & handicaps'}
+          {setup.busy ? 'Saving…' : 'Save tees'}
         </Button>
-        {badIndexes.length > 0 ? (
-          <p className="mt-2 text-[0.82rem] text-gold-bright">
-            Check the index for {badIndexes.map((p) => p.name).join(', ')} —{' '}
-            {indexError(assign[badIndexes[0].playerId]?.index ?? '')}
-          </p>
-        ) : null}
         <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
-          Saved at {Math.round(settings.allowance * 100)}% allowance, cap{' '}
-          {settings.handicapCap}. The server recomputes course handicap, playing handicap and
-          strokes received from the tee — this form never sends them. The index here applies to
-          this round only; the Players tab holds the trip-wide one.{' '}
-          <strong className="text-paper-dim">
-            Tee changes queue like scores and work with no signal
-          </strong>{' '}
-          — strokes recompute on this phone straight away and sync when you have a connection.
+          Strokes come from each player's index (Players tab) and the tee. Change an index there
+          and it applies everywhere.{' '}
+          <strong className="text-paper-dim">Tee changes queue like scores and work offline</strong>
+          {' '}— strokes recompute on this phone straight away and sync when you have a connection.
         </p>
         <Report report={setup.report} />
       </div>
@@ -348,26 +239,13 @@ function RoundPanel({
         {vm.round.status === 'final' ? (
           <p className="mt-4 text-[0.85rem] text-paper-dim">
             Final{vm.round.holes_counted !== null ? ` over ${vm.round.holes_counted} holes` : ''}.
-            Money is frozen; re-snapshotting handicaps is blocked.
+            Money is frozen.
           </p>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap gap-3">
-          {vm.round.status !== 'final' && vm.round.status !== 'abandoned' ? (
-            <Button
-              disabled={disabled || life.busy}
-              onClick={() =>
-                void life.run('Handicaps re-snapshotted from current indexes.', () =>
-                  resnapshotRound(vm.round.id),
-                )
-              }
-            >
-              Re-snapshot handicaps
-            </Button>
-          ) : null}
-
-          {vm.round.status !== 'abandoned' ? (
-            confirmAbandon ? (
+        {vm.round.status !== 'final' && vm.round.status !== 'abandoned' ? (
+          <div className="mt-4 flex flex-wrap gap-3">
+            {confirmAbandon ? (
               <>
                 <Button
                   tone="danger"
@@ -387,63 +265,12 @@ function RoundPanel({
               <Button tone="danger" disabled={disabled} onClick={() => setConfirmAbandon(true)}>
                 Abandon round
               </Button>
-            )
-          ) : null}
-        </div>
+            )}
+          </div>
+        ) : null}
 
         <Report report={life.report} />
       </div>
     </Section>
-  )
-}
-
-/**
- * The escape hatch when the computed allocation is wrong on the day. Kept next to the
- * computed number so it is always obvious what is being overridden and by how much;
- * clearing it hands the computed value back rather than freezing today's number in.
- */
-function ManualOverride({
-  roundId,
-  playerId,
-  computed,
-  current,
-  disabled,
-}: {
-  roundId: string
-  playerId: string
-  computed: number
-  current: number | null
-  disabled: boolean
-}) {
-  const { busy, report, run } = useAdminAction()
-  const [value, setValue] = useState(current === null ? '' : String(current))
-
-  return (
-    <div className="mt-3 border-t border-hair pt-3">
-      <Field
-        label="Manual stroke override"
-        hint={`Blank uses the computed ${computed}.`}
-      >
-        <div className="flex gap-2">
-          <input
-            className={inputClass}
-            inputMode="numeric"
-            placeholder={String(computed)}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            disabled={disabled}
-          />
-          <Button
-            disabled={disabled || busy}
-            onClick={() =>
-              void run('Override saved.', () => setManualOverride(roundId, playerId, num(value)))
-            }
-          >
-            {busy ? '…' : 'Set'}
-          </Button>
-        </div>
-      </Field>
-      <Report report={report} />
-    </div>
   )
 }

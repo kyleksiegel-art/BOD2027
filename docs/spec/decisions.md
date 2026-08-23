@@ -568,3 +568,27 @@ for undecided rounds/holes (the "pending" bucket), so the balances don't sum to 
 settlement would be misleading. The Money page shows transfers only when every non-abandoned
 round is `final` and nothing is pending; until then it says settlement isn't available yet.
 Voided/returned CTP pots are refunded evenly to all contributors (everyone who bought in).
+
+### Handicap index is live, not snapshotted; Players/Rounds simplified (2026-08-22, Kyle)
+
+Kyle: "simplify players and rounds — I want to mark their handicap and rounds just let me
+choose the tee boxes; when I start the round I want to choose what tee we are playing and
+just go." The per-round handicap snapshot was the source of the overbuilt feel — it forced a
+per-round index field, an allowance/cap display, a manual override, a re-snapshot button, and
+two "not retroactive" warnings.
+
+Decision: the handicap index is a **live property of the player**. `buildRoundDetail` pass 1
+reads `players.handicap_index` (falling back to `round_players.index_used` only if the player
+row is missing); the tee still converts it to strokes via `computeHandicap`, unchanged. The
+`round_players` row keeps snapshotting `index_used`/`allowance_used`/`cap_used` so the server
+RPC can still compute and store `strokes_received`, but the client no longer scores off it.
+
+Consequences: editing an index on the Players tab now moves points on every **non-finalized**
+round immediately — no re-snapshot. Finalized-round **money** is still frozen in `round_money`,
+so payouts never move; only the (already provisional) points display of a finalized round
+would shift, which is acceptable and unlikely to be edited post-finalize. The Rounds editor is
+now one tee dropdown per player + Save/Start/Finalize/Abandon; the index field, allowance/cap
+line, manual override and the DNP status picker were removed from the UI. The Players editor
+lost the "not retroactive" note and the index-change badge. `resnapshotRound` and
+`setManualOverride` remain in `admin.ts`/the RPC layer (still exercised by the SQL tests) but
+are no longer wired to any screen. No schema change, no migration.

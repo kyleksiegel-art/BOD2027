@@ -7,11 +7,9 @@ import { formatDay } from '@/lib/format'
 /**
  * Players and their indexes.
  *
- * The one thing worth knowing here: editing an index is NOT retroactive. Rounds carry a
- * handicap snapshot taken when the round was set up, and changing the index changes only
- * what the NEXT snapshot will use. Making it retroactive is a separate, explicit action
- * on one named round (Re-snapshot, in the Rounds editor). The note under the form says so,
- * because "I changed my index and the leaderboard didn't move" is otherwise a bug report.
+ * The index is read live everywhere it matters: scoring pulls each player's current index
+ * (plus the round's tee) rather than a per-round snapshot, so changing it here moves the
+ * numbers on every non-finalized round at once. No re-snapshot step, nothing to keep in sync.
  */
 function PlayerCard({ player, disabled }: { player: PlayerRow; disabled: boolean }) {
   const { busy, report, run } = useAdminAction()
@@ -93,11 +91,6 @@ function PlayerCard({ player, disabled }: { player: PlayerRow; disabled: boolean
         >
           {busy ? 'Saving…' : 'Save'}
         </Button>
-        {parsedIndex !== null && parsedIndex !== player.handicap_index ? (
-          <span className="text-[0.8rem] text-gold-bright">
-            Index change — not retroactive
-          </span>
-        ) : null}
       </div>
 
       <Report report={report} />
@@ -109,9 +102,8 @@ export function PlayersEditor({ players, disabled }: { players: PlayerRow[]; dis
   return (
     <>
       <p className="mt-4 text-[0.88rem] leading-relaxed text-paper-dim">
-        Changing an index does not move any leaderboard on its own. Each round holds the
-        handicap it was set up with; to pull a new index into a round, re-snapshot that
-        round under <strong className="text-paper">Rounds</strong>.
+        A player's index applies live to every round in play — scoring reads it here plus the
+        tee. Finalized rounds keep their frozen money.
       </p>
       {players.map((p) => (
         <PlayerCard key={p.id} player={p} disabled={disabled} />
