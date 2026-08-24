@@ -134,123 +134,67 @@ function HandicapCard({ settings, disabled }: { settings: AdminSettingsVM; disab
   )
 }
 
+// Defaults match the trip's money sheet, used when a value hasn't been set yet.
+const DEFAULT_BUY_IN_CENTS = 25000
+const DEFAULT_FIRST_CENTS = 60000
+const DEFAULT_SECOND_CENTS = 20000
+const DEFAULT_ROUND_CENTS = 5000
+
 function PurseCard({ settings, disabled }: { settings: AdminSettingsVM; disabled: boolean }) {
   const { busy, report, run } = useAdminAction()
-  const [mode, setMode] = useState(settings.purseMode)
-  const [buyIn, setBuyIn] = useState(
-    String((settings.purseAmounts.buy_in_per_player_cents ?? 0) / 100),
-  )
-  const [ch, setCh] = useState(String(Math.round(settings.purseWeights.championship * 100)))
-  const [rw, setRw] = useState(String(Math.round(settings.purseWeights.roundWinners * 100)))
-  const [ctp, setCtp] = useState(String(Math.round(settings.purseWeights.ctp * 100)))
-  const fixed = settings.purseAmounts.fixed_cents ?? {}
-  const [fCh, setFCh] = useState(String((fixed.championship ?? 0) / 100))
-  const [fRw, setFRw] = useState(String((fixed.roundWinners ?? 0) / 100))
-  const [fCtp, setFCtp] = useState(String((fixed.ctp ?? 0) / 100))
+  const a = settings.purseAmounts
+  const dollars = (cents: number | undefined, fallback: number) => String((cents ?? fallback) / 100)
+  const [buyIn, setBuyIn] = useState(dollars(a.buy_in_per_player_cents, DEFAULT_BUY_IN_CENTS))
+  const [first, setFirst] = useState(dollars(a.champ_first_cents, DEFAULT_FIRST_CENTS))
+  const [second, setSecond] = useState(dollars(a.champ_second_cents, DEFAULT_SECOND_CENTS))
+  const [round, setRound] = useState(dollars(a.round_winner_cents, DEFAULT_ROUND_CENTS))
 
-  const weights = { championship: num(ch), roundWinners: num(rw), ctp: num(ctp) }
-  const weightsValid = Object.values(weights).every((v) => v !== null && v >= 0)
-  const weightSum = weightsValid ? weights.championship! + weights.roundWinners! + weights.ctp! : 0
+  const parsed = { buyIn: num(buyIn), first: num(first), second: num(second), round: num(round) }
+  const valid = Object.values(parsed).every((v) => v !== null && v >= 0)
 
   return (
-    <Section title="Purse" meta={mode === 'buyin' ? 'Buy-in' : 'Fixed pots'}>
-      <div className="mt-3">
-        <Field label="Mode">
-          <select
-            className={inputClass}
-            value={mode}
-            onChange={(e) => setMode(e.target.value)}
-            disabled={disabled}
-          >
-            <option value="buyin">Buy-in per player</option>
-            <option value="fixed">Fixed pot amounts</option>
-          </select>
+    <Section title="Money" meta="Buy-in and payouts">
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Field label="Buy-in / player ($)">
+          <input className={inputClass} inputMode="decimal" value={buyIn}
+            onChange={(e) => setBuyIn(e.target.value)} disabled={disabled} />
+        </Field>
+        <Field label="Round winner ($)" hint="Paid each counting round.">
+          <input className={inputClass} inputMode="decimal" value={round}
+            onChange={(e) => setRound(e.target.value)} disabled={disabled} />
+        </Field>
+        <Field label="1st overall ($)">
+          <input className={inputClass} inputMode="decimal" value={first}
+            onChange={(e) => setFirst(e.target.value)} disabled={disabled} />
+        </Field>
+        <Field label="2nd overall ($)">
+          <input className={inputClass} inputMode="decimal" value={second}
+            onChange={(e) => setSecond(e.target.value)} disabled={disabled} />
         </Field>
       </div>
-
-      {mode === 'buyin' ? (
-        <>
-          <div className="mt-3">
-            <Field label="Buy-in per player ($)">
-              <input
-                className={inputClass}
-                inputMode="decimal"
-                value={buyIn}
-                onChange={(e) => setBuyIn(e.target.value)}
-                disabled={disabled}
-              />
-            </Field>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <Field label="Champ %">
-              <input className={inputClass} inputMode="numeric" value={ch}
-                onChange={(e) => setCh(e.target.value)} disabled={disabled} />
-            </Field>
-            <Field label="Rounds %">
-              <input className={inputClass} inputMode="numeric" value={rw}
-                onChange={(e) => setRw(e.target.value)} disabled={disabled} />
-            </Field>
-            <Field label="CTP %">
-              <input className={inputClass} inputMode="numeric" value={ctp}
-                onChange={(e) => setCtp(e.target.value)} disabled={disabled} />
-            </Field>
-          </div>
-          {weightsValid && weightSum !== 100 ? (
-            <p className="mt-2 text-[0.8rem] text-gold-bright">
-              The three add up to {weightSum}%, not 100. They are used as weights, so the
-              pot is still fully allocated — but the numbers won't read as percentages.
-            </p>
-          ) : null}
-        </>
-      ) : (
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          <Field label="Champ $">
-            <input className={inputClass} inputMode="decimal" value={fCh}
-              onChange={(e) => setFCh(e.target.value)} disabled={disabled} />
-          </Field>
-          <Field label="Rounds $">
-            <input className={inputClass} inputMode="decimal" value={fRw}
-              onChange={(e) => setFRw(e.target.value)} disabled={disabled} />
-          </Field>
-          <Field label="CTP $">
-            <input className={inputClass} inputMode="decimal" value={fCtp}
-              onChange={(e) => setFCtp(e.target.value)} disabled={disabled} />
-          </Field>
-        </div>
-      )}
 
       <div className="mt-4">
         <Button
           tone="primary"
-          disabled={disabled || busy || (mode === 'buyin' && !weightsValid)}
+          disabled={disabled || busy || !valid}
           onClick={() =>
-            void run('Purse settings saved.', async () => {
-              await saveSetting('purse_mode', mode)
-              if (mode === 'buyin') {
-                await saveSetting('purse_weights', {
-                  championship: weights.championship! / 100,
-                  roundWinners: weights.roundWinners! / 100,
-                  ctp: weights.ctp! / 100,
-                })
-              }
-              // Cents, always — dollars are a display unit. Amounts for BOTH modes are kept
-              // in one row so switching modes doesn't discard the other mode's figures.
-              await saveSetting('purse_amounts', {
-                buy_in_per_player_cents: Math.round((num(buyIn) ?? 0) * 100),
-                fixed_cents: {
-                  championship: Math.round((num(fCh) ?? 0) * 100),
-                  roundWinners: Math.round((num(fRw) ?? 0) * 100),
-                  ctp: Math.round((num(fCtp) ?? 0) * 100),
-                },
-              })
-            })
+            void run('Money settings saved.', () =>
+              // Cents, always — dollars are a display unit.
+              saveSetting('purse_amounts', {
+                buy_in_per_player_cents: Math.round((parsed.buyIn ?? 0) * 100),
+                champ_first_cents: Math.round((parsed.first ?? 0) * 100),
+                champ_second_cents: Math.round((parsed.second ?? 0) * 100),
+                round_winner_cents: Math.round((parsed.round ?? 0) * 100),
+              }),
+            )
           }
         >
-          {busy ? 'Saving…' : 'Save purse'}
+          {busy ? 'Saving…' : 'Save money settings'}
         </Button>
         <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
-          Rounds already finalized keep the money frozen at the time they were finalized.
-          This changes what future finalizations and the Money page derive.
+          The Money page reconciles buy-ins against the payouts: 1st + 2nd + (round winner ×
+          counting rounds) should equal the buy-in per man × players. Closest-to-pin is still
+          entered for bragging rights but pays nothing.
         </p>
       </div>
       <Report report={report} />

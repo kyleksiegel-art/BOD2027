@@ -621,7 +621,13 @@ export interface AdminSettingsVM {
   handicapCap: number
   purseMode: string
   purseWeights: { championship: number; roundWinners: number; ctp: number }
-  purseAmounts: { buy_in_per_player_cents?: number; fixed_cents?: Record<string, number> }
+  purseAmounts: {
+    buy_in_per_player_cents?: number
+    champ_first_cents?: number
+    champ_second_cents?: number
+    round_winner_cents?: number
+    fixed_cents?: Record<string, number> // legacy — no longer written
+  }
   ctpCarryMode: string
   assignedIndexFootnote: string
 }

@@ -264,43 +264,47 @@ Things that will bite if forgotten:
 ## Money path (Phase 7) — the shape to reuse
 
 The money ledger, assembled the same way every other screen is: Dexie rows → pure compute →
-`useLiveQuery`. **No migration and no new RPC** — the tables (`ctp_results`, `round_money`),
-`rpc_upsert_ctp` and `rpc_finalize_round` all shipped earlier; Phase 7 is the compute layer
-and the UI.
+`useLiveQuery`.
+
+**Model revised 2026-08-23 (Kyle — the trip's real money sheet), see `decisions.md §"Money
+model: buy-in funds 1st/2nd + round winners, no CTP money"`:** a buy-in per man funds three
+payouts — **1st overall, 2nd overall, and a per-round winner**. There is **no closest-to-pin
+money** (CTP is still entered on the round screen for bragging rights, it just pays $0). The old
+40/30/30 championship/round/CTP weighted split is gone.
 
 - **`src/lib/data/money.ts` `buildMoney(dbData) → MoneyVM`** is the whole ledger, pure and
-  offline-identical. It reads `settings` (purse mode/weights/amounts, `ctp_carry_mode`) + each
-  round's par-3 count, calls `computePurse`/`settle`/`allocate*Cents` from `@/lib/scoring`, and
-  orchestrates the payouts. Everything is **integer cents**; round only at display
-  (`formatMoney`/`formatMoneySigned` in `format.ts`).
-- **Derive live; never read `round_money` on the client.** The frozen snapshot is a
-  verification mirror — it must agree to the cent (both `admin_path.sql` and `money.test.ts`
-  assert the split) but the page derives so money is right offline before finalization.
-- **`ctp_results` is now in the `Db` interface** and `useDbData` loads it (it was already a
-  Dexie table + hydrated + merged since 6a). `round_money` is deliberately **not** hydrated.
-- **CTP entry: `src/components/round/CtpEntry.tsx`, inside `/rounds/:n`** (via `useRoundCtp`).
-  One row per **played** par 3, winner chips (playing players only) + "No winner" + a feet
-  input, per-hole Save. Writes through `saveCtp` (`mutations.ts`) → `enqueueCtp` → the **same
-  outbox** as scores, no PIN. A `null` winner is the explicit carry row.
-- **Money page: `src/routes/Money.tsx`** (`useMoney`). Total purse + 40/30/30 breakdown,
-  buy-in reconciliation line, per-round cards (championship share / round winner / CTP pot with
-  per-hole won·carry·void·pending), per-player ledger, settlement, remainder-cent footnotes.
+  offline-identical. It reads `settings.purse_amounts` = `{ buy_in_per_player_cents,
+  champ_first_cents, champ_second_cents, round_winner_cents }`, resolves 1st/2nd off
+  `buildStandings` and each round's winner off `resolveRoundWinner`, and awards. Everything is
+  **integer cents**; round only at display (`formatMoney`/`formatMoneySigned`). `computePurse`
+  and the weighted `PurseConfig` in `@/lib/scoring` are now **unused by the app** (kept, still
+  unit-tested); `buildMoney` uses `allocateEvenCents`/`settle`/`compareCountback` directly.
+- **Ties pool the tied positions' purses and split evenly** (`resolveChampionPlaces`): two tied
+  for 1st split (1st+2nd); a tie for 2nd splits 2nd; the remainder cent → higher standing
+  (`orderByStanding`). Round-winner ties split via the round countback then even split.
+- **Reconciliation is now a real check, not just a status.** `balanced` = `awarded + pending ===
+  buy-in × players`; because the awards are fixed amounts (not fractions of the pot), a
+  misconfigured amount or an abandoned round genuinely won't reconcile and the page flags it.
+  Settlement runs only when settleable **and** balanced **and** nothing pending.
+- **Derive live; never read `round_money` on the client.** `rpc_finalize_round` still freezes a
+  mirror, but under the new model it freezes **`round_purse_cents = round_winner_cents`** and
+  **0** for championship_share and ctp (championship is trip-level; CTP pays nothing). The table
+  shape is unchanged. Migration: `20260823120000_money_model_revision.sql`.
+- **CTP entry: `src/components/round/CtpEntry.tsx`, inside `/rounds/:n`** — unchanged, still
+  records winners through the outbox. It just no longer feeds the money ledger.
+- **Money page: `src/routes/Money.tsx`** — total purse + 1st/2nd/round-winner breakdown, buy-in
+  reconciliation, per-round winner cards (no CTP section), per-player ledger, settlement.
+- **Settings: `SettingsEditor.tsx` "Money" card** — four dollar fields (buy-in, round winner,
+  1st, 2nd), defaulting to $250/$50/$600/$200. `purse_mode`/`purse_weights`/`ctp_carry_mode` are
+  legacy settings the money model no longer reads (still valid in `rpc_upsert_settings`).
 
 Things that will bite if forgotten:
-- **A cut-off par 3's CTP slice folds into the last *played* par 3.** A round finalized at 15
-  holes (Black) leaves hole 17 unplayable; its slice must not vanish — `buildMoney` adds it to
-  the last played par 3's pot so the ledger reconciles. (`money.test.ts` §"shortened round".)
-- **Reconciliation is a tripwire, not a status.** `awarded + pending === buy-ins` holds by
-  construction; the loud warning fires only on a real bug. Mid-trip, undecided rounds/holes sit
-  in `pending` — that is expected, not an imbalance.
-- **Settlement shows only when every non-abandoned round is `final` and nothing is pending** —
-  `settle()` needs zero-sum balances. Voided/returned CTP pots refund evenly to all buy-in
-  contributors.
-- **Champion/round-winner ties run the real chain** (`resolveChampion`/`resolveRoundWinner`
-  reuse `tallyHolesWon`/`compareCountback`); a genuine tie splits, remainder cent to the better
-  single round / higher standing.
-- **The buy-in vs fixed toggle already exists** in `SettingsEditor.tsx` (Phase 5B). Phase 7 did
-  not touch admin.
-- Tests: `money.test.ts` (9) covers the pot split, payouts+reconciliation, carry-to-contributors,
-  void mode, the shortened-round fold, abandoned redistribution, pending, fixed mode, and
-  frozen-figure parity. Full `vitest run` → **131**. `supabase test db` unchanged (no migration).
+- **Standings ties share a position** (competition ranking), which is exactly what the
+  pooled-position payout relies on — three tied for 1st still share only the two paid places.
+- **On the hosted DB, `purse_amounts` may still hold the old shape** (`buy_in_per_player_cents` +
+  `fixed_cents`) until the migration is pushed *or* someone hits Save on the Money settings card.
+  `buildMoney` reads the new fields (fallback 0), so until then the Money page will reconcile
+  against a stale buy-in — set it in Settings.
+- Tests: `money.test.ts` (6) covers payouts+reconciliation, tie pooling, pending, abandoned, the
+  reconciliation tripwire, and empty config. Full `vitest run` → **130**. `supabase test db` →
+  **232** (finalize freeze + admin_path asserts updated; `plan(106)` unchanged).

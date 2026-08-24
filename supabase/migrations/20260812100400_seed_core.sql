@@ -70,15 +70,16 @@ on conflict (id) do nothing;
 -- Shapes match the pure scoring engine (src/lib/scoring): points_table -> PointsTable,
 -- purse_weights -> PurseWeights. Editing points_table/allowance/handicap_cap is
 -- retroactive at compute time; handicaps themselves are snapshotted per round.
--- purse_amounts is a WORKING placeholder ($100/player buy-in); real purse config
--- (mode + amounts) is TODO in the brief and set in the Phase 7 admin editor.
+-- purse_amounts holds the trip's real money model (Kyle 2026-08-23): $250/man buy-in funding
+-- 1st ($600) + 2nd ($200) overall and a $50 per-round winner; no CTP money. purse_mode and
+-- purse_weights are legacy (the money model no longer reads them) but kept as valid settings.
 insert into public.settings (key, value) values
   ('points_table', '{"threeOrMoreUnder":5,"twoUnder":4,"oneUnder":3,"level":2,"oneOver":1,"twoOrMoreOver":0}'::jsonb),
   ('allowance', '1.0'::jsonb),
   ('handicap_cap', '18'::jsonb),
   ('purse_mode', '"buyin"'::jsonb),
   ('purse_weights', '{"championship":0.4,"roundWinners":0.3,"ctp":0.3}'::jsonb),
-  ('purse_amounts', '{"buy_in_per_player_cents":10000,"fixed_cents":{"championship":0,"roundWinners":0,"ctp":0}}'::jsonb),
+  ('purse_amounts', '{"buy_in_per_player_cents":25000,"champ_first_cents":60000,"champ_second_cents":20000,"round_winner_cents":5000}'::jsonb),
   ('ctp_carry_mode', '"carry"'::jsonb),
   ('assigned_index_footnote', '"Players without an established GHIN index play off an agreed index, marked with an asterisk."'::jsonb)
 on conflict (key) do nothing;

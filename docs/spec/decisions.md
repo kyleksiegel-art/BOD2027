@@ -592,3 +592,27 @@ line, manual override and the DNP status picker were removed from the UI. The Pl
 lost the "not retroactive" note and the index-change badge. `resnapshotRound` and
 `setManualOverride` remain in `admin.ts`/the RPC layer (still exercised by the SQL tests) but
 are no longer wired to any screen. No schema change, no migration.
+
+### Money model: buy-in funds 1st/2nd + round winners, no CTP money (2026-08-23, Kyle)
+
+Kyle supplied the trip's actual money sheet: **$250/man buy-in**, paying **1st overall $600,
+2nd overall $200, and a daily round winner $50** (× 4 rounds). $600 + $200 + $50×4 = $1,000 =
+4 × $250, so it reconciles exactly. **No closest-to-pin money** — CTP is still entered on the
+round screen for bragging rights but pays nothing and is absent from the Money page. Amounts are
+**editable in the admin Settings "Money" card**.
+
+This replaced the earlier weighted 40/30/30 championship/round-winner/CTP model. Structural
+changes: the championship now pays **two places**, not a single winner-take-all pot; ties pool
+the tied positions' purses and split evenly (two tied for 1st split 1st+2nd; the remainder cent
+goes to the higher standing). Reconciliation became a genuine check — because the awards are
+fixed dollars rather than fractions of the pot, a misconfigured amount or an abandoned round can
+fail to reconcile, and the Money page flags it; settlement runs only when balanced.
+
+Implementation: `src/lib/data/money.ts` rewritten (`resolveChampionPlaces` for 1st/2nd,
+`resolveRoundWinner` unchanged); `Money.tsx` and the Settings "Money" card rewritten;
+`settings.purse_amounts` shape is now `{ buy_in_per_player_cents, champ_first_cents,
+champ_second_cents, round_winner_cents }`. `rpc_finalize_round` freezes `round_purse_cents =
+round_winner_cents` and 0 for championship_share/ctp (migration
+`20260823120000_money_model_revision.sql`); the `round_money` table shape is unchanged. The
+weighted `computePurse` in `src/lib/scoring/money.ts` is retained (still unit-tested) but no
+longer used by the app. `purse_mode`/`purse_weights`/`ctp_carry_mode` are now legacy settings.

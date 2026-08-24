@@ -350,15 +350,17 @@ select is(
   (select holes_counted from public.rounds where id = (select r3 from t)), 12,
   'and holes_counted records the cutoff');
 
--- The frozen money. $100 × 4 players = $400; 40/30/30; four counting rounds.
+-- The frozen money (new model): championship (1st/2nd overall) is decided across the whole
+-- trip, so it freezes at 0 per round; CTP pays nothing; only the per-round winner is per-round,
+-- frozen at round_winner_cents ($50 = 5000 in the seed).
 select is(
   (select championship_share_cents from public.round_money where round_id = (select r3 from t)),
-  4000,
-  'round_money freezes this round''s even share of the championship pot');
+  0,
+  'round_money freezes 0 for the championship (decided across the whole trip)');
 select is(
   (select round_purse_cents from public.round_money where round_id = (select r3 from t)),
-  3000,
-  'and its even share of the round-winner pot');
+  5000,
+  'and freezes the per-round winner amount');
 select is(
   (select par_3_count from public.round_money where round_id = (select r3 from t)),
   (select count(*)::int from public.holes h
