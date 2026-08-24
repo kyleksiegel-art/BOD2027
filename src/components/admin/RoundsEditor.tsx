@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   clearRoundScores,
   finalizeRound,
+  saveRound,
   saveRoundPlayersQueued,
   startRound,
   type RoundPlayerInput,
@@ -9,7 +10,7 @@ import {
 import type { AdminRoundVM, AdminSettingsVM } from '@/lib/data/compute'
 import type { PlayerRow } from '@/lib/data/types'
 import { StatusBadge } from '@/components/StatusBadge'
-import { formatDay, formatTeeTime } from '@/lib/format'
+import { composeEtTimestamp, etTimeInputValue, formatDay, formatTeeTime } from '@/lib/format'
 import { Button, Field, Report, Section, inputClass, num, useAdminAction } from './kit'
 
 /**
@@ -64,6 +65,8 @@ function RoundPanel({
 }) {
   const setup = useAdminAction()
   const life = useAdminAction()
+  const teeTime = useAdminAction()
+  const [teeTimeValue, setTeeTimeValue] = useState(() => etTimeInputValue(vm.round.tee_time))
 
   // The player's live trip index — read straight off the Players tab, snapshotted into the
   // round only so the server can compute strokes. Nothing per-round to edit here.
@@ -166,6 +169,44 @@ function RoundPanel({
           {' '}— strokes recompute on this phone straight away and sync when you have a connection.
         </p>
         <Report report={setup.report} />
+      </div>
+
+      {/* ── Tee time ───────────────────────────────────────────────────────── */}
+      <div className="mt-5 border-t border-hair pt-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <Field label="Tee time (ET)">
+              <input
+                type="time"
+                aria-label={`Tee time for round ${vm.round.round_number}`}
+                className={inputClass}
+                value={teeTimeValue}
+                onChange={(e) => setTeeTimeValue(e.target.value)}
+                disabled={disabled}
+              />
+            </Field>
+          </div>
+          <Button
+            disabled={disabled || teeTime.busy}
+            onClick={() =>
+              void teeTime.run('Tee time saved.', () =>
+                saveRound({
+                  id: vm.round.id,
+                  roundNumber: vm.round.round_number,
+                  date: vm.round.date,
+                  courseId: vm.round.course_id,
+                  teeTime: composeEtTimestamp(vm.round.date, teeTimeValue),
+                }),
+              )
+            }
+          >
+            {teeTime.busy ? 'Saving…' : 'Save tee time'}
+          </Button>
+        </div>
+        <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
+          Rendered everywhere in Eastern time. Clear it to leave the round without a set time.
+        </p>
+        <Report report={teeTime.report} />
       </div>
 
       {/* ── Lifecycle ──────────────────────────────────────────────────────── */}

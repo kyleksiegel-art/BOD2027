@@ -787,7 +787,30 @@ scores on that DB are fake) and clears on the next `supabase db reset`.
 
 ## Phase 8 — Info + admin editors
 
-_(To be filled in at end of Phase 8.)_
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| Itinerary Info page — timeline grouped by day, current-day highlight, all times ET | `src/routes/info/Itinerary.tsx`; `buildItinerary()` in `compute.ts`. Live: added "Welcome dinner" via admin, it rendered on `/info/itinerary` as "Thursday, February 4 · 7:00 PM ET · The Lodge · MEAL". Current-day flag unit-tested (`info.test.ts`, `todayET` injected). |
+| Courses Info page — index + per-course scorecard pages | `src/routes/info/Courses.tsx` (index), `CourseDetail.tsx` (`/info/courses/:courseId`); `buildCoursesIndex()` / `buildCourseDetail()`. Live: index rendered all four courses ordered by round, Bone Valley flagged "Card TBD"; scorecard shows 18 holes × tee yardages, tee ratings/slopes, front/back par. |
+| Players Info page — photos + course-handicap-per-course | `src/routes/info/Players.tsx` extended; `buildPlayerCourseHandicaps()` computes each player's playing handicap **live** from the current index (not a snapshot). Live: Jon 13/13/13, Kyle 17/17/17, Chris DNP on Blue, Bone Valley "—" (unassigned). |
+| Rules Info page money section corrected to the buy-in model | `src/routes/info/Rules.tsx` rewritten; pulls live amounts from `settings.purse_amounts`. Live: rendered buy-in $250 → 1st $600 / 2nd $200 / round winner $50, "CTP for bragging rights, no money", pooled-tie copy. |
+| Itinerary admin editor | `src/components/admin/ItineraryEditor.tsx` → `saveItinerary()` → `rpc_upsert_itinerary`. Live add landed and refreshed to "1 item" with no duplicate row (new-draft self-removes on success). |
+| Lodging admin editor (with `lodging_assignments`) | `src/components/admin/LodgingEditor.tsx` → `saveLodging()` / `saveLodgingAssignment()` → `rpc_upsert_lodging` / `rpc_upsert_lodging_assignment`. Rooms appear only after the property has an id (assignment RPC needs `lodging_id`). |
+| Tee times per round | Added to `RoundsEditor.tsx` → `saveRound()` → `rpc_upsert_round(p_tee_time)`; `<input type=time>` composed at ET −05:00 via `composeEtTimestamp`. |
+| Admin edit → public page within one Realtime tick | Admin writes invalidate `['hydrate']` (existing path); Info tables now hydrated into Dexie v6 and read via `useLiveQuery`. Demonstrated by the itinerary round-trip above. |
+| All timestamps rendered `America/New_York` | `formatDayLong` / `etDateString` / `etTimeInputValue` / `composeEtTimestamp` all pin `America/New_York` / −05:00 (February is EST). |
+
+### Automated tests
+
+- `src/lib/data/info.test.ts` (10) — itinerary grouping/ordering/current-day/empty; lodging join + nights + empty; courses index ordering + placeholder + longest-tee par/yardage; course detail 18 holes + per-tee yardage + front/back par + unknown-id null; player course handicaps live-from-index + DNP + unassigned-null.
+- Full suite: `vitest run` → **140** (was 130). `tsc -b` clean. `npm run build` clean (pre-existing chunk-size warning only). No migration changed, so `supabase test db` is unchanged (232).
+
+### Deferred / deviations
+
+- **No delete path for itinerary/lodging/assignments this phase** (Kyle, 2026-08-24 — "just two rooms and dinners and pool time, nothing crazy"). Editors are add/edit only; removal would need new delete RPCs. See `decisions.md §"No delete for the Info editors (Phase 8)"`.
+- Photo **upload** for players stays Phase 9 (needs the upload Edge Function); `photo_url` is still passed through and rendered where present.
+- Left no demo data behind — the itinerary row created during live verification was removed via direct SQL.
 
 ---
 

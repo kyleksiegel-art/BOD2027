@@ -300,6 +300,100 @@ export function saveSetting(key: string, value: unknown) {
   return call<unknown>('rpc_upsert_settings', { p_key: key, p_value: value })
 }
 
+// ── Itinerary / lodging (Phase 8) ──────────────────────────────────────────────
+// Online-only admin writes, like every other RPC here — the Info tables are not on the
+// offline boundary (CLAUDE.md). The RPCs shipped gated in Phase 5B; these are the client
+// bindings. There is deliberately no delete path this phase (Kyle, 2026-08-24: the data is
+// a small fixed set of rooms and dinners — edit in place, don't build removal yet).
+
+export interface ItineraryEntryInput {
+  id: string | null
+  day: string // 'YYYY-MM-DD'
+  sortOrder: number
+  startTime: string | null // ISO timestamptz, or null for all-day
+  category: 'travel' | 'golf' | 'meal' | 'lodging' | 'other'
+  title: string
+  detail: string | null
+  location: string | null
+}
+
+/** Batch upsert — the RPC takes the whole array and reports per-entry applied/error. */
+export async function saveItinerary(entries: ItineraryEntryInput[]): Promise<CheckedResult> {
+  const results = await call<{ applied: boolean; error: string | null }[]>('rpc_upsert_itinerary', {
+    entries: entries.map((e) => ({
+      id: e.id,
+      day: e.day,
+      sort_order: e.sortOrder,
+      start_time: e.startTime,
+      category: e.category,
+      title: e.title,
+      detail: e.detail,
+      location: e.location,
+    })),
+  })
+  const refused = (results ?? []).filter((r) => !r.applied)
+  return { ok: refused.length === 0, errors: refused.map((r) => r.error ?? 'refused') }
+}
+
+export interface LodgingInput {
+  id: string | null
+  property: string
+  checkIn: string // 'YYYY-MM-DD'
+  checkOut: string
+  confirmation: string | null
+  notes: string | null
+}
+
+export function saveLodging(l: LodgingInput) {
+  return call<unknown>('rpc_upsert_lodging', {
+    p_id: l.id,
+    p_property: l.property,
+    p_check_in: l.checkIn,
+    p_check_out: l.checkOut,
+    p_confirmation: l.confirmation,
+    p_notes: l.notes,
+  })
+}
+
+export interface LodgingAssignmentInput {
+  id: string | null
+  lodgingId: string
+  playerId: string
+  roomLabel: string | null
+}
+
+export function saveLodgingAssignment(a: LodgingAssignmentInput) {
+  return call<unknown>('rpc_upsert_lodging_assignment', {
+    p_id: a.id,
+    p_lodging_id: a.lodgingId,
+    p_player_id: a.playerId,
+    p_room_label: a.roomLabel,
+  })
+}
+
+// ── Rounds: tee time (Phase 8) ───────────────────────────────────────────────
+// rpc_upsert_round rewrites the whole round row, so the caller must pass the values it is
+// NOT changing (round_number, date, course) back unchanged — the editor reads them from the
+// admin VM. Tee time is a timestamptz; the editor composes it from the round's ET date.
+
+export interface RoundInput {
+  id: string
+  roundNumber: number
+  date: string // 'YYYY-MM-DD'
+  courseId: string
+  teeTime: string | null // ISO timestamptz
+}
+
+export function saveRound(r: RoundInput) {
+  return call<unknown>('rpc_upsert_round', {
+    p_id: r.id,
+    p_round_number: r.roundNumber,
+    p_date: r.date,
+    p_course_id: r.courseId,
+    p_tee_time: r.teeTime,
+  })
+}
+
 // ── Diagnostics ──────────────────────────────────────────────────────────────
 
 export function exportAll() {

@@ -12,6 +12,7 @@ import NotFound from '@/routes/NotFound'
 import InfoLayout from '@/routes/info/InfoLayout'
 import Itinerary from '@/routes/info/Itinerary'
 import Courses from '@/routes/info/Courses'
+import CourseDetail from '@/routes/info/CourseDetail'
 import Players from '@/routes/info/Players'
 import Rules from '@/routes/info/Rules'
 
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="itinerary" replace /> },
           { path: 'itinerary', element: <Itinerary /> },
           { path: 'courses', element: <Courses /> },
+          { path: 'courses/:courseId', element: <CourseDetail /> },
           { path: 'players', element: <Players /> },
           { path: 'rules', element: <Rules /> },
         ],

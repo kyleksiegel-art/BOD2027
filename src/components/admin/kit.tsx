@@ -140,7 +140,8 @@ export function useAdminAction() {
   const [busy, setBusy] = useState(false)
   const [report, setReport] = useState<ActionReport | null>(null)
 
-  const run = useCallback(async (successLine: string, fn: () => Promise<unknown>) => {
+  const run = useCallback(
+    async (successLine: string, fn: () => Promise<unknown>, onSuccess?: () => void) => {
     setBusy(true)
     setReport(null)
     try {
@@ -149,6 +150,7 @@ export function useAdminAction() {
         setReport({ tone: 'bad', lines: result.errors.length ? result.errors : ['Refused.'] })
       } else {
         setReport({ tone: 'ok', lines: [successLine] })
+        onSuccess?.()
       }
     } catch (e) {
       setReport({

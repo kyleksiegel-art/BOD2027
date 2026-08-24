@@ -106,6 +106,35 @@ export interface CtpResultRow {
   client_id?: string
 }
 
+export type ItinCategory = 'travel' | 'golf' | 'meal' | 'lodging' | 'other'
+
+export interface ItineraryItemRow {
+  id: string
+  day: string // date-only, 'YYYY-MM-DD'
+  sort_order: number
+  start_time: string | null // timestamptz
+  category: ItinCategory
+  title: string
+  detail: string | null
+  location: string | null
+}
+
+export interface LodgingRow {
+  id: string
+  property: string
+  check_in: string // date-only
+  check_out: string // date-only
+  confirmation: string | null
+  notes: string | null
+}
+
+export interface LodgingAssignmentRow {
+  id: string
+  lodging_id: string
+  player_id: string
+  room_label: string | null
+}
+
 /** Local only — never synced. The PIN session token and its expiry. */
 export interface SessionRow {
   id: 'current'

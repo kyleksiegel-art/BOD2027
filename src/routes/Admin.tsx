@@ -7,6 +7,8 @@ import { PlayersEditor } from '@/components/admin/PlayersEditor'
 import { CoursesEditor } from '@/components/admin/CoursesEditor'
 import { RoundsEditor } from '@/components/admin/RoundsEditor'
 import { SettingsEditor } from '@/components/admin/SettingsEditor'
+import { ItineraryEditor } from '@/components/admin/ItineraryEditor'
+import { LodgingEditor } from '@/components/admin/LodgingEditor'
 import { Button, Report, useAdminAction } from '@/components/admin/kit'
 import { useAdmin } from '@/lib/data/selectors'
 import { useSession, lock } from '@/lib/auth/session'
@@ -31,12 +33,14 @@ import { formatDay } from '@/lib/format'
  *     from a stale local copy silently re-derives the trip.
  */
 
-type Tab = 'rounds' | 'players' | 'courses' | 'settings'
+type Tab = 'rounds' | 'players' | 'courses' | 'itinerary' | 'lodging' | 'settings'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'rounds', label: 'Rounds' },
   { id: 'players', label: 'Players' },
   { id: 'courses', label: 'Courses' },
+  { id: 'itinerary', label: 'Itinerary' },
+  { id: 'lodging', label: 'Lodging' },
   { id: 'settings', label: 'Settings' },
 ]
 
@@ -68,6 +72,14 @@ export default function Admin() {
 
   const disabled = !online
 
+  // Sensible date defaults for new itinerary/lodging rows: the trip's first and last round
+  // dates. The user edits from there; this just avoids an empty date picker.
+  const roundDates = admin.rounds.map((r) => r.round.date).sort()
+  const tripDates = {
+    first: roundDates[0] ?? '',
+    last: roundDates[roundDates.length - 1] ?? '',
+  }
+
   return (
     <Page>
       <PageHeader
@@ -89,7 +101,7 @@ export default function Admin() {
         </p>
       ) : null}
 
-      <nav className="mt-5 grid grid-cols-4 gap-2">
+      <nav className="mt-5 grid grid-cols-3 gap-2">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -115,6 +127,22 @@ export default function Admin() {
       ) : null}
       {tab === 'players' ? <PlayersEditor players={admin.players} disabled={disabled} /> : null}
       {tab === 'courses' ? <CoursesEditor courses={admin.courses} disabled={disabled} /> : null}
+      {tab === 'itinerary' ? (
+        <ItineraryEditor
+          items={admin.itinerary}
+          defaultDay={tripDates.first}
+          disabled={disabled}
+        />
+      ) : null}
+      {tab === 'lodging' ? (
+        <LodgingEditor
+          lodging={admin.lodging}
+          players={admin.players}
+          defaultCheckIn={tripDates.first}
+          defaultCheckOut={tripDates.last}
+          disabled={disabled}
+        />
+      ) : null}
       {tab === 'settings' ? <SettingsEditor settings={admin.settings} disabled={disabled} /> : null}
 
       <ExportPanel disabled={disabled} />

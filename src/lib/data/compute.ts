@@ -33,7 +33,12 @@ import type {
   ScoreRow,
   CtpResultRow,
   SettingRow,
+  ItineraryItemRow,
+  LodgingRow,
+  LodgingAssignmentRow,
+  ItinCategory,
 } from './types'
+import { formatDay, formatDayLong, formatTeeTime, etDateString } from '@/lib/format'
 
 // ── Shared lookups ───────────────────────────────────────────────────────────
 export interface Db {
@@ -47,6 +52,11 @@ export interface Db {
   scores: ScoreRow[]
   ctp_results: CtpResultRow[]
   settings: SettingRow[]
+  // Info reference tables (Phase 8). Optional so the many scoring-only test fixtures that
+  // predate them still satisfy Db; the build functions treat an absent table as empty.
+  itinerary_items?: ItineraryItemRow[]
+  lodging?: LodgingRow[]
+  lodging_assignments?: LodgingAssignmentRow[]
 }
 
 export function pointsTableOf(settings: SettingRow[]): PointsTable {
@@ -632,11 +642,19 @@ export interface AdminSettingsVM {
   assignedIndexFootnote: string
 }
 
+export interface AdminLodgingVM {
+  row: LodgingRow
+  assignments: LodgingAssignmentRow[]
+}
+
 export interface AdminVM {
   players: PlayerRow[]
   courses: AdminCourseVM[]
   rounds: AdminRoundVM[]
   settings: AdminSettingsVM
+  /** Raw itinerary rows, day then sort_order — the editor edits these in place. */
+  itinerary: ItineraryItemRow[]
+  lodging: AdminLodgingVM[]
 }
 
 function settingValue<T>(settings: SettingRow[], key: string, fallback: T): T {
@@ -720,10 +738,30 @@ export function buildAdmin(dbData: Db): AdminVM {
       return { round, course, tees: dbData.tees.filter((t) => t.course_id === course.id), participants, startIssues }
     })
 
+  const itinerary = (dbData.itinerary_items ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        a.day.localeCompare(b.day) ||
+        a.sort_order - b.sort_order ||
+        (a.start_time ?? '').localeCompare(b.start_time ?? ''),
+    )
+
+  const lodgingAssignments = dbData.lodging_assignments ?? []
+  const lodging: AdminLodgingVM[] = (dbData.lodging ?? [])
+    .slice()
+    .sort((a, b) => a.check_in.localeCompare(b.check_in) || a.property.localeCompare(b.property))
+    .map((row) => ({
+      row,
+      assignments: lodgingAssignments.filter((a) => a.lodging_id === row.id),
+    }))
+
   return {
     players: dbData.players.slice().sort((a, b) => a.sort_order - b.sort_order),
     courses,
     rounds,
+    itinerary,
+    lodging,
     settings: {
       pointsTable: pointsTableOf(dbData.settings),
       allowance: settingValue(dbData.settings, 'allowance', 1),
@@ -739,4 +777,345 @@ export function buildAdmin(dbData: Db): AdminVM {
       assignedIndexFootnote: settingValue(dbData.settings, 'assigned_index_footnote', ''),
     },
   }
+}
+
+// ── Info: itinerary ────────────────────────────────────────────────────────────
+// The public timeline. Grouped by day, each day's items ordered by sort_order then
+// start_time. "Today" is decided in America/New_York (the trip's timezone), never the
+// device locale — so a phone left on Pacific time still highlights the right day.
+
+export interface ItineraryEntryVM {
+  id: string
+  time: string | null // "1:10 PM ET", or null for an all-day item
+  category: ItinCategory
+  title: string
+  detail: string | null
+  location: string | null
+}
+
+export interface ItineraryDayVM {
+  day: string // 'YYYY-MM-DD'
+  label: string // "Thursday, February 4"
+  isToday: boolean
+  entries: ItineraryEntryVM[]
+}
+
+export interface ItineraryVM {
+  days: ItineraryDayVM[]
+  isEmpty: boolean
+}
+
+/** `todayET` is injectable for tests; in the app it defaults to the ET date of now. */
+export function buildItinerary(dbData: Db, todayET: string = etDateString(new Date())): ItineraryVM {
+  const items = (dbData.itinerary_items ?? []).slice()
+  const byDay = new Map<string, ItineraryItemRow[]>()
+  for (const it of items) {
+    const list = byDay.get(it.day) ?? []
+    list.push(it)
+    byDay.set(it.day, list)
+  }
+
+  const days: ItineraryDayVM[] = [...byDay.keys()]
+    .sort()
+    .map((day) => {
+      const entries = byDay
+        .get(day)!
+        .slice()
+        .sort(
+          (a, b) =>
+            a.sort_order - b.sort_order ||
+            (a.start_time ?? '').localeCompare(b.start_time ?? '') ||
+            a.title.localeCompare(b.title),
+        )
+        .map(
+          (it): ItineraryEntryVM => ({
+            id: it.id,
+            time: formatTeeTime(it.start_time),
+            category: it.category,
+            title: it.title,
+            detail: it.detail,
+            location: it.location,
+          }),
+        )
+      return { day, label: formatDayLong(day), isToday: day === todayET, entries }
+    })
+
+  return { days, isEmpty: days.length === 0 }
+}
+
+// ── Info: lodging ────────────────────────────────────────────────────────────
+export interface LodgingAssignmentVM {
+  id: string
+  playerName: string
+  roomLabel: string | null
+  sortOrder: number
+}
+
+export interface LodgingVM {
+  properties: {
+    id: string
+    property: string
+    checkIn: string // "Thu, Feb 4"
+    checkOut: string
+    nights: number
+    confirmation: string | null
+    notes: string | null
+    assignments: LodgingAssignmentVM[]
+  }[]
+  isEmpty: boolean
+}
+
+function nightsBetween(checkIn: string, checkOut: string): number {
+  const a = new Date(`${checkIn}T12:00:00-05:00`).getTime()
+  const b = new Date(`${checkOut}T12:00:00-05:00`).getTime()
+  return Math.max(0, Math.round((b - a) / 86_400_000))
+}
+
+export function buildLodging(dbData: Db): LodgingVM {
+  const playersById = new Map(dbData.players.map((p) => [p.id, p]))
+  const assignments = dbData.lodging_assignments ?? []
+
+  const properties = (dbData.lodging ?? [])
+    .slice()
+    .sort((a, b) => a.check_in.localeCompare(b.check_in) || a.property.localeCompare(b.property))
+    .map((l) => ({
+      id: l.id,
+      property: l.property,
+      checkIn: formatDay(l.check_in),
+      checkOut: formatDay(l.check_out),
+      nights: nightsBetween(l.check_in, l.check_out),
+      confirmation: l.confirmation,
+      notes: l.notes,
+      assignments: assignments
+        .filter((a) => a.lodging_id === l.id)
+        .map((a): LodgingAssignmentVM => {
+          const p = playersById.get(a.player_id)
+          return {
+            id: a.id,
+            playerName: p?.name ?? 'Unknown',
+            roomLabel: a.room_label,
+            sortOrder: p?.sort_order ?? 999,
+          }
+        })
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    }))
+
+  return { properties, isEmpty: properties.length === 0 }
+}
+
+// ── Info: courses ──────────────────────────────────────────────────────────────
+// The index and the per-course scorecard. Everything here is already hydrated (courses,
+// tees, holes, hole_yardages); this only shapes it for reading. A course whose card is a
+// placeholder (Bone Valley pre-publish) renders with nulls, never fabricated numbers.
+
+/** The round that plays a given course, if any — used to order the index and label a page. */
+function roundForCourse(courseId: string, dbData: Db): RoundRow | undefined {
+  return dbData.rounds.find((r) => r.course_id === courseId)
+}
+
+export interface CourseIndexItemVM {
+  id: string
+  name: string
+  architect: string
+  yearOpened: number
+  isPlaceholder: boolean
+  roundNumber: number | null
+  dayLabel: string | null
+  par: number | null // the primary tee's par, when a tee exists
+  totalYardage: number | null
+}
+
+export function buildCoursesIndex(dbData: Db): CourseIndexItemVM[] {
+  return dbData.courses
+    .map((course) => {
+      const round = roundForCourse(course.id, dbData)
+      const tees = dbData.tees.filter((t) => t.course_id === course.id)
+      const primary = tees
+        .slice()
+        .sort((a, b) => (b.total_yardage ?? 0) - (a.total_yardage ?? 0))[0]
+      return {
+        id: course.id,
+        name: course.name,
+        architect: course.architect,
+        yearOpened: course.year_opened,
+        isPlaceholder: course.data_is_placeholder,
+        roundNumber: round?.round_number ?? null,
+        dayLabel: round ? formatDay(round.date) : null,
+        par: primary?.par ?? null,
+        totalYardage: primary?.total_yardage ?? null,
+      }
+    })
+    .sort(
+      (a, b) =>
+        (a.roundNumber ?? 99) - (b.roundNumber ?? 99) || a.name.localeCompare(b.name),
+    )
+}
+
+export interface CourseTeeVM {
+  id: string
+  name: string
+  rating: number | null
+  slope: number | null
+  par: number
+  totalYardage: number | null
+  frontPar: number | null
+  backPar: number | null
+  frontYardage: number | null
+  backYardage: number | null
+}
+
+export interface CourseHoleVM {
+  holeNumber: number
+  par: number | null
+  strokeIndex: number | null
+  yardageByTee: Record<string, number | null> // teeId -> yardage
+}
+
+export interface CourseDetailVM {
+  course: CourseRow
+  roundNumber: number | null
+  dayLabel: string | null
+  teeTime: string | null
+  isPlaceholder: boolean
+  tees: CourseTeeVM[]
+  holes: CourseHoleVM[] // always 18
+}
+
+export function buildCourseDetail(courseId: string, dbData: Db): CourseDetailVM | null {
+  const course = dbData.courses.find((c) => c.id === courseId)
+  if (!course) return null
+
+  const round = roundForCourse(course.id, dbData)
+  const holeRows = dbData.holes.filter((h) => h.course_id === course.id)
+  const byNumber = new Map(holeRows.map((h) => [h.hole_number, h]))
+  const holeIds = new Set(holeRows.map((h) => h.id))
+  const holeById = new Map(holeRows.map((h) => [h.id, h]))
+
+  // yardage[teeId][holeNumber]
+  const yByTeeHole = new Map<string, Map<number, number | null>>()
+  for (const y of dbData.hole_yardages) {
+    if (!holeIds.has(y.hole_id)) continue
+    const holeNumber = holeById.get(y.hole_id)!.hole_number
+    const m = yByTeeHole.get(y.tee_id) ?? new Map<number, number | null>()
+    m.set(holeNumber, y.yardage)
+    yByTeeHole.set(y.tee_id, m)
+  }
+
+  const tees: CourseTeeVM[] = dbData.tees
+    .filter((t) => t.course_id === course.id)
+    .sort((a, b) => (b.total_yardage ?? 0) - (a.total_yardage ?? 0) || a.name.localeCompare(b.name))
+    .map((t) => {
+      const yards = yByTeeHole.get(t.id)
+      const sumRange = (from: number, to: number): number | null => {
+        if (!yards) return null
+        let total = 0
+        for (let h = from; h <= to; h++) {
+          const v = yards.get(h)
+          if (v === null || v === undefined) return null
+          total += v
+        }
+        return total
+      }
+      const sumParRange = (from: number, to: number): number | null => {
+        let total = 0
+        for (let h = from; h <= to; h++) {
+          const p = byNumber.get(h)?.par
+          if (p === null || p === undefined) return null
+          total += p
+        }
+        return total
+      }
+      return {
+        id: t.id,
+        name: t.name,
+        rating: t.rating,
+        slope: t.slope,
+        par: t.par,
+        totalYardage: t.total_yardage,
+        frontPar: sumParRange(1, 9),
+        backPar: sumParRange(10, 18),
+        frontYardage: sumRange(1, 9),
+        backYardage: sumRange(10, 18),
+      }
+    })
+
+  const holes: CourseHoleVM[] = Array.from({ length: 18 }, (_, i) => {
+    const n = i + 1
+    const row = byNumber.get(n)
+    const yardageByTee: Record<string, number | null> = {}
+    for (const t of tees) yardageByTee[t.id] = yByTeeHole.get(t.id)?.get(n) ?? null
+    return {
+      holeNumber: n,
+      par: row?.par ?? null,
+      strokeIndex: row?.stroke_index ?? null,
+      yardageByTee,
+    }
+  })
+
+  return {
+    course,
+    roundNumber: round?.round_number ?? null,
+    dayLabel: round ? formatDay(round.date) : null,
+    teeTime: round ? formatTeeTime(round.tee_time) : null,
+    isPlaceholder: course.data_is_placeholder,
+    tees,
+    holes,
+  }
+}
+
+// ── Info: players — course handicap per course ──────────────────────────────────
+// Each player's PLAYING handicap at each round's tee, computed LIVE from the player's
+// current index (CLAUDE.md §Scoring — the index is read live, never a per-round snapshot),
+// so the reference page moves the instant an index is edited on the admin Players tab. This
+// is the player's own handicap (post allowance/cap/override), NOT the play-off-the-low
+// relative figure the scorecard uses.
+
+export interface PlayerCourseHandicapVM {
+  roundNumber: number
+  courseName: string
+  teeName: string | null
+  playingHandicap: number | null // null when the player is not assigned / DNP / no card
+  didNotPlay: boolean
+}
+
+export function buildPlayerCourseHandicaps(dbData: Db): Map<string, PlayerCourseHandicapVM[]> {
+  const coursesById = new Map(dbData.courses.map((c) => [c.id, c]))
+  const teesById = new Map(dbData.tees.map((t) => [t.id, t]))
+  const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
+  const out = new Map<string, PlayerCourseHandicapVM[]>()
+
+  for (const player of dbData.players) {
+    const rows: PlayerCourseHandicapVM[] = rounds.map((round) => {
+      const course = coursesById.get(round.course_id)
+      const rp = dbData.round_players.find(
+        (x) => x.round_id === round.id && x.player_id === player.id,
+      )
+      const tee = rp ? teesById.get(rp.tee_id) : undefined
+      const didNotPlay = rp?.status === 'did_not_play'
+
+      let playingHandicap: number | null = null
+      if (rp && tee && !didNotPlay) {
+        const result = computeHandicap({
+          index: player.handicap_index ?? rp.index_used,
+          rating: tee.rating,
+          slope: tee.slope,
+          par: tee.par,
+          allowancePct: rp.allowance_used,
+          cap: rp.cap_used,
+        })
+        playingHandicap = resolveStrokesReceived(result.strokesReceived, rp.manual_override).value
+      }
+
+      return {
+        roundNumber: round.round_number,
+        courseName: course?.name ?? 'Course',
+        teeName: tee?.name ?? null,
+        playingHandicap,
+        didNotPlay,
+      }
+    })
+    out.set(player.id, rows)
+  }
+
+  return out
 }

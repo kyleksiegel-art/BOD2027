@@ -616,3 +616,40 @@ round_winner_cents` and 0 for championship_share/ctp (migration
 `20260823120000_money_model_revision.sql`); the `round_money` table shape is unchanged. The
 weighted `computePurse` in `src/lib/scoring/money.ts` is retained (still unit-tested) but no
 longer used by the app. `purse_mode`/`purse_weights`/`ctp_carry_mode` are now legacy settings.
+
+## Phase 8 — Info + admin editors
+
+### No delete for the Info editors (2026-08-24, Kyle)
+
+The itinerary/lodging admin RPCs only insert/upsert — there is no delete path anywhere, and no
+seed data for either table. Asked whether to add delete RPCs (a migration + pgTAP) or ship
+edit-only editors, Kyle: *"It's just two rooms and dinners and pool time — nothing crazy."* So
+Phase 8 ships **add/edit only**. A mistaken row is edited in place, not removed; the data is a
+small fixed set. If removal is ever needed, it's a later phase (session-gated
+`rpc_delete_itinerary_item` / `_lodging` / `_lodging_assignment` + asserts).
+
+### Rules "money" copy rewritten to the buy-in model
+
+The Rules Info page still described the retired 40/30/30 championship/round/CTP split. Rewritten
+to the current model — buy-in funds 1st overall, 2nd overall, and a per-round winner; CTP is for
+bragging rights with no money — and it now reads the live dollar figures from
+`settings.purse_amounts` rather than hardcoding them. This is a correctness fix, not a new
+decision; it just aligns the public copy with `decisions.md §"Money model…"`.
+
+### Info tables wired into the read model (Dexie v6)
+
+`itinerary_items`, `lodging`, `lodging_assignments` are hydrated into Dexie (v6) and read via the
+same `useDbData → compute → useLiveQuery` path as every other screen. They are **plain reference
+tables** — online-only admin writes, no comparator columns, no outbox — matching the offline
+boundary (itinerary/lodging edits are online-only in the brief). `Db`'s three new fields are
+optional so the pre-existing scoring-only test fixtures still satisfy the type; the build
+functions treat an absent table as empty.
+
+### Course handicap per course is computed live, not snapshotted
+
+The Players Info page shows each player's playing handicap at each course. It is derived live
+from the player's **current** index (via `computeHandicap`, mirroring `buildRoundDetail` pass 1),
+not from `round_players` snapshots — consistent with the live-index decision (2026-08-22). It is
+the player's own handicap (post allowance/cap/override), **not** the play-off-the-low relative
+figure the scorecard uses. A player with no `round_players` row for a round reads "—"; a
+did-not-play row reads "DNP".

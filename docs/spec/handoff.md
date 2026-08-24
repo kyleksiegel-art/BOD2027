@@ -1,41 +1,36 @@
 # Handoff
 
-**Phase just finished:** 7 — Money. Built on branch `phase-7-money` (off `phase-6-offline`;
-Phases 4–7 unmerged, `origin/main` is still only the countdown page — Kyle's call). **Not yet
-committed/pushed** — commit and push `phase-7-money`. Nothing stubbed. **No migration, no new
-RPC** — the tables + `rpc_upsert_ctp` + `rpc_finalize_round` shipped earlier; Phase 7 is compute
-+ UI only.
+**Phase just finished:** 8 — Info + admin editors. Built on branch `phase-8-info` (off
+`phase-7-money`; Phases 4–8 unmerged, `origin/main` is still only the countdown page — Kyle's
+call). **Not yet committed** — commit and push `phase-8-info`. Nothing stubbed.
 
-**Built:** `src/lib/data/money.ts` `buildMoney()` — the whole ledger, pure, offline-identical,
-integer cents, derived live from `settings` + par-3 counts (never reads `round_money`). CTP entry
-`src/components/round/CtpEntry.tsx` inside `/rounds/:n` (par-3 rows, playing-only winner chips,
-feet input, no-winner/carry, per-hole Save → `saveCtp` → same outbox as scores, no PIN). Money
-page `src/routes/Money.tsx`: pots, 40/30/30, buy-in reconciliation, per-round cards, per-player
-ledger, greedy settlement (gated until all rounds final), footnotes. `ctp_results` added to the
-`Db` interface + `useDbData`. `formatMoney`/`formatMoneySigned` in `format.ts`.
+**No migration, no new RPC.** The three Info RPCs (`rpc_upsert_itinerary` / `_lodging` /
+`_lodging_assignment`) and `rpc_upsert_round` already existed + gated (Phase 5B). Phase 8 is
+client wiring + UI only, so `supabase test db` is unchanged (232).
 
-**Verified:** `vitest run` → **131** (+9 `money.test.ts`); `tsc`/`build` clean; `supabase test
-db` unchanged (no migration). Browser 375 px vs local Supabase: pot breakdown correct, a real CTP
-save (Jon, R3 h5, 14.5 ft) landed in the DB via the outbox and flowed back to the Money page,
-reconciliation "to the cent."
+**Built:** Dexie **v6** (`itinerary_items`/`lodging`/`lodging_assignments` — plain reference
+tables, hydrated + read); compute `buildItinerary`/`buildLodging`/`buildCoursesIndex`/
+`buildCourseDetail`/`buildPlayerCourseHandicaps`; selectors + `PlayerCardVM.courseHandicaps`.
+Public pages: Itinerary timeline (current-day highlight), Courses index + `/info/courses/:id`
+scorecard, Players (per-course handicap, live from index), Rules (money section rewritten to the
+buy-in model). Admin: Itinerary + Lodging editors, tee-time field in RoundsEditor, two new tabs,
+writes in `admin.ts`. Time helpers in `format.ts`, all `America/New_York`. See CLAUDE.md §"Info +
+admin editors (Phase 8)" and `decisions.md §"Phase 8"`.
 
-**Bug caught + fixed live:** a shortened round (Black, 15 holes) dropped its 4th par 3's CTP
-slice → $10 reconciliation gap. Fix: cut-off par-3 slices fold into the last **played** par 3.
-Locked by `money.test.ts` §"shortened round". (`decisions.md` has this + settlement-gating +
-CTP-in-round-detail.)
+**Verified:** `vitest run` → **140** (+10 `info.test.ts`); `tsc -b` + `npm run build` clean.
+Browser (local Supabase, 375 px): all four Info pages render on real data; a real itinerary add
+via the admin editor round-tripped through the server to the public timeline ("Thu Feb 4 · 7:00
+PM ET"); demo row cleaned up via SQL.
 
-**Deviations (all in `decisions.md` + checklist):** cut-off-par-3 fold; settlement hidden until
-every round is final (zero-sum); CTP entry in the round detail, no PIN; voided CTP refunds evenly
-to contributors.
+**Deviations (in `decisions.md` + checklist):** no delete path for Info editors (Kyle — small
+fixed data set); Rules money copy corrected to the buy-in model. Player photo **upload** stays
+Phase 9.
 
-**Left a harmless demo `ctp_results` row** (R3 h5) in the local fake-data DB — service_role has
-no DELETE grant and a `db reset` would disrupt another active session on the stack. Clears on the
-next reset.
+**Kyle still owes (carried):** real indexes/tees/PIN secrets (`APP_PIN_ARGON2_HASH` +
+`APP_PIN_BCRYPT_HASH`), hosted Supabase + `db push`, Netlify env. PWA install/two-phone/airplane
+are pre-trip manual checks. **PIN is `1922`.** Local admin session had gone stale (server
+token) — re-unlock with the PIN after a `db reset`.
 
-**Kyle still owes (carried):** real indexes/tees/PIN secrets (BOTH `APP_PIN_ARGON2_HASH` +
-`APP_PIN_BCRYPT_HASH`), hosted Supabase + `db push`, Netlify env. PWA install/update + two-phone +
-airplane-mode + end-of-trip real settlement are pre-trip manual checks. **PIN is `1922`.**
-
-**Next phase:** 8 — Info + admin editors (itinerary/lodging editors; the RPCs already exist +
-gated). Read `CLAUDE.md` §"Money path (Phase 7)", `acceptance-checklist.md` §Phase 8, this file,
-Phase 8 in `phase-plan.md`.
+**Next phase:** 9 — Polish (incl. player photo upload Edge Function). Read CLAUDE.md §"Info +
+admin editors (Phase 8)", `acceptance-checklist.md` §Phase 9, this file, Phase 9 in
+`phase-plan.md`.

@@ -11,6 +11,11 @@ import {
   buildChampionships,
   buildEnterHole,
   buildAdmin,
+  buildItinerary,
+  buildLodging,
+  buildCoursesIndex,
+  buildCourseDetail,
+  buildPlayerCourseHandicaps,
   type AdminVM,
   type Db,
   type EnterVM,
@@ -18,6 +23,11 @@ import {
   type StandingsVM,
   type RoundDetailVM,
   type RoundListItemVM,
+  type ItineraryVM,
+  type LodgingVM,
+  type CourseIndexItemVM,
+  type CourseDetailVM,
+  type PlayerCourseHandicapVM,
 } from './compute'
 import { buildMoney, type MoneyVM } from './money'
 import { totalPoints } from '@/lib/scoring'
@@ -27,8 +37,10 @@ import type { PlayerRow, RoundRow } from './types'
 /** Load the whole read model out of Dexie. Re-runs whenever any table changes. */
 function useDbData(): Db | undefined {
   return useLiveQuery(async () => {
-    const [players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results, settings] =
-      await Promise.all([
+    const [
+      players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results,
+      settings, itinerary_items, lodging, lodging_assignments,
+    ] = await Promise.all([
         db.players.toArray(),
         db.courses.toArray(),
         db.tees.toArray(),
@@ -39,9 +51,13 @@ function useDbData(): Db | undefined {
         db.scores.toArray(),
         db.ctp_results.toArray(),
         db.settings.toArray(),
+        db.itinerary_items.toArray(),
+        db.lodging.toArray(),
+        db.lodging_assignments.toArray(),
       ])
     return {
-      players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results, settings,
+      players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results,
+      settings, itinerary_items, lodging, lodging_assignments,
     } satisfies Db
   }, [])
 }
@@ -73,6 +89,7 @@ export function useRoundDetail(roundNumber: number): { vm: RoundDetailVM | null;
 export interface PlayerCardVM {
   player: PlayerRow
   championshipTotal: number
+  courseHandicaps: PlayerCourseHandicapVM[]
 }
 
 export function usePlayers(): PlayerCardVM[] | undefined {
@@ -81,11 +98,47 @@ export function usePlayers(): PlayerCardVM[] | undefined {
     if (!data) return undefined
     const champs = buildChampionships(data)
     const totalById = new Map(champs.map((c) => [c.playerId, totalPoints(c.byRound)]))
+    const handicapsByPlayer = buildPlayerCourseHandicaps(data)
     return data.players
       .slice()
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map((player) => ({ player, championshipTotal: totalById.get(player.id) ?? 0 }))
+      .map((player) => ({
+        player,
+        championshipTotal: totalById.get(player.id) ?? 0,
+        courseHandicaps: handicapsByPlayer.get(player.id) ?? [],
+      }))
   }, [data])
+}
+
+/** The public itinerary timeline. "Today" is decided in America/New_York inside compute. */
+export function useItinerary(): ItineraryVM | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildItinerary(data) : undefined), [data])
+}
+
+/** Lodging properties with their room assignments. */
+export function useLodging(): LodgingVM | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildLodging(data) : undefined), [data])
+}
+
+/** The courses index, ordered by the round that plays each. */
+export function useCoursesIndex(): CourseIndexItemVM[] | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildCoursesIndex(data) : undefined), [data])
+}
+
+/** One course's scorecard, or null when the id is unknown. */
+export function useCourseDetail(courseId: string | undefined): {
+  vm: CourseDetailVM | null
+  loading: boolean
+} {
+  const data = useDbData()
+  const vm = useMemo(
+    () => (data && courseId ? buildCourseDetail(courseId, data) : null),
+    [data, courseId],
+  )
+  return { vm, loading: data === undefined }
 }
 
 /** The whole money ledger — pots, per-round breakdown, payouts, settlement, reconciliation. */

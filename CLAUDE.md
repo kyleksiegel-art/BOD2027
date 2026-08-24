@@ -308,3 +308,42 @@ Things that will bite if forgotten:
 - Tests: `money.test.ts` (6) covers payouts+reconciliation, tie pooling, pending, abandoned, the
   reconciliation tripwire, and empty config. Full `vitest run` → **130**. `supabase test db` →
   **232** (finalize freeze + admin_path asserts updated; `plan(106)` unchanged).
+
+## Info + admin editors (Phase 8) — the shape to reuse
+
+The four Info sub-pages and their admin editors, assembled the same way everything else is:
+Dexie rows → pure compute → `useLiveQuery`. Three new tables joined the read model.
+
+- **Dexie v6** adds `itinerary_items`, `lodging`, `lodging_assignments` — **plain reference
+  tables**: online-only admin writes (the offline boundary keeps itinerary/lodging online), so
+  no comparator columns, no outbox, no merge. `hydrate.ts` fetches and `bulkPut`s them like the
+  other uncontended tables; `useDbData` reads them. `Db`'s three new fields are **optional** so
+  the scoring-only test fixtures still satisfy the type — build functions read `?? []`.
+- **Compute** (`compute.ts`): `buildItinerary(db, todayET?)` (grouped by day, current-day flag,
+  `todayET` injectable for tests), `buildLodging`, `buildCoursesIndex`, `buildCourseDetail`,
+  `buildPlayerCourseHandicaps` (playing handicap per round, **live from the current index**, not
+  a snapshot). `buildAdmin` gained `itinerary` (raw rows) + `lodging` (rows + assignments).
+- **Selectors**: `useItinerary`, `useLodging`, `useCoursesIndex`, `useCourseDetail`;
+  `PlayerCardVM` gained `courseHandicaps`.
+- **Public pages** (`src/routes/info/`): `Itinerary.tsx` (timeline), `Courses.tsx` (index) +
+  `CourseDetail.tsx` (`/info/courses/:courseId` scorecard), `Players.tsx` (per-course handicap
+  strip added), `Rules.tsx` (money section rewritten to the buy-in model, reads live amounts).
+- **Admin editors** (`src/components/admin/`): `ItineraryEditor.tsx`, `LodgingEditor.tsx`, and a
+  tee-time field added to `RoundsEditor.tsx`. Writes in `admin.ts`: `saveItinerary` (batch),
+  `saveLodging`, `saveLodgingAssignment`, `saveRound` (tee time) — all through the existing
+  session-gated `call()` + `['hydrate']` invalidate. Two new admin tabs.
+- **Time helpers** (`format.ts`): `formatDayLong`, `etDateString`, `etTimeInputValue`,
+  `composeEtTimestamp` — all pinned to `America/New_York` / −05:00 (the trip is entirely EST).
+
+Things that will bite if forgotten:
+- **No delete path this phase** (Kyle, 2026-08-24 — small fixed data set). Editors are add/edit
+  only; the RPCs never had a delete. See `decisions.md §"No delete for the Info editors"`.
+- **New-row pattern**: existing rows render from props (keyed by id, own edit state); an added
+  row is a local draft that **removes itself on save success** (`useAdminAction` gained an
+  optional `onSuccess`) so the server row re-appears via hydrate without a duplicate. A new
+  lodging must be saved before its rooms — the assignment RPC needs `lodging_id`.
+- **The three RPCs already existed + gated** in `20260819090000_admin_rpcs.sql`; Phase 8 added
+  only the client bindings. **No migration changed** — `supabase test db` still 232.
+- Course handicap on the Players page is the player's **own** handicap (post cap/override), NOT
+  the play-off-the-low relative figure the scorecard uses.
+- Tests: `info.test.ts` (10). Full `vitest run` → **140**. `tsc -b` + `npm run build` clean.

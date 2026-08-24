@@ -18,6 +18,9 @@ import type {
   ScoreRow,
   SettingRow,
   CtpResultRow,
+  ItineraryItemRow,
+  LodgingRow,
+  LodgingAssignmentRow,
   OutboxEntry,
   DeadLetterEntry,
   SyncMetaRow,
@@ -34,6 +37,12 @@ export class BodDatabase extends Dexie {
   scores!: Table<ScoreRow, [string, string, number]>
   ctp_results!: Table<CtpResultRow, [string, number]>
   settings!: Table<SettingRow, string>
+  // Read mirrors of the Info tables (Phase 8). Admin writes them online-only via direct
+  // RPC (CLAUDE.md §"Offline capability boundary"), so they carry no comparator columns and
+  // a hydrate is a plain idempotent bulkPut, exactly like the other reference tables.
+  itinerary_items!: Table<ItineraryItemRow, string>
+  lodging!: Table<LodgingRow, string>
+  lodging_assignments!: Table<LodgingAssignmentRow, string>
   // Not a mirror of a server table: this is the local PIN session (Phase 5). Dexie, not
   // sessionStorage -- a force-quit in the cart must not log the scorer out.
   session!: Table<SessionRow, string>
@@ -85,6 +94,13 @@ export class BodDatabase extends Dexie {
       outbox: '++seq, id, key, kind',
       dead_letter: 'id, key, kind, failed_at',
       sync_meta: 'key',
+    })
+    // v6 — Phase 8. The three Info reference tables. Indexed on the foreign keys the read
+    // model groups by (day for the itinerary timeline, lodging_id for room assignments).
+    this.version(6).stores({
+      itinerary_items: 'id, day, sort_order',
+      lodging: 'id, check_in',
+      lodging_assignments: 'id, lodging_id, player_id',
     })
   }
 }

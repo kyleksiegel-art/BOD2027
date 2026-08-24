@@ -28,6 +28,9 @@ import type {
   ScoreRow,
   SettingRow,
   CtpResultRow,
+  ItineraryItemRow,
+  LodgingRow,
+  LodgingAssignmentRow,
 } from './types'
 import { flushOutbox } from '@/lib/sync/outbox'
 import { mergeStampedRows } from '@/lib/sync/merge'
@@ -49,12 +52,15 @@ export interface HydratePayload {
   scores: ScoreRow[]
   ctp_results: CtpResultRow[]
   settings: SettingRow[]
+  itinerary_items: ItineraryItemRow[]
+  lodging: LodgingRow[]
+  lodging_assignments: LodgingAssignmentRow[]
 }
 
 async function fetchAll(): Promise<HydratePayload> {
   const [
     players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results,
-    settings,
+    settings, itinerary_items, lodging, lodging_assignments,
   ] = await Promise.all([
       selectAll<PlayerRow>('players'),
       selectAll<CourseRow>('courses'),
@@ -66,10 +72,13 @@ async function fetchAll(): Promise<HydratePayload> {
       selectAll<ScoreRow>('scores'),
       selectAll<CtpResultRow>('ctp_results'),
       selectAll<SettingRow>('settings'),
+      selectAll<ItineraryItemRow>('itinerary_items'),
+      selectAll<LodgingRow>('lodging'),
+      selectAll<LodgingAssignmentRow>('lodging_assignments'),
     ])
   return {
     players, courses, tees, holes, hole_yardages, rounds, round_players, scores, ctp_results,
-    settings,
+    settings, itinerary_items, lodging, lodging_assignments,
   }
 }
 
@@ -87,6 +96,9 @@ async function writeToDexie(p: HydratePayload): Promise<void> {
       db.scores,
       db.ctp_results,
       db.settings,
+      db.itinerary_items,
+      db.lodging,
+      db.lodging_assignments,
       db.outbox,
     ],
     async () => {
@@ -104,6 +116,9 @@ async function writeToDexie(p: HydratePayload): Promise<void> {
         db.hole_yardages.bulkPut(p.hole_yardages),
         db.rounds.bulkPut(p.rounds),
         db.settings.bulkPut(p.settings),
+        db.itinerary_items.bulkPut(p.itinerary_items),
+        db.lodging.bulkPut(p.lodging),
+        db.lodging_assignments.bulkPut(p.lodging_assignments),
       ])
       await mergeStampedRows(p)
     },

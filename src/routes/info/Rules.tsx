@@ -1,8 +1,16 @@
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { useSetting } from '@/lib/data/selectors'
+import { formatMoney } from '@/lib/format'
 import { DEFAULT_POINTS_TABLE } from '@/lib/scoring'
 import type { PointsTable } from '@/lib/scoring'
+
+interface PurseAmounts {
+  buy_in_per_player_cents?: number
+  champ_first_cents?: number
+  champ_second_cents?: number
+  round_winner_cents?: number
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -17,6 +25,9 @@ export default function Rules() {
   const table = useSetting<PointsTable>('points_table') ?? DEFAULT_POINTS_TABLE
   const allowance = useSetting<number>('allowance') ?? 1
   const cap = useSetting<number>('handicap_cap') ?? 18
+  const purse = useSetting<PurseAmounts>('purse_amounts')
+  const amt = (cents: number | undefined) =>
+    cents && cents > 0 ? ` (${formatMoney(cents)})` : ''
 
   const rows: [string, number][] = [
     ['Net 3 under par or better', table.threeOrMoreUnder],
@@ -73,26 +84,37 @@ export default function Rules() {
       </Section>
 
       <Section title="The money">
-        <p>The pot splits three ways:</p>
+        <p>
+          Everyone puts in the same buy-in{amt(purse?.buy_in_per_player_cents)}. That single pot
+          funds three payouts:
+        </p>
         <ul className="ml-4 list-disc space-y-1.5">
           <li>
-            <strong className="font-semibold text-paper">Championship</strong> — the best cumulative
-            total over the counting rounds.
+            <strong className="font-semibold text-paper">1st overall</strong>
+            {amt(purse?.champ_first_cents)} — the best cumulative net Stableford across the counting
+            rounds.
           </li>
           <li>
-            <strong className="font-semibold text-paper">Round winners</strong> — the best net
-            Stableford in each individual round.
+            <strong className="font-semibold text-paper">2nd overall</strong>
+            {amt(purse?.champ_second_cents)} — the runner-up on the same cumulative total.
           </li>
           <li>
-            <strong className="font-semibold text-paper">Closest to the pin</strong> — a per-round
-            pot, sized to how many par 3s that course has.
+            <strong className="font-semibold text-paper">Round winner</strong>
+            {amt(purse?.round_winner_cents)} — paid to the best net Stableford in each individual
+            round.
           </li>
         </ul>
+        <p>
+          Closest to the pin is still played and recorded each round, but it’s for bragging rights —
+          there’s no money on it.
+        </p>
       </Section>
 
       <Section title="Ties">
         <p>
-          A tied championship is broken by holes won, then by a countback over the closing holes. A
+          A tie for a paid overall place pools those spots’ money and splits it evenly — two tied for
+          1st share 1st and 2nd between them. Round-winner ties split the round’s payout the same
+          way. Deadlocks are broken first by holes won, then by a countback over the closing holes. A
           round that’s abandoned doesn’t count; a round cut short counts only the holes everyone
           finished.
         </p>
