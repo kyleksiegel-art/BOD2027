@@ -266,8 +266,14 @@ export async function finalizeRound(roundId: string, holesCounted: number | null
   return { ok: r.finalized, errors: r.errors ?? [] }
 }
 
-export function abandonRound(roundId: string) {
-  return call<unknown>('rpc_abandon_round', { p_round_id: roundId })
+/**
+ * Wipe a round's scores, CTP and frozen money and put it back to in_progress so it can be
+ * re-entered from scratch — tees and handicaps (round_players) are kept. Replaces the old
+ * one-way "abandon" as the admin reset (Kyle, 2026-08-23). Clearing an abandoned round also
+ * revives it.
+ */
+export function clearRoundScores(roundId: string) {
+  return call<unknown>('rpc_clear_round_scores', { p_round_id: roundId })
 }
 
 /** The one door that makes an index edit retroactive — for one named round, deliberately. */

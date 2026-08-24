@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  abandonRound,
+  clearRoundScores,
   finalizeRound,
   saveRoundPlayersQueued,
   startRound,
@@ -76,7 +76,7 @@ function RoundPanel({
     ),
   )
   const [holesCounted, setHolesCounted] = useState('')
-  const [confirmAbandon, setConfirmAbandon] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
 
   const unassigned = vm.participants.filter((p) => p.row === null)
   const canSave = vm.tees.length > 0 && vm.participants.every((p) => teeById[p.playerId])
@@ -246,29 +246,35 @@ function RoundPanel({
           </p>
         ) : null}
 
-        {vm.round.status !== 'final' && vm.round.status !== 'abandoned' ? (
-          <div className="mt-4 flex flex-wrap gap-3">
-            {confirmAbandon ? (
-              <>
-                <Button
-                  tone="danger"
-                  disabled={disabled || life.busy}
-                  onClick={() => {
-                    setConfirmAbandon(false)
-                    void life.run('Round abandoned — it no longer counts for money.', () =>
-                      abandonRound(vm.round.id),
-                    )
-                  }}
-                >
-                  Yes, abandon it
+        {vm.round.status !== 'upcoming' ? (
+          <div className="mt-4 border-t border-hair pt-4">
+            <div className="flex flex-wrap gap-3">
+              {confirmClear ? (
+                <>
+                  <Button
+                    tone="danger"
+                    disabled={disabled || life.busy}
+                    onClick={() => {
+                      setConfirmClear(false)
+                      void life.run('Scores cleared — the round is live again.', () =>
+                        clearRoundScores(vm.round.id),
+                      )
+                    }}
+                  >
+                    Yes, clear every score
+                  </Button>
+                  <Button onClick={() => setConfirmClear(false)}>Cancel</Button>
+                </>
+              ) : (
+                <Button tone="danger" disabled={disabled} onClick={() => setConfirmClear(true)}>
+                  Clear scores
                 </Button>
-                <Button onClick={() => setConfirmAbandon(false)}>Cancel</Button>
-              </>
-            ) : (
-              <Button tone="danger" disabled={disabled} onClick={() => setConfirmAbandon(true)}>
-                Abandon round
-              </Button>
-            )}
+              )}
+            </div>
+            <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
+              Deletes every score and CTP result for this round and puts it back in progress so
+              it can be re-entered. Tees and handicaps are kept. This cannot be undone.
+            </p>
           </div>
         ) : null}
 
