@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FIRST_TEE_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
 import { useRoundsList, useStandings, useRoundDetail } from '@/lib/data/selectors'
-import { formatGap } from '@/lib/format'
 
 const TARGET = new Date(FIRST_TEE_ISO).getTime()
 
