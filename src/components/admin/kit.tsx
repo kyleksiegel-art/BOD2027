@@ -35,18 +35,40 @@ export function Section({
   title,
   meta,
   children,
+  collapsible = false,
+  defaultOpen = true,
 }: {
   title: string
   meta?: ReactNode
   children: ReactNode
+  /** When true the header toggles the body open/closed; meta stays visible either way. */
+  collapsible?: boolean
+  defaultOpen?: boolean
 }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const showBody = !collapsible || open
+
   return (
     <section className="mt-4 rounded-lg border border-hair bg-black/20 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-display text-xl text-paper">{title}</h3>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="tap flex flex-1 items-baseline gap-2 text-left"
+          >
+            <span aria-hidden className="text-gold-bright">
+              {open ? '▾' : '▸'}
+            </span>
+            <h3 className="font-display text-xl text-paper">{title}</h3>
+          </button>
+        ) : (
+          <h3 className="font-display text-xl text-paper">{title}</h3>
+        )}
         {meta ? <div className="text-[0.78rem] text-paper-dim tnum">{meta}</div> : null}
       </div>
-      {children}
+      {showBody ? children : null}
     </section>
   )
 }

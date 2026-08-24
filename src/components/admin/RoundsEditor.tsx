@@ -96,6 +96,9 @@ function RoundPanel({
 
   return (
     <Section
+      collapsible
+      // Finished rounds tuck away; whatever's upcoming or in play stays open.
+      defaultOpen={vm.round.status !== 'final'}
       title={`Round ${vm.round.round_number} — ${vm.course.name}`}
       meta={
         <span className="inline-flex items-center gap-2">
