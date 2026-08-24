@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { FIRST_TEE_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
+import { useRoundsList, useStandings, useRoundDetail } from '@/lib/data/selectors'
+import { formatGap } from '@/lib/format'
 
 const TARGET = new Date(FIRST_TEE_ISO).getTime()
 
@@ -39,8 +42,224 @@ function CountdownUnit({ value, label }: { value: string; label: string }) {
   )
 }
 
+function Countdown({ r }: { r: Remaining }) {
+  return (
+    <div className="py-8 text-center sm:py-10">
+      <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,rgba(209,131,22,0.12)_100%)] [height:1.5px]" />
+      <div
+        className="mt-6 grid grid-cols-4 items-end justify-items-center gap-2 sm:gap-6"
+        role="timer"
+        aria-live="off"
+      >
+        <CountdownUnit value={String(r.days)} label="Days" />
+        <CountdownUnit value={pad(r.hours)} label="Hours" />
+        <CountdownUnit value={pad(r.minutes)} label="Minutes" />
+        <CountdownUnit value={pad(r.seconds)} label="Seconds" />
+      </div>
+      <p className="mt-6 text-[0.9rem] text-paper-dim">
+        First tee — <strong className="font-semibold text-gold-bright">Thu, Feb 4</strong>{' '}
+        · <strong className="font-semibold text-gold-bright">1:10 PM ET</strong> ·
+        Streamsong Red
+      </p>
+    </div>
+  )
+}
+
+/** Small CTA that matches the annual-report treatment — gold hairline, plain copy. */
+function LiveLink({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="flex min-h-[44px] items-center justify-center rounded-sm border border-hair-strong px-4 text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-paper transition-colors hover:border-gold hover:text-gold-bright"
+    >
+      {children}
+    </Link>
+  )
+}
+
+/**
+ * Once the trip is underway the countdown is dead weight — this replaces it with the one
+ * thing worth glancing at from the lock screen: what's live, who leads it, and who leads the
+ * championship, with one tap into the screen you actually need. Reads only from selectors,
+ * so it is offline-identical to every other screen.
+ */
+function LivePanel() {
+  const roundsList = useRoundsList()
+  const standings = useStandings()
+
+  // Pick the round in play, else the next one up. buildRoundDetail(0) returns null, so the
+  // detail hook is always called (hook-order safe) and simply idles when nothing is live.
+  const inProgress = roundsList?.find((r) => r.round.status === 'in_progress')
+  const { vm: liveDetail } = useRoundDetail(inProgress?.round.round_number ?? 0)
+
+  if (!roundsList || !standings) {
+    return (
+      <div className="py-8">
+        <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,rgba(209,131,22,0.12)_100%)] [height:1.5px]" />
+        <p className="mt-6 animate-pulse text-center text-paper-faint">Loading the board…</p>
+      </div>
+    )
+  }
+
+  const nextUp = roundsList.find((r) => r.round.status === 'upcoming')
+  const allDone =
+    roundsList.length > 0 &&
+    roundsList.every((r) => r.round.status === 'final' || r.round.status === 'abandoned')
+
+  const leaders = standings.hasCountingRound
+    ? standings.rows.filter((r) => r.position === 1)
+    : []
+  const overall =
+    leaders.length === 0
+      ? null
+      : leaders.length === 1
+        ? { text: leaders[0].name, points: leaders[0].total, tied: false }
+        : { text: leaders.map((l) => l.name).join(' & '), points: leaders[0].total, tied: true }
+
+  return (
+    <div className="py-8">
+      <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,rgba(209,131,22,0.12)_100%)] [height:1.5px]" />
+
+      {inProgress ? (
+        <OnCourse
+          course={inProgress.course.name}
+          roundNo={inProgress.round.round_number}
+          detail={liveDetail}
+        />
+      ) : allDone ? (
+        <Complete overall={overall} />
+      ) : nextUp ? (
+        <BetweenRounds course={nextUp.course.name} roundNo={nextUp.round.round_number} />
+      ) : (
+        <p className="mt-6 text-center text-paper-dim">The trip is underway.</p>
+      )}
+
+      {/* Championship line — shown whenever a round has counted, in every live state. */}
+      {overall && !allDone && (
+        <p className="mt-6 text-center text-[0.9rem] text-paper-dim">
+          {overall.tied ? 'Tied at the top' : 'Leading the championship'} —{' '}
+          <strong className="font-semibold text-paper">{overall.text}</strong>{' '}
+          <span className="tnum text-gold">{overall.points} pts</span>
+        </p>
+      )}
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        {inProgress ? (
+          <>
+            <LiveLink to="/enter">Enter scores</LiveLink>
+            <LiveLink to="/standings">Standings</LiveLink>
+          </>
+        ) : allDone ? (
+          <>
+            <LiveLink to="/standings">Final standings</LiveLink>
+            <LiveLink to="/money">The money</LiveLink>
+          </>
+        ) : (
+          <>
+            <LiveLink to="/standings">Standings</LiveLink>
+            <LiveLink to="/rounds">Rounds</LiveLink>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function OnCourse({
+  course,
+  roundNo,
+  detail,
+}: {
+  course: string
+  roundNo: number
+  detail: ReturnType<typeof useRoundDetail>['vm']
+}) {
+  const leader = detail?.leaderboard[0]
+  const holesTotal = detail?.holes?.length ?? 18
+  const leaderHasScore = leader && leader.totalPoints > 0 && leader.thru > 0
+
+  return (
+    <>
+      <div className="mt-6 flex items-center justify-center gap-2">
+        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-gold-bright" />
+        <span className="eyebrow">On the course now</span>
+      </div>
+      <h2 className="mt-3 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none tracking-tight text-paper">
+        {course}
+      </h2>
+      <p className="mt-2 text-center text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
+        Round {roundNo} of 4
+      </p>
+      <p className="mt-4 text-center text-[0.95rem]">
+        {leaderHasScore ? (
+          <>
+            <strong className="font-semibold text-paper">{leader!.name}</strong> leads{' '}
+            <span className="tnum text-gold">{leader!.totalPoints} pts</span>
+            <span className="text-paper-faint"> · thru {leader!.thru}/{holesTotal}</span>
+          </>
+        ) : (
+          <span className="text-paper-dim">No scores in yet — tee it up.</span>
+        )}
+      </p>
+    </>
+  )
+}
+
+function BetweenRounds({ course, roundNo }: { course: string; roundNo: number }) {
+  const card = ROUNDS.find((r) => r.no === roundNo)
+  return (
+    <>
+      <div className="mt-6 text-center">
+        <span className="eyebrow">Up next</span>
+      </div>
+      <h2 className="mt-3 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none tracking-tight text-paper">
+        {course}
+      </h2>
+      <p className="mt-2 text-center text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
+        Round {roundNo} of 4
+        {card ? (
+          <>
+            {' · '}
+            <span className="text-gold">{card.day}</span> · {card.tee}
+          </>
+        ) : null}
+      </p>
+    </>
+  )
+}
+
+function Complete({
+  overall,
+}: {
+  overall: { text: string; points: number; tied: boolean } | null
+}) {
+  return (
+    <>
+      <div className="mt-6 text-center">
+        <span className="eyebrow">The Championship</span>
+      </div>
+      {overall ? (
+        <>
+          <p className="mt-3 text-center text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
+            {overall.tied ? 'Shared title' : 'Champion'}
+          </p>
+          <h2 className="mt-2 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none tracking-tight text-gold-bright">
+            {overall.text}
+          </h2>
+          <p className="mt-3 text-center text-[0.95rem] text-paper-dim">
+            {overall.points} points · Streamsong 2027
+          </p>
+        </>
+      ) : (
+        <p className="mt-6 text-center text-paper-dim">All four rounds are in the books.</p>
+      )}
+    </>
+  )
+}
+
 export default function Home() {
   const [r, setR] = useState<Remaining>(() => remainingFrom(Date.now()))
+  const roundsList = useRoundsList()
 
   useEffect(() => {
     if (r.done) return
@@ -48,6 +267,13 @@ export default function Home() {
     return () => window.clearInterval(id)
     // Re-arm only when we cross into the "done" state.
   }, [r.done])
+
+  // The tournament is "started" either when the clock passes first tee, or the moment an
+  // admin flips a round live (which can precede the booked tee time). Either flips the hero's
+  // countdown over to the live board.
+  const anyLive =
+    roundsList?.some((r) => r.round.status !== 'upcoming') ?? false
+  const showLive = r.done || anyLive
 
   return (
     <div>
@@ -85,33 +311,8 @@ export default function Home() {
       </header>
 
       <div className="mx-auto max-w-[720px] px-5 pb-4">
-        {/* Countdown */}
-        <div className="py-8 text-center sm:py-10">
-          <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,rgba(209,131,22,0.12)_100%)] [height:1.5px]" />
-          <div
-            className="mt-6 grid grid-cols-4 items-end justify-items-center gap-2 sm:gap-6"
-            role="timer"
-            aria-live="off"
-          >
-            <CountdownUnit value={String(r.days)} label="Days" />
-            <CountdownUnit value={pad(r.hours)} label="Hours" />
-            <CountdownUnit value={pad(r.minutes)} label="Minutes" />
-            <CountdownUnit value={pad(r.seconds)} label="Seconds" />
-          </div>
-          <p className="mt-6 text-[0.9rem] text-paper-dim">
-            {r.done ? (
-              <span className="font-semibold text-gold-bright">
-                Tee it up — see you in Florida
-              </span>
-            ) : (
-              <>
-                First tee — <strong className="font-semibold text-gold-bright">Thu, Feb 4</strong>{' '}
-                · <strong className="font-semibold text-gold-bright">1:10 PM ET</strong> ·
-                Streamsong Red
-              </>
-            )}
-          </p>
-        </div>
+        {/* Before first tee: countdown. Once underway: the live board. */}
+        {showLive ? <LivePanel /> : <Countdown r={r} />}
 
         {/* The Field */}
         <section className="mt-8">
