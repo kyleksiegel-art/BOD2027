@@ -31,24 +31,46 @@ export function PlayerEntryRow({
   const shown = player.gross ?? par
 
   const strokes = player.strokesOnHole
+  // "Getting a stroke here" is the thing the scorer most needs to see at a glance — it
+  // decides net, and it changes hole to hole. So it drives a gold row accent, gold pips on
+  // the score box (the paper-scorecard convention), and bolded gold copy, not a faint line.
+  const getsStroke = !dnp && strokes > 0
 
   return (
     <div
-      className={`border-t border-hair py-3 ${dnp ? 'opacity-40' : entered ? '' : 'opacity-60'}`}
+      className={`border-t py-3 ${
+        getsStroke ? 'border-l-2 border-l-gold bg-gold/[0.07] pl-3' : 'border-hair'
+      } ${dnp ? 'opacity-40' : entered ? '' : 'opacity-60'}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate font-semibold text-paper">{player.name}</div>
+          <div className="flex items-center gap-2">
+            <span className="truncate font-semibold text-paper">{player.name}</span>
+            {getsStroke && !player.pickedUp ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-gold/60 bg-gold/15 px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-gold-bright tnum">
+                <span aria-hidden className="flex gap-0.5">
+                  {Array.from({ length: Math.min(strokes, 3) }).map((_, i) => (
+                    <span key={i} className="h-1.5 w-1.5 rounded-full bg-gold-bright" />
+                  ))}
+                </span>
+                {strokes > 1 ? `+${strokes}` : 'Stroke'}
+              </span>
+            ) : null}
+          </div>
           <div className="mt-0.5 text-[0.78rem] text-paper-faint tnum">
             {dnp ? (
               'Did not play'
             ) : (
               <>
-                {strokes > 0
-                  ? `${'•'.repeat(Math.min(strokes, 3))} ${strokes} stroke${strokes === 1 ? '' : 's'}`
-                  : strokes < 0
-                    ? `${strokes} stroke`
-                    : 'no stroke'}
+                {getsStroke ? (
+                  <span className="font-semibold text-gold-bright">
+                    {strokes} stroke{strokes === 1 ? '' : 's'} here
+                  </span>
+                ) : strokes < 0 ? (
+                  `${strokes} stroke`
+                ) : (
+                  'no stroke'
+                )}
                 {' · thru '}
                 {player.thru} · {player.roundPoints} pts
               </>
@@ -68,7 +90,14 @@ export function PlayerEntryRow({
               −
             </button>
 
-            <div className="w-14 text-center">
+            <div className="relative w-14 text-center">
+              {getsStroke && !player.pickedUp ? (
+                <span aria-hidden className="absolute -right-0.5 -top-1 flex gap-0.5">
+                  {Array.from({ length: Math.min(strokes, 3) }).map((_, i) => (
+                    <span key={i} className="h-1.5 w-1.5 rounded-full bg-gold-bright" />
+                  ))}
+                </span>
+              ) : null}
               {player.pickedUp ? (
                 <span className="font-display text-3xl text-paper-faint">—</span>
               ) : (
