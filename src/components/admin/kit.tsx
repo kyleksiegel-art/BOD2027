@@ -50,13 +50,14 @@ export function Section({
 
   return (
     <section className="mt-4 rounded-lg border border-hair bg-ground-2 p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      {/* Stack title over meta on phones (they collide side-by-side); row on wider screens. */}
+      <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-2">
         {collapsible ? (
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
-            className="tap flex flex-1 items-baseline gap-2 text-left"
+            className="tap flex min-w-0 items-baseline gap-2 text-left sm:flex-1"
           >
             <span aria-hidden className="text-gold-bright">
               {open ? '▾' : '▸'}
