@@ -694,3 +694,10 @@ the 4.7 s cold-load-on-slow-4G is a synthetic worst case, not the lived experien
 
 Note: run Lighthouse against a local `vite preview`, NOT a Netlify deploy preview — the preview
 overlay injects ~1.3 MB of MP4s + its own app and tanks the Performance score (measured 66 there).
+
+### No player photos — drop the photo-upload Edge Function (2026-08-25, Kyle)
+
+Phase 9 listed "photos uploaded via Edge Function" for player avatars. Cut: the trip doesn't
+need a photo per player. The Players page already falls back to initials monograms when
+`players.photo_url` is null (which it always is now), so nothing to build or change. The
+`photo_url` column stays (harmless); no upload path, no Storage bucket, no Edge Function.
