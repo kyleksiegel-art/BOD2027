@@ -15,17 +15,14 @@ export function BottomTabBar() {
             <NavLink
               to={to}
               className={({ isActive }) =>
-                `tap flex flex-col items-center justify-center gap-1 py-2 text-[0.6rem] font-semibold uppercase tracking-[0.12em] transition-colors ${
-                  isActive ? 'text-gold' : 'text-paper-faint'
+                `tap flex flex-col items-center justify-center gap-1 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] transition-colors ${
+                  isActive ? 'text-gold' : 'text-paper-dim'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <Icon
-                    className="h-6 w-6"
-                    style={{ opacity: isActive ? 1 : 0.85 }}
-                  />
+                  <Icon className="h-6 w-6" style={{ opacity: isActive ? 1 : 0.95 }} />
                   <span>{label}</span>
                 </>
               )}
