@@ -223,7 +223,10 @@ The rest of Phase 6: the PWA, the offline PIN, the day-of tee change, Diagnostic
   `src/components/PwaUpdatePrompt.tsx`, mounted in `Layout`); the prompt renders `null` while
   `useSyncSnapshot().pending > 0`, so a reload never interrupts a flush. `globPatterns` and
   `maximumFileSizeToCacheInBytes` (4 MiB) are explicit; the build precaches the shell, JS/CSS,
-  both fonts, the icons and the hero (~1.2 MiB). Icons live in `public/` (`icon.svg` +
+  both fonts, the icons and the responsive hero (AVIF/WebP at 640/1080/1600 + the JPG fallback,
+  ~1.6 MiB total — `glob` includes `avif,webp`). The hero is a `<picture>` in `Home.tsx`, not a
+  CSS background; regenerate variants with `node scripts/gen-hero-images.mjs` (needs the `sharp`
+  devDep) after replacing `public/assets/hero.jpg`. Icons live in `public/` (`icon.svg` +
   `sips`-rasterised PNGs); `index.html` carries the apple-touch/favicon links, the manifest link
   is injected. **Install/update needs a real HTTPS origin — pre-trip manual check.**
 - **`navigator.storage.persist()`** — `src/lib/storage.ts` `requestPersistentStorage()`, called

@@ -374,23 +374,41 @@ export default function Home() {
   return (
     <div>
       {/* Hero */}
-      <header
-        className="relative flex min-h-[clamp(420px,72vh,640px)] flex-col justify-between px-5 pb-10 pt-4"
-        style={{
-          backgroundImage:
-            'linear-gradient(to bottom, rgba(16,14,10,0.46) 0%, rgba(16,14,10,0.12) 24%, rgba(16,14,10,0.10) 42%, rgba(16,14,10,0.74) 82%, var(--ground) 100%), url(/assets/hero.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 42%',
-        }}
-        role="img"
-        aria-label="Streamsong Resort — the Black course windmill and sand bunkers"
-      >
+      <header className="relative flex min-h-[clamp(420px,72vh,640px)] flex-col justify-between overflow-hidden px-5 pb-10 pt-4">
+        {/* Responsive hero photo — AVIF/WebP per viewport, JPG fallback. The browser downloads
+            one variant sized to the screen (~40–90 KB on a phone) instead of the 369 KB source. */}
+        <picture>
+          <source
+            type="image/avif"
+            srcSet="/assets/hero/hero-640.avif 640w, /assets/hero/hero-1080.avif 1080w, /assets/hero/hero-1600.avif 1600w"
+            sizes="100vw"
+          />
+          <source
+            type="image/webp"
+            srcSet="/assets/hero/hero-640.webp 640w, /assets/hero/hero-1080.webp 1080w, /assets/hero/hero-1600.webp 1600w"
+            sizes="100vw"
+          />
+          <img
+            src="/assets/hero.jpg"
+            alt="Streamsong Resort — the Black course windmill and sand bunkers"
+            className="absolute inset-0 h-full w-full object-cover [object-position:center_42%]"
+            decoding="async"
+          />
+        </picture>
+        {/* Scrim: darkens for the cover text, dissolves into the page ground at the base. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(to bottom, rgba(16,14,10,0.46) 0%, rgba(16,14,10,0.12) 24%, rgba(16,14,10,0.10) 42%, rgba(16,14,10,0.74) 82%, var(--ground) 100%)',
+          }}
+        />
         <img
           src="/assets/streamsong-logo.svg"
           alt="Streamsong"
-          className="h-8 w-auto"
+          className="relative z-10 h-8 w-auto"
         />
-        <div className="max-w-[640px]">
+        <div className="relative z-10 max-w-[640px]">
           {/* Hero copy sits over the photo — force light values regardless of theme tokens. */}
           <span className="eyebrow block" style={{ color: '#e6a442' }}>
             {TRIP.name}

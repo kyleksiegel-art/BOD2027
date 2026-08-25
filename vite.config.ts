@@ -26,7 +26,9 @@ export default defineConfig({
         // Everything the SPA needs to boot and score with no network: the shell, the JS/CSS,
         // the fonts, the icons, and the hero. Content-addressed build output lives under
         // _assets/ (see build.assetsDir); stable public files under assets/.
-        globPatterns: ['**/*.{js,css,html,woff2,svg,png,jpg,ico,webmanifest}'],
+        // avif/webp cover the responsive hero variants; the browser precaches every variant
+        // so the one it picks for this device is available offline.
+        globPatterns: ['**/*.{js,css,html,woff2,svg,png,jpg,avif,webp,ico,webmanifest}'],
         // Room for the hero photo; nothing we ship approaches this.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // The SPA fallback: any navigation not in the precache resolves to the app shell,
