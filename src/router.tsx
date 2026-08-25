@@ -15,6 +15,7 @@ import Courses from '@/routes/info/Courses'
 import CourseDetail from '@/routes/info/CourseDetail'
 import Players from '@/routes/info/Players'
 import Rules from '@/routes/info/Rules'
+import SideGames from '@/routes/info/SideGames'
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
           { path: 'courses/:courseId', element: <CourseDetail /> },
           { path: 'players', element: <Players /> },
           { path: 'rules', element: <Rules /> },
+          { path: 'side-games', element: <SideGames /> },
         ],
       },
       { path: '/admin', element: <Admin /> },
