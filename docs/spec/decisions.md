@@ -678,3 +678,19 @@ Mechanics that a dark→light flip forces (all handled):
 
 Tokens are the single source of truth (`src/index.css`); components were only touched where they
 hardcoded a dark assumption. `--blue`/`--olive` deepened for the light ground.
+
+### Accept Lighthouse Performance ~79 (a11y 100), skip route code-splitting (2026-08-25, Kyle)
+
+Phase 9 targets mobile Performance ≥ 90. Measured cleanly (production build via `vite preview`,
+no Netlify deploy-preview overlay), the app scores **Performance 79, Accessibility 100**, with
+TBT 40 ms and CLS 0 — the whole gap is FCP 2.6 s / LCP 4.7 s under Lighthouse's simulated slow-4G
++ 4× CPU throttle. Cause: a single ~751 KB JS bundle (SPA — nothing paints until React boots).
+The fix would be route-based `React.lazy` code-splitting.
+
+Decision: **accept 79, do not code-split.** Rationale: this is a four-person app used on known
+iPhones over wifi/LTE, and once installed as a PWA the shell is precached and served from cache —
+the 4.7 s cold-load-on-slow-4G is a synthetic worst case, not the lived experience. The a11y gate
+(the one that affects reading in the cart) is fully met. Revisit only if real-world load feels slow.
+
+Note: run Lighthouse against a local `vite preview`, NOT a Netlify deploy preview — the preview
+overlay injects ~1.3 MB of MP4s + its own app and tanks the Performance score (measured 66 there).
