@@ -1,6 +1,6 @@
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
-import { usePlayers, useSetting } from '@/lib/data/selectors'
+import { usePlayers } from '@/lib/data/selectors'
 
 const initials = (name: string) =>
   name
@@ -12,9 +12,6 @@ const initials = (name: string) =>
 
 export default function Players() {
   const players = usePlayers()
-  const footnote = useSetting<string>('assigned_index_footnote')
-
-  const anyUnassigned = players?.some((p) => !p.player.index_is_assigned) ?? false
 
   return (
     <Page>
@@ -51,7 +48,6 @@ export default function Players() {
                   <span className="flex flex-col items-end">
                     <span className="tnum font-display text-[1.15rem] font-semibold text-paper">
                       {player.handicap_index.toFixed(1)}
-                      {!player.index_is_assigned && <span className="text-gold">*</span>}
                     </span>
                     <span className="text-[0.62rem] uppercase tracking-[0.12em] text-paper-faint">
                       Index
@@ -81,12 +77,6 @@ export default function Players() {
           <p className="mt-4 text-[0.72rem] text-paper-faint">
             Numbers under each name are that player’s course handicap at each course.
           </p>
-
-          {anyUnassigned && footnote && (
-            <p className="mt-5 text-[0.76rem] leading-relaxed text-paper-faint">
-              <span className="text-gold">*</span> {footnote}
-            </p>
-          )}
         </>
       )}
     </Page>

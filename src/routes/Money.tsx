@@ -30,7 +30,6 @@ export default function Money() {
       ) : (
         <>
           <PotSummary money={money} />
-          <Reconciliation money={money} />
           <PerRound money={money} />
           <Ledger money={money} />
           <Settlement money={money} />
@@ -88,44 +87,6 @@ function PotLine({
         ) : null}
       </span>
       <span className="tnum text-paper">{formatMoney(value)}</span>
-    </div>
-  )
-}
-
-function Reconciliation({ money }: { money: MoneyVM }) {
-  const r = money.reconciliation
-  const balanced = r.balanced
-  return (
-    <section className="mt-6">
-      <div className={`rounded-lg border p-4 ${balanced ? 'border-hair bg-black/20' : 'border-gold bg-gold/10'}`}>
-        <span className="eyebrow block">Buy-in reconciliation</span>
-        <dl className="mt-3 space-y-1.5 text-[0.9rem]">
-          <Row label="Collected (buy-ins)" value={formatMoney(r.totalInCents)} />
-          <Row label="Awarded so far" value={formatMoney(r.awardedCents)} />
-          <Row label="Still to be decided" value={formatMoney(r.pendingCents)} muted />
-        </dl>
-        {!balanced ? (
-          <p className="mt-3 text-[0.85rem] font-semibold text-gold-bright">
-            ⚠ Payouts don’t add up to the buy-ins. Check the buy-in and payout amounts in Admin.
-          </p>
-        ) : r.pendingCents > 0 ? (
-          <p className="mt-3 text-[0.8rem] text-paper-faint">
-            Reconciles to the cent — {formatMoney(r.pendingCents)} is reserved for rounds and the
-            championship not yet decided.
-          </p>
-        ) : (
-          <p className="mt-3 text-[0.8rem] text-paper-faint">Reconciles to the cent.</p>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className={muted ? 'text-paper-dim' : 'text-paper'}>{label}</span>
-      <span className={`tnum ${muted ? 'text-paper-dim' : 'text-paper'}`}>{value}</span>
     </div>
   )
 }

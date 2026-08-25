@@ -4,23 +4,15 @@ import type { CtpPayload } from '@/lib/data/types'
 import { saveCtp } from '@/lib/data/mutations'
 
 // Closest-to-pin entry, one row per par 3, shown inside the round detail. Same offline-first
-// contract as score entry: a tap edits a local draft, Save enqueues the whole row (winner +
-// distance) through the outbox, and "No winner" records an explicit null-winner row — no one
-// got on with par, so the hole is simply dead (no rollover), distinct from "not entered yet".
-// CTP entry takes no PIN.
+// contract as score entry: a tap edits a local draft, Save enqueues the winner through the
+// outbox, and "No winner" records an explicit null-winner row — no one got on with par, so the
+// hole is simply dead (no rollover), distinct from "not entered yet". CTP entry takes no PIN.
+// We record only who won, not the distance — distance is never surfaced.
 
-type Draft = { playerId: string | null | undefined; distance: string }
+type Draft = { playerId: string | null | undefined }
 
 function storedDraft(row: CtpPayload | undefined): Draft {
-  if (!row) return { playerId: undefined, distance: '' }
-  return { playerId: row.player_id, distance: row.distance_feet !== null ? String(row.distance_feet) : '' }
-}
-
-function normDistance(s: string): number | null {
-  const t = s.trim()
-  if (t === '') return null
-  const n = Number(t)
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : null
+  return { playerId: row ? row.player_id : undefined }
 }
 
 export function CtpEntry({
@@ -46,8 +38,7 @@ export function CtpEntry({
   const isDirty = (hole: number): boolean => {
     const d = drafts[hole]
     if (!d) return false
-    const s = storedDraft(ctpByHole.get(hole))
-    return d.playerId !== s.playerId || normDistance(d.distance) !== normDistance(s.distance)
+    return d.playerId !== storedDraft(ctpByHole.get(hole)).playerId
   }
 
   const save = async (hole: number) => {
@@ -58,7 +49,7 @@ export function CtpEntry({
       round_id: vm.round.id,
       hole_number: hole,
       player_id: d.playerId, // string winner, or null for "no winner"
-      distance_feet: d.playerId ? normDistance(d.distance) : null,
+      distance_feet: null, // distance is no longer tracked
     }
     const ok = await saveCtp(payload)
     setSavingHole(null)
@@ -109,7 +100,7 @@ export function CtpEntry({
                   type="button"
                   disabled={!editable}
                   aria-pressed={d.playerId === null}
-                  onClick={() => setDraft(h.holeNumber, { playerId: null, distance: '' })}
+                  onClick={() => setDraft(h.holeNumber, { playerId: null })}
                   className={`tap rounded-md border px-3 text-[0.85rem] disabled:opacity-40 ${
                     d.playerId === null
                       ? 'border-gold bg-gold text-ground font-semibold'
@@ -119,23 +110,6 @@ export function CtpEntry({
                   No winner
                 </button>
               </div>
-
-              {d.playerId ? (
-                <div className="mt-3 flex items-center gap-2">
-                  <label className="text-[0.75rem] uppercase tracking-[0.14em] text-paper-faint">
-                    Distance
-                  </label>
-                  <input
-                    inputMode="decimal"
-                    disabled={!editable}
-                    value={d.distance}
-                    onChange={(e) => setDraft(h.holeNumber, { distance: e.target.value })}
-                    placeholder="feet"
-                    className="tap w-24 rounded-md border border-hair-strong bg-ground px-3 py-2 text-paper tnum placeholder:text-paper-faint focus:border-gold focus:outline-none disabled:opacity-40"
-                  />
-                  <span className="text-[0.8rem] text-paper-faint">ft</span>
-                </div>
-              ) : null}
 
               <div className="mt-3 flex items-center justify-end">
                 <button

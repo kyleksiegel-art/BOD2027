@@ -256,8 +256,105 @@ function Complete({
   )
 }
 
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={`flex-none text-paper-faint transition-transform ${open ? 'rotate-180' : ''}`}
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
+/**
+ * One row of The Card. Tapping the row expands that round's leaderboard, read live from the
+ * same selectors as every other screen — so it is offline-identical and updates as scores land.
+ * Before a round has any scores (every upcoming round) it simply says so. ROUNDS is a fixed
+ * four, so calling the detail hook once per row is hook-order-stable.
+ */
+function CardRound({
+  round,
+  open,
+  onToggle,
+}: {
+  round: (typeof ROUNDS)[number]
+  open: boolean
+  onToggle: () => void
+}) {
+  const { vm } = useRoundDetail(round.no)
+  const hasScores = vm?.leaderboard.some((p) => p.thru > 0) ?? false
+  const panelId = `round-leaderboard-${round.no}`
+
+  return (
+    <div className="border-b border-hair first:border-t first:border-t-hair-strong">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="tap grid w-full grid-cols-[auto_1fr_auto] items-center gap-x-4 py-3.5 text-left"
+      >
+        <span className="font-display text-[0.75rem] uppercase tracking-[0.15em] text-paper-faint">
+          R{round.no}
+        </span>
+        <span className="flex flex-col gap-0.5">
+          <span className="font-display text-[1.14rem] font-semibold text-paper">
+            {round.course}
+          </span>
+          <span className="text-[0.76rem] text-paper-faint">{round.architect}</span>
+        </span>
+        <span className="flex items-center gap-3">
+          <span className="tnum whitespace-nowrap text-right text-[0.8rem] text-paper-dim">
+            {round.day}
+            <span className="mt-0.5 block text-[0.72rem] tracking-[0.04em] text-gold">
+              {round.tee}
+            </span>
+          </span>
+          <Chevron open={open} />
+        </span>
+      </button>
+
+      {open && (
+        <div id={panelId} className="pb-4">
+          {hasScores ? (
+            <ol className="mt-1">
+              {vm!.leaderboard.map((p, i) => (
+                <li
+                  key={p.playerId}
+                  className="flex items-baseline justify-between gap-3 border-t border-hair/60 py-2"
+                >
+                  <span className="flex items-baseline gap-3">
+                    <span className="tnum w-4 text-[0.75rem] text-paper-faint">{i + 1}</span>
+                    <span className="text-[0.95rem] text-paper">{p.name}</span>
+                  </span>
+                  <span className="tnum text-[0.85rem]">
+                    <span className="font-semibold text-gold">{p.totalPoints}</span>
+                    <span className="text-paper-faint"> pts · thru {p.thru}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="py-2 text-[0.85rem] text-paper-dim">No scores in yet.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Home() {
   const [r, setR] = useState<Remaining>(() => remainingFrom(Date.now()))
+  const [openRound, setOpenRound] = useState<number | null>(null)
   const roundsList = useRoundsList()
 
   useEffect(() => {
@@ -336,30 +433,19 @@ export default function Home() {
           <span className="eyebrow block">The Card — Four Rounds, Four Days</span>
           <div className="mt-4">
             {ROUNDS.map((round) => (
-              <div
+              <CardRound
                 key={round.no}
-                className="grid grid-cols-[auto_1fr_auto] items-baseline gap-x-4 border-b border-hair py-3.5 first:border-t first:border-t-hair-strong"
-              >
-                <span className="font-display text-[0.75rem] uppercase tracking-[0.15em] text-paper-faint">
-                  R{round.no}
-                </span>
-                <span className="flex flex-col gap-0.5">
-                  <span className="font-display text-[1.14rem] font-semibold text-paper">
-                    {round.course}
-                  </span>
-                  <span className="text-[0.76rem] text-paper-faint">
-                    {round.architect}
-                  </span>
-                </span>
-                <span className="tnum whitespace-nowrap text-right text-[0.8rem] text-paper-dim">
-                  {round.day}
-                  <span className="mt-0.5 block text-[0.72rem] tracking-[0.04em] text-gold">
-                    {round.tee}
-                  </span>
-                </span>
-              </div>
+                round={round}
+                open={openRound === round.no}
+                onToggle={() =>
+                  setOpenRound((cur) => (cur === round.no ? null : round.no))
+                }
+              />
             ))}
           </div>
+          <p className="mt-3 text-[0.72rem] text-paper-faint">
+            Tap a round for its leaderboard.
+          </p>
         </section>
 
         <footer className="mt-10 border-t border-hair pt-6 text-center text-[0.7rem] uppercase tracking-[0.14em] text-paper-faint">
