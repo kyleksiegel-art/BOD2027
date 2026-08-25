@@ -44,19 +44,7 @@ export function PlayerEntryRow({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-semibold text-paper">{player.name}</span>
-            {getsStroke && !player.pickedUp ? (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-gold/60 bg-gold/15 px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-gold-bright tnum">
-                <span aria-hidden className="flex gap-0.5">
-                  {Array.from({ length: Math.min(strokes, 3) }).map((_, i) => (
-                    <span key={i} className="h-1.5 w-1.5 rounded-full bg-gold-bright" />
-                  ))}
-                </span>
-                {strokes > 1 ? `+${strokes}` : 'Stroke'}
-              </span>
-            ) : null}
-          </div>
+          <div className="font-semibold text-paper">{player.name}</div>
           <div className="mt-0.5 text-[0.78rem] text-paper-faint tnum">
             {dnp ? (
               'Did not play'

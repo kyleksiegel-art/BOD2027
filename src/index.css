@@ -14,8 +14,8 @@
   /* Fairway Linen — light "sun mode" (Kyle 2026-08-24; see decisions.md). On a light
      ground the accent must read as TEXT, so gold/gold-bright are deep brasses (both ≥4.5:1
      on cream); emphasis comes from weight, not a brighter hue that would fail on light. */
-  --ground: #f4efe2; /* warm cream base */
-  --ground-2: #fbf8f0; /* raised surfaces — lighter than ground */
+  --ground: #e9e1d0; /* warm sand base — softer than cream, less glare in sun */
+  --ground-2: #f2ecdd; /* raised surfaces — lighter than ground */
   --paper: #1b1e1c; /* ink — body text */
   --paper-dim: #5c584f; /* secondary text */
   --paper-faint: #6f6960; /* labels, captions */
@@ -23,8 +23,8 @@
   --gold-bright: #935608; /* emphasis / warnings / indicators */
   --blue: #345f7c; /* steel blue */
   --olive: #6f7511; /* olive */
-  --hair: rgba(27, 30, 28, 0.12); /* hairline border */
-  --hair-strong: rgba(27, 30, 28, 0.22);
+  --hair: rgba(27, 30, 28, 0.14); /* hairline border */
+  --hair-strong: rgba(27, 30, 28, 0.24);
 
   color-scheme: light;
 }

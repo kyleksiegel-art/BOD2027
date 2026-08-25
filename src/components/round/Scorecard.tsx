@@ -215,11 +215,11 @@ function PlayerRow({
 /** net-to-par → golf-standard mark. Circle = under, square = over. */
 function shapeClass(netToPar: number | null): string {
   if (netToPar === null) return ''
-  if (netToPar <= -2) return 'rounded-full border border-olive outline outline-1 outline-offset-[3px] outline-olive'
-  if (netToPar === -1) return 'rounded-full border border-olive'
+  if (netToPar <= -2) return 'rounded-full border-2 border-olive outline outline-2 outline-offset-2 outline-olive'
+  if (netToPar === -1) return 'rounded-full border-2 border-olive'
   if (netToPar === 0) return ''
-  if (netToPar === 1) return 'border border-gold/70'
-  return 'border border-gold outline outline-1 outline-offset-[3px] outline-gold'
+  if (netToPar === 1) return 'border-2 border-gold'
+  return 'border-2 border-gold outline outline-2 outline-offset-2 outline-gold'
 }
 
 function ScoreCell({
@@ -276,10 +276,10 @@ function Legend() {
   return (
     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[0.68rem] text-paper-faint">
       <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-3.5 w-3.5 rounded-full border border-olive" /> net birdie+
+        <span className="inline-block h-4 w-4 rounded-full border-2 border-olive" /> net birdie+
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-3.5 w-3.5 border border-gold/70" /> net bogey+
+        <span className="inline-block h-4 w-4 border-2 border-gold" /> net bogey+
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="text-gold">•</span> strokes received
