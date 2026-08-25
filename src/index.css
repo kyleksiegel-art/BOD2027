@@ -18,8 +18,8 @@
   --ground-2: #f2ecdd; /* raised surfaces — lighter than ground */
   --paper: #1b1e1c; /* ink — body text */
   --paper-dim: #5c584f; /* secondary text */
-  --paper-faint: #6f6960; /* labels, captions */
-  --gold: #9c5f0e; /* deep brass accent — legible as text on cream */
+  --paper-faint: #635d54; /* labels, captions — ≥4.5:1 on the sand ground */
+  --gold: #8f5410; /* deep brass accent — ≥4.5:1 as small text on the sand ground */
   --gold-bright: #935608; /* emphasis / warnings / indicators */
   --gold-fill: #d18316; /* bright brass — solid fills (buttons, active toggles) with dark text */
   --blue: #345f7c; /* steel blue */
