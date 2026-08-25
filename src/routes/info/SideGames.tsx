@@ -60,12 +60,6 @@ const DAYS: Day[] = [
         detail:
           "Two-man teams. Each side's two scores combine into a two-digit number (low score first); the point spread between the teams is the payout.",
       },
-      {
-        name: 'Shit from above',
-        stake: '—',
-        detail: 'Runs alongside Vegas.',
-        tbd: 'Confirm the format.',
-      },
     ],
   },
   {
