@@ -14,7 +14,7 @@ const CATEGORY_LABEL: Record<ItinCategory, string> = {
 // A quiet color per category — enough to scan a day at a glance, never loud.
 const CATEGORY_DOT: Record<ItinCategory, string> = {
   travel: 'bg-sky-400',
-  golf: 'bg-gold',
+  golf: 'bg-gold-fill',
   meal: 'bg-amber-400',
   lodging: 'bg-violet-400',
   other: 'bg-paper-faint',

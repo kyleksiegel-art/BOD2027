@@ -96,7 +96,7 @@ export function PinGate({ purpose }: { purpose: string }) {
         <button
           type="submit"
           disabled={pin.length !== PIN_LENGTH || busy}
-          className="tap mt-3 w-full rounded-md bg-gold px-4 py-3 font-semibold text-ground disabled:opacity-40"
+          className="tap mt-3 w-full rounded-md bg-gold-fill px-4 py-3 font-semibold text-paper disabled:opacity-40"
         >
           {busy ? 'Checking…' : 'Unlock'}
         </button>

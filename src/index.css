@@ -21,6 +21,7 @@
   --paper-faint: #6f6960; /* labels, captions */
   --gold: #9c5f0e; /* deep brass accent — legible as text on cream */
   --gold-bright: #935608; /* emphasis / warnings / indicators */
+  --gold-fill: #d18316; /* bright brass — solid fills (buttons, active toggles) with dark text */
   --blue: #345f7c; /* steel blue */
   --olive: #6f7511; /* olive */
   --hair: rgba(27, 30, 28, 0.14); /* hairline border */

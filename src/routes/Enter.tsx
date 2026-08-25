@@ -285,7 +285,7 @@ export default function Enter() {
               type="button"
               disabled={!holeIsDirty || !allEntered || write.status === 'saving'}
               onClick={() => void saveHole()}
-              className="tap w-full rounded-md bg-gold px-4 py-3 font-semibold text-ground disabled:bg-transparent disabled:text-paper-faint disabled:outline disabled:outline-1 disabled:outline-hair"
+              className="tap w-full rounded-md bg-gold-fill px-4 py-3 font-semibold text-paper disabled:bg-transparent disabled:text-paper-faint disabled:outline disabled:outline-1 disabled:outline-hair"
             >
               {write.status === 'saving'
                 ? 'Saving…'

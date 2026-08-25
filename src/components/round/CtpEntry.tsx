@@ -89,7 +89,7 @@ export function CtpEntry({
                       aria-pressed={sel}
                       onClick={() => setDraft(h.holeNumber, { playerId: p.playerId })}
                       className={`tap rounded-md border px-3 text-[0.85rem] disabled:opacity-40 ${
-                        sel ? 'border-gold bg-gold text-ground font-semibold' : 'border-hair-strong text-paper'
+                        sel ? 'border-gold bg-gold-fill text-paper font-semibold' : 'border-hair-strong text-paper'
                       }`}
                     >
                       {p.name}
@@ -103,7 +103,7 @@ export function CtpEntry({
                   onClick={() => setDraft(h.holeNumber, { playerId: null })}
                   className={`tap rounded-md border px-3 text-[0.85rem] disabled:opacity-40 ${
                     d.playerId === null
-                      ? 'border-gold bg-gold text-ground font-semibold'
+                      ? 'border-gold bg-gold-fill text-paper font-semibold'
                       : 'border-hair-strong text-paper-dim'
                   }`}
                 >
@@ -116,7 +116,7 @@ export function CtpEntry({
                   type="button"
                   disabled={!editable || !dirty || saving || d.playerId === undefined}
                   onClick={() => void save(h.holeNumber)}
-                  className="tap rounded-md bg-gold px-4 py-2 text-[0.85rem] font-semibold text-ground disabled:opacity-40"
+                  className="tap rounded-md bg-gold-fill px-4 py-2 text-[0.85rem] font-semibold text-paper disabled:opacity-40"
                 >
                   {saving ? 'Saving…' : dirty ? `Save hole ${h.holeNumber}` : 'Saved'}
                 </button>

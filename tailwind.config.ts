@@ -18,6 +18,7 @@ export default {
         'paper-faint': 'var(--paper-faint)',
         gold: 'var(--gold)',
         'gold-bright': 'var(--gold-bright)',
+        'gold-fill': 'var(--gold-fill)',
         blue: 'var(--blue)',
         olive: 'var(--olive)',
         hair: 'var(--hair)',

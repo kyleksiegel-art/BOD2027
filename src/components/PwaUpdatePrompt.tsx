@@ -37,7 +37,7 @@ export function PwaUpdatePrompt() {
           <button
             type="button"
             onClick={() => void updateServiceWorker(true)}
-            className="tap rounded-md bg-gold px-3 py-1.5 font-semibold text-ground"
+            className="tap rounded-md bg-gold-fill px-3 py-1.5 font-semibold text-paper"
           >
             Update
           </button>

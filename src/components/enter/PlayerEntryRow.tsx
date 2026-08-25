@@ -121,7 +121,7 @@ export function PlayerEntryRow({
               aria-pressed={player.pickedUp}
               className={`tap rounded-md border px-3 text-[0.8rem] font-semibold disabled:opacity-30 ${
                 player.pickedUp
-                  ? 'border-gold bg-gold text-ground'
+                  ? 'border-gold bg-gold-fill text-paper'
                   : 'border-hair-strong text-paper-dim'
               }`}
             >

@@ -31,7 +31,7 @@ export function ConnectionBadge() {
         : online
           ? 'Online'
           : 'Offline'
-  const dot = deadLetter > 0 ? 'bg-gold-bright' : pending > 0 ? 'bg-gold' : online ? 'bg-olive' : 'bg-gold'
+  const dot = deadLetter > 0 ? 'bg-gold-bright' : pending > 0 ? 'bg-gold-fill' : online ? 'bg-olive' : 'bg-gold-fill'
 
   return (
     <span

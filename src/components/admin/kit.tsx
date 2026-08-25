@@ -86,7 +86,7 @@ export function Button({
 }) {
   const styles =
     tone === 'primary'
-      ? 'bg-gold text-ground font-semibold'
+      ? 'bg-gold-fill text-paper font-semibold'
       : tone === 'danger'
         ? 'border border-hair-strong text-gold-bright'
         : 'border border-hair-strong text-paper'
