@@ -653,3 +653,28 @@ not from `round_players` snapshots — consistent with the live-index decision (
 the player's own handicap (post allowance/cap/override), **not** the play-off-the-low relative
 figure the scorecard uses. A player with no `round_players` row for a round reads "—"; a
 did-not-play row reads "DNP".
+
+### Fairway Linen — light theme replaces dark-only (2026-08-24, Kyle)
+
+The app moves from the brief's **dark-mode-only** scheme to a single **light** theme, "Fairway
+Linen": warm cream ground (`--ground #f4efe2`), ink body text (`--paper #1b1e1c`), deep-brass
+accents. Rationale: the whole point is one-handed reading in direct Florida sun, and a light,
+high-luminance ground competes with bright ambient light better than a dark screen. It stays
+**single-theme** (no toggle), matching the app's original one-theme philosophy — just light.
+
+Mechanics that a dark→light flip forces (all handled):
+- **The accent must read as text on cream**, so `--gold` (#9c5f0e) and `--gold-bright` (#935608)
+  are both *deep* brasses at ≥4.5:1 on the ground. On light there is no "brighter" emphasis hue
+  that stays legible — emphasis comes from weight, and `text-gold-bright` is now a deep brass, so
+  all ~30 existing usages remain legible without per-site changes.
+- **Gold-fill buttons** (`bg-gold text-ground`) become deep-brass fills with cream text — a bronze
+  CTA, legible (large/bold ≥3:1). Not the old bright-gold-with-dark-text look; acceptable trade.
+- **Raised surfaces** flipped from `bg-black/20` (a dark scrim) to `bg-ground-2` (#fbf8f0, *lighter*
+  than the ground) so depth reads correctly on light.
+- **Hairlines** flipped from cream-alpha to ink-alpha, or they'd be invisible on cream.
+- **The hero stays a photo banner**: its copy sits over the image, so the eyebrow, "2", dates and
+  venue are pinned to explicit light values (not theme tokens), and the scrim now dissolves into
+  the cream page instead of into black.
+
+Tokens are the single source of truth (`src/index.css`); components were only touched where they
+hardcoded a dark assumption. `--blue`/`--olive` deepened for the light ground.

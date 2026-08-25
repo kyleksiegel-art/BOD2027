@@ -44,7 +44,7 @@ function CountdownUnit({ value, label }: { value: string; label: string }) {
 function Countdown({ r }: { r: Remaining }) {
   return (
     <div className="py-8 text-center sm:py-10">
-      <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,rgba(209,131,22,0.12)_100%)] [height:1.5px]" />
+      <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,transparent_100%)] [height:1.5px]" />
       <div
         className="mt-6 grid grid-cols-4 items-end justify-items-center gap-2 sm:gap-6"
         role="timer"
@@ -94,7 +94,7 @@ function LivePanel() {
   if (!roundsList || !standings) {
     return (
       <div className="py-8">
-        <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,rgba(209,131,22,0.12)_100%)] [height:1.5px]" />
+        <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,transparent_100%)] [height:1.5px]" />
         <p className="mt-6 animate-pulse text-center text-paper-faint">Loading the board…</p>
       </div>
     )
@@ -117,7 +117,7 @@ function LivePanel() {
 
   return (
     <div className="py-8">
-      <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,rgba(209,131,22,0.12)_100%)] [height:1.5px]" />
+      <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,transparent_100%)] [height:1.5px]" />
 
       {inProgress ? (
         <OnCourse
@@ -378,7 +378,7 @@ export default function Home() {
         className="relative flex min-h-[clamp(420px,72vh,640px)] flex-col justify-between px-5 pb-10 pt-4"
         style={{
           backgroundImage:
-            'linear-gradient(to bottom, rgba(8,10,13,0.62) 0%, rgba(8,10,13,0.10) 20%, rgba(8,10,13,0.05) 42%, rgba(8,10,13,0.70) 74%, var(--ground) 100%), url(/assets/hero.jpg)',
+            'linear-gradient(to bottom, rgba(16,14,10,0.46) 0%, rgba(16,14,10,0.12) 24%, rgba(16,14,10,0.10) 42%, rgba(16,14,10,0.74) 82%, var(--ground) 100%), url(/assets/hero.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center 42%',
         }}
@@ -391,16 +391,19 @@ export default function Home() {
           className="h-8 w-auto"
         />
         <div className="max-w-[640px]">
-          <span className="eyebrow block">{TRIP.name}</span>
+          {/* Hero copy sits over the photo — force light values regardless of theme tokens. */}
+          <span className="eyebrow block" style={{ color: '#e6a442' }}>
+            {TRIP.name}
+          </span>
           <h1 className="mt-3 font-display text-[clamp(2.6rem,13vw,4.8rem)] font-semibold leading-[0.94] tracking-tight text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.5)]">
             Streamsong
             <br />
-            20<span className="text-gold-bright">2</span>7
+            20<span className="text-[#e6a442]">2</span>7
           </h1>
-          <p className="mt-4 font-display text-[clamp(1.05rem,4.6vw,1.4rem)] text-paper">
+          <p className="mt-4 font-display text-[clamp(1.05rem,4.6vw,1.4rem)] text-[#f5efe1]">
             {TRIP.dates}
           </p>
-          <p className="mt-1 text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
+          <p className="mt-1 text-[0.8rem] uppercase tracking-[0.12em] text-[#dad3c5]">
             {TRIP.venue} · {TRIP.venueCity}
           </p>
         </div>

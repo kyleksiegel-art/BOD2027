@@ -166,7 +166,7 @@ export default function Enter() {
       {/* The Round 4 hard block. Not a dismissible banner — a genuine stop, with the list
           of what's missing and where to go fix it. */}
       {vm.blocked?.reason === 'course_card_incomplete' ? (
-        <section className="mt-5 rounded-lg border border-hair bg-black/20 p-5">
+        <section className="mt-5 rounded-lg border border-hair bg-ground-2 p-5">
           <span className="eyebrow block">Blocked</span>
           <h2 className="mt-2 font-display text-2xl text-paper">
             {vm.course.name}’s scorecard isn’t entered yet
@@ -189,7 +189,7 @@ export default function Enter() {
       ) : null}
 
       {vm.blocked?.reason === 'round_upcoming' ? (
-        <p className="mt-5 rounded-md border border-hair bg-black/20 p-4 text-[0.9rem] text-paper-dim">
+        <p className="mt-5 rounded-md border border-hair bg-ground-2 p-4 text-[0.9rem] text-paper-dim">
           Round {vm.round.round_number} hasn’t started. Start it from{' '}
           <Link to="/admin" className="underline underline-offset-2">
             admin

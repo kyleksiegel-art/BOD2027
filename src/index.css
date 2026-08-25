@@ -7,23 +7,26 @@
 
 /* ------------------------------------------------------------------ */
 /* Design tokens — the single source of truth for the palette.        */
-/* Dark-mode only; high contrast for reading in direct Florida sun.    */
-/* Streamsong-derived palette: accents lifted from the resort logo.    */
+/* Light-mode only ("Fairway Linen"); high contrast for direct sun.    */
+/* Streamsong-derived palette: cream ground, brass accents.            */
 /* ------------------------------------------------------------------ */
 :root {
-  --ground: #0c1013; /* near-black base */
-  --ground-2: #12171c; /* raised surfaces */
-  --paper: #f5efe1; /* warm cream — body text */
-  --paper-dim: #bcb6a9; /* secondary text */
-  --paper-faint: #726d64; /* labels, captions */
-  --gold: #d18316; /* brass accent */
-  --gold-bright: #e6a442; /* emphasis on dark */
-  --blue: #3b6e8f; /* steel blue */
-  --olive: #9fa617; /* olive */
-  --hair: rgba(245, 239, 225, 0.12); /* hairline border */
-  --hair-strong: rgba(245, 239, 225, 0.22);
+  /* Fairway Linen — light "sun mode" (Kyle 2026-08-24; see decisions.md). On a light
+     ground the accent must read as TEXT, so gold/gold-bright are deep brasses (both ≥4.5:1
+     on cream); emphasis comes from weight, not a brighter hue that would fail on light. */
+  --ground: #f4efe2; /* warm cream base */
+  --ground-2: #fbf8f0; /* raised surfaces — lighter than ground */
+  --paper: #1b1e1c; /* ink — body text */
+  --paper-dim: #5c584f; /* secondary text */
+  --paper-faint: #6f6960; /* labels, captions */
+  --gold: #9c5f0e; /* deep brass accent — legible as text on cream */
+  --gold-bright: #935608; /* emphasis / warnings / indicators */
+  --blue: #345f7c; /* steel blue */
+  --olive: #6f7511; /* olive */
+  --hair: rgba(27, 30, 28, 0.12); /* hairline border */
+  --hair-strong: rgba(27, 30, 28, 0.22);
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 @layer base {

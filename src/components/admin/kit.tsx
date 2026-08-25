@@ -49,7 +49,7 @@ export function Section({
   const showBody = !collapsible || open
 
   return (
-    <section className="mt-4 rounded-lg border border-hair bg-black/20 p-4">
+    <section className="mt-4 rounded-lg border border-hair bg-ground-2 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         {collapsible ? (
           <button

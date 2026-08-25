@@ -72,7 +72,7 @@ export function PinGate({ purpose }: { purpose: string }) {
   }
 
   return (
-    <section className="rounded-lg border border-hair bg-black/20 p-5">
+    <section className="rounded-lg border border-hair bg-ground-2 p-5">
       <span className="eyebrow block">Locked</span>
       <h2 className="mt-2 font-display text-2xl text-paper">Enter the PIN</h2>
       <p className="mt-2 text-[0.9rem] leading-relaxed text-paper-dim">{purpose}</p>

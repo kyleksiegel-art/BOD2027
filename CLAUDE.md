@@ -74,7 +74,7 @@ Net Stableford. Points table stored in `settings` (retroactive). **Handicap inde
 ## Conventions
 
 - **Language in the UI is plain.** No "Shareholder Standings" or "Accounts Payable." Standings, Rounds, Scorecard, Players, Money, Rules, Itinerary. Visual treatment carries the annual-report idea; copy does not wink at it.
-- **Dark mode only.** High contrast. Tabular numerals wherever numbers appear.
+- **Light mode only ("Fairway Linen").** Cream ground, ink text, deep-brass accents; single theme, high contrast for direct sun (Kyle 2026-08-24, reverses the brief's dark-only — see `decisions.md §"Fairway Linen"`). Tabular numerals wherever numbers appear. Tokens live in `src/index.css`; on a light ground the accent must read as text, so `--gold`/`--gold-bright` are both deep brasses (≥4.5:1 on cream) and emphasis comes from weight, not a brighter hue.
 - **Minimum 44px tap targets.** No hover-dependent interactions. `font-size: 16px` on inputs to prevent iOS zoom-on-focus.
 - **Viewport:** standard `width=device-width, initial-scale=1`. No `user-scalable=no`.
 - **Timezones:** always render tee times and itinerary in `America/New_York`. Never device locale.

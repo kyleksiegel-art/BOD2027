@@ -178,7 +178,7 @@ function ExportPanel({ disabled }: { disabled: boolean }) {
   const [csv, setCsv] = useState<string | null>(null)
 
   return (
-    <section className="mt-8 rounded-lg border border-hair bg-black/20 p-4">
+    <section className="mt-8 rounded-lg border border-hair bg-ground-2 p-4">
       <h3 className="font-display text-xl text-paper">Export</h3>
       <p className="mt-2 text-[0.85rem] leading-relaxed text-paper-dim">
         Every score, handicap snapshot, CTP result, frozen money row and setting — enough to

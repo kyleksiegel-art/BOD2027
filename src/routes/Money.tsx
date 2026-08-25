@@ -43,7 +43,7 @@ export default function Money() {
 function PotSummary({ money }: { money: MoneyVM }) {
   return (
     <section className="mt-8">
-      <div className="rounded-lg border border-hair-strong bg-black/20 p-5">
+      <div className="rounded-lg border border-hair-strong bg-ground-2 p-5">
         <span className="eyebrow block">Total purse</span>
         <div className="mt-1 font-display text-4xl font-semibold tnum text-gold">
           {formatMoney(money.totalPotCents)}
@@ -107,7 +107,7 @@ function PerRound({ money }: { money: MoneyVM }) {
 function RoundCard({ r }: { r: RoundMoneyVM }) {
   const abandoned = r.status === 'abandoned'
   return (
-    <div className={`rounded-lg border border-hair bg-black/20 p-4 ${abandoned ? 'opacity-50' : ''}`}>
+    <div className={`rounded-lg border border-hair bg-ground-2 p-4 ${abandoned ? 'opacity-50' : ''}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="font-display text-xl text-paper">
           Round {r.roundNumber} · {r.courseName}

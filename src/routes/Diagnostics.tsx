@@ -143,7 +143,7 @@ export default function Diagnostics() {
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="mt-5 rounded-lg border border-hair bg-black/20 p-4">
+    <section className="mt-5 rounded-lg border border-hair bg-ground-2 p-4">
       <h3 className="font-display text-lg text-paper">{title}</h3>
       <div className="mt-3">{children}</div>
     </section>

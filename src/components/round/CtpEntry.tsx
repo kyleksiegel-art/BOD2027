@@ -72,7 +72,7 @@ export function CtpEntry({
           const dirty = isDirty(h.holeNumber)
           const saving = savingHole === h.holeNumber
           return (
-            <div key={h.holeNumber} className="rounded-lg border border-hair bg-black/20 p-3">
+            <div key={h.holeNumber} className="rounded-lg border border-hair bg-ground-2 p-3">
               <div className="flex items-baseline justify-between">
                 <span className="font-display text-lg text-paper">Hole {h.holeNumber}</span>
                 <span className="text-[0.75rem] text-paper-faint tnum">par 3</span>
