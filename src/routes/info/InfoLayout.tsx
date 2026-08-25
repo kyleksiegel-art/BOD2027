@@ -9,8 +9,10 @@ export default function InfoLayout() {
       <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-paper">
         Info
       </h1>
+      {/* Text tabs spread edge-to-edge: all six fit on one line at any phone width,
+          no wrapping and no horizontal scroll. Active is gold with a hairline underline. */}
       <nav
-        className="mt-5 flex flex-wrap gap-1 border-b border-hair pb-3"
+        className="mt-5 flex items-stretch justify-between border-b border-hair"
         aria-label="Info sections"
       >
         {INFO_SUBNAV.map(({ to, label }) => (
@@ -18,10 +20,10 @@ export default function InfoLayout() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `tap flex items-center whitespace-nowrap rounded-full px-3 text-[0.82rem] font-semibold transition-colors ${
+              `flex min-h-[44px] items-center whitespace-nowrap border-b-2 pb-1 text-[0.8rem] font-semibold transition-colors ${
                 isActive
-                  ? 'bg-ground-2 text-gold'
-                  : 'text-paper-faint hover:text-paper-dim'
+                  ? 'border-gold text-gold'
+                  : 'border-transparent text-paper-faint hover:text-paper-dim'
               }`
             }
           >
