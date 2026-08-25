@@ -74,6 +74,6 @@ export const INFO_SUBNAV: { to: string; label: string }[] = [
   { to: '/info/courses', label: 'Courses' },
   { to: '/info/players', label: 'Players' },
   { to: '/info/rules', label: 'Rules' },
-  { to: '/info/side-games', label: 'Side Games' },
+  { to: '/info/side-games', label: 'Games' },
   { to: '/admin', label: 'Admin' },
 ]
