@@ -5,8 +5,9 @@ import { saveCtp } from '@/lib/data/mutations'
 
 // Closest-to-pin entry, one row per par 3, shown inside the round detail. Same offline-first
 // contract as score entry: a tap edits a local draft, Save enqueues the whole row (winner +
-// distance) through the outbox, and "No winner" records an explicit null-winner row so the
-// Money page's carry logic can tell "unclaimed" from "not entered yet". CTP entry takes no PIN.
+// distance) through the outbox, and "No winner" records an explicit null-winner row — no one
+// got on with par, so the hole is simply dead (no rollover), distinct from "not entered yet".
+// CTP entry takes no PIN.
 
 type Draft = { playerId: string | null | undefined; distance: string }
 

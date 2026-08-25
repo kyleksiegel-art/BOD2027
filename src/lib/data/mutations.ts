@@ -105,7 +105,7 @@ export async function saveCells(cells: ScoreCellInput[]): Promise<boolean> {
  * Record one closest-to-pin result. Same offline-first path as saveCells: the row is written
  * to Dexie and appended to the outbox in one transaction (enqueueCtp), then the flush is
  * best-effort. Like score entry, CTP entry takes no session token. A `null` player_id records
- * "no winner yet / carry" — the same row the carry logic reads on the Money page.
+ * an explicit "no winner" for the hole (no rollover), distinct from a hole not entered yet.
  */
 export async function saveCtp(result: CtpPayload): Promise<boolean> {
   publish({ status: 'saving', message: null })
