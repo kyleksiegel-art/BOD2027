@@ -70,8 +70,8 @@ export function CtpEntry({
     <section className="mt-8">
       <span className="eyebrow block">Closest to pin</span>
       <p className="mt-2 text-[0.8rem] text-paper-dim">
-        One winner per par 3 — the tee shot must finish on the green. Tap “No winner” to carry
-        the pot to the next par 3.
+        One winner per par 3 — closest to the pin on the green, and you must make par or better
+        to claim it. Tap “No winner” if no one qualifies.
       </p>
 
       <div className="mt-4 space-y-3">
