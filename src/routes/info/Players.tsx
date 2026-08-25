@@ -28,7 +28,7 @@ export default function Players() {
                 className="border-b border-hair py-4 first:border-t first:border-t-hair-strong"
               >
                 <div className="flex items-center gap-4">
-                  <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full border border-hair-strong bg-ground-2 font-display text-[0.9rem] font-semibold text-paper-dim">
+                  <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full border border-gold/30 bg-gold/10 font-display text-[0.9rem] font-semibold text-gold">
                     {player.photo_url ? (
                       <img
                         src={player.photo_url}

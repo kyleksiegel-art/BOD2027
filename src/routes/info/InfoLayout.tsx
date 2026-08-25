@@ -10,7 +10,7 @@ export default function InfoLayout() {
         Info
       </h1>
       <nav
-        className="mt-5 -mx-1 flex gap-1 overflow-x-auto border-b border-hair pb-3"
+        className="mt-5 flex flex-wrap gap-1 border-b border-hair pb-3"
         aria-label="Info sections"
       >
         {INFO_SUBNAV.map(({ to, label }) => (
@@ -18,7 +18,7 @@ export default function InfoLayout() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `tap flex items-center whitespace-nowrap rounded-full px-4 text-[0.82rem] font-semibold transition-colors ${
+              `tap flex items-center whitespace-nowrap rounded-full px-3 text-[0.82rem] font-semibold transition-colors ${
                 isActive
                   ? 'bg-ground-2 text-gold'
                   : 'text-paper-faint hover:text-paper-dim'
