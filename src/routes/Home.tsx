@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FIRST_TEE_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
+import { COUNTDOWN_TARGET_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
 import { useRoundsList, useStandings, useRoundDetail } from '@/lib/data/selectors'
 
-const TARGET = new Date(FIRST_TEE_ISO).getTime()
+const TARGET = new Date(COUNTDOWN_TARGET_ISO).getTime()
 
 interface Remaining {
   days: number

@@ -19,11 +19,19 @@ export const TRIP = {
 } as const
 
 /**
- * Countdown target: first tee is 1:10 PM ET, Thu Feb 4, 2027.
- * February is EST (UTC−5); the fixed offset makes the countdown correct in any
- * viewer's timezone. Phase 9 will make this live off round status.
+ * First tee is 1:10 PM ET, Thu Feb 4, 2027 — the real first-shot moment,
+ * referenced in copy. February is EST (UTC−5); the fixed offset keeps every
+ * time correct in any viewer's timezone.
  */
 export const FIRST_TEE_ISO = '2027-02-04T13:10:00-05:00'
+
+/**
+ * Countdown target: midnight ET as the calendar flips from Feb 3 to Feb 4.
+ * The counter hits zero when we wake up on day one, so the hero is already
+ * showing the live board (see Home's `showLive`) rather than a clock, before
+ * anyone tees off. An admin flipping a round live still trips `showLive` early.
+ */
+export const COUNTDOWN_TARGET_ISO = '2027-02-04T00:00:00-05:00'
 
 export const PLAYERS = [
   'Jon Aronson',
