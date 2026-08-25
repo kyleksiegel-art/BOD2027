@@ -2,7 +2,11 @@
 // One-time / re-runnable: outputs to public/assets/hero/. The original
 // public/assets/hero.jpg stays as the <img> fallback for browsers without AVIF/WebP.
 //
-//   node scripts/gen-hero-images.mjs
+// `sharp` is NOT a project dependency (it broke Netlify's `npm ci`), so install it
+// on demand just for this run — the generated images are committed, so the build
+// itself never needs sharp:
+//
+//   npm i --no-save sharp && node scripts/gen-hero-images.mjs
 //
 // Widths are capped at the source's native width (1600) — never upscale.
 import sharp from 'sharp'

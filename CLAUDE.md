@@ -225,8 +225,10 @@ The rest of Phase 6: the PWA, the offline PIN, the day-of tee change, Diagnostic
   `maximumFileSizeToCacheInBytes` (4 MiB) are explicit; the build precaches the shell, JS/CSS,
   both fonts, the icons and the responsive hero (AVIF/WebP at 640/1080/1600 + the JPG fallback,
   ~1.6 MiB total — `glob` includes `avif,webp`). The hero is a `<picture>` in `Home.tsx`, not a
-  CSS background; regenerate variants with `node scripts/gen-hero-images.mjs` (needs the `sharp`
-  devDep) after replacing `public/assets/hero.jpg`. Icons live in `public/` (`icon.svg` +
+  CSS background; regenerate variants after replacing `public/assets/hero.jpg` with
+  `npm i --no-save sharp && node scripts/gen-hero-images.mjs`. **`sharp` is deliberately NOT a
+  dependency** — it broke Netlify's `npm ci` (install-deps stage); the variants are committed so
+  the build never needs it. Icons live in `public/` (`icon.svg` +
   `sips`-rasterised PNGs); `index.html` carries the apple-touch/favicon links, the manifest link
   is injected. **Install/update needs a real HTTPS origin — pre-trip manual check.**
 - **`navigator.storage.persist()`** — `src/lib/storage.ts` `requestPersistentStorage()`, called
