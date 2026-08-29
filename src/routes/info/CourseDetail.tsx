@@ -265,32 +265,26 @@ export default function CourseDetail() {
         <section className="mt-9">
           <h2 className="eyebrow">Holes to Know</h2>
           {editorial && editorial.holesToKnow.length > 0 ? (
-            <div className="mt-3 grid gap-5 sm:grid-cols-2">
+            <div className="mt-3 grid gap-x-7 gap-y-5 sm:grid-cols-2">
               {editorial.holesToKnow.map((h) => (
-                <article key={h.hole} className="round" data-course={slug ?? undefined}>
-                  {/* Photo band with the large hole number overlaid (kept), scrim for legibility. */}
-                  <div className="relative aspect-[2/1] w-full overflow-hidden rounded-sm">
-                    <CoursePhoto
-                      base={h.image ? `${slug}/${h.image}` : undefined}
-                      alt={h.imageAlt ?? `Streamsong ${course.name}, hole ${h.hole}`}
-                      sizes="(min-width: 640px) 340px, 100vw"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
-                    <div className="absolute bottom-2 left-3 flex items-end gap-2">
-                      <span className="text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-white/80">
-                        Hole
-                      </span>
-                      <span className="fx-display font-display text-[2.4rem] font-semibold leading-[0.8] text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.6)]">
-                        {h.hole}
-                      </span>
-                    </div>
+                <article key={h.hole} className="grid grid-cols-[auto_1fr] gap-x-4">
+                  {/* Large hole-number treatment — the editorial anchor, no photo. */}
+                  <div className="flex flex-col">
+                    <span className="text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-paper-faint">
+                      Hole
+                    </span>
+                    <span className="fx-display tnum font-display text-[2.4rem] font-semibold leading-[0.85] text-paper">
+                      {h.hole}
+                    </span>
                   </div>
-                  <h3 className="fx-serif-sm mt-2.5 font-display text-[1.1rem] font-semibold leading-tight text-paper">
-                    {h.title}
-                  </h3>
-                  <p className="mt-1 text-[0.88rem] leading-relaxed text-paper-dim">
-                    {h.description}
-                  </p>
+                  <div>
+                    <h3 className="fx-serif-sm font-display text-[1.08rem] font-semibold leading-tight text-paper">
+                      {h.title}
+                    </h3>
+                    <p className="mt-1 text-[0.88rem] leading-relaxed text-paper-dim">
+                      {h.description}
+                    </p>
+                  </div>
                 </article>
               ))}
             </div>

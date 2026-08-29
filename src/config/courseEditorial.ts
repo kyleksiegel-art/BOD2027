@@ -44,10 +44,12 @@ export interface CourseEditorial {
 
 export const COURSE_EDITORIAL: Record<CourseSlug, CourseEditorial> = {
   red: {
-    // Photography not yet supplied — see this file's header. Drop
-    // public/assets/courses/red/hero.jpg and set heroImage: 'red' to switch on the photo.
-    heroImage: undefined,
-    heroAlt: 'Streamsong Red — Coore & Crenshaw duneland',
+    // Hero: public/assets/courses/red/hero.jpg (aerial of the Red course + clubhouse at
+    // golden hour, supplied by Kyle). The page uses hero.jpg immediately; run
+    // `npm i --no-save sharp && node scripts/gen-course-images.mjs` to emit the responsive
+    // AVIF/WebP derivatives it prefers. Falls back to the accent plate if the file is absent.
+    heroImage: 'red',
+    heroAlt: 'Streamsong Red — aerial over the dunes and clubhouse at golden hour',
     tagline:
       'Wide corridors, bold angles and enormous sandy waste areas reward choosing the right side of the fairway rather than simply finding it.',
     // The DB description covers the SETTING (reclaimed phosphate-mine duneland); the tagline
@@ -59,24 +61,18 @@ export const COURSE_EDITORIAL: Record<CourseSlug, CourseEditorial> = {
         title: 'The narrowest invitation.',
         description:
           'A short par 3 to a reverse-S green over 60 yards deep but as little as 8 wide, ringed by sandbelt bunkering. Club and spin decide it, not distance — anything mis-flighted slides off the wrong tier.',
-        image: 'hole-8',
-        imageAlt: 'Streamsong Red — the par-3 8th and its reverse-S green',
       },
       {
         hole: 15,
         title: 'Pick your side of the sand.',
         description:
           'One of the deepest waste bunkers on the course runs the entire left side. Hug it for the ideal angle in; bail out right and the green — falling hard right to left — throws your ball away.',
-        image: 'hole-15',
-        imageAlt: 'Streamsong Red — the 15th and its long left-side waste bunker',
       },
       {
         hole: 16,
         title: 'Biarritz over the water.',
         description:
           "Coore & Crenshaw's modern Biarritz — a green nearly 60 yards long with a deep swale swallowing anything short, all carried over water. Miss the right shelf and par is a real two-putt test.",
-        image: 'hole-16',
-        imageAlt: 'Streamsong Red — the par-3 16th playing over water',
       },
     ],
   },
