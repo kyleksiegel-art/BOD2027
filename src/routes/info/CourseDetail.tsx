@@ -7,16 +7,75 @@ import { COURSE_EDITORIAL } from '@/config/courseEditorial'
 
 const dash = <span className="text-paper-faint">—</span>
 
+/** Accent-color plate used whenever a photo is absent or fails to load — same look for the
+ *  hero and the hole bands so a photoless course reads as intentional, not broken. */
+function AccentPlate() {
+  return (
+    <div
+      className="absolute inset-0"
+      style={{
+        background:
+          'linear-gradient(150deg, color-mix(in srgb, var(--course, var(--paper-dim)) 90%, black) 0%, color-mix(in srgb, var(--course, var(--paper-dim)) 58%, black) 100%)',
+      }}
+    />
+  )
+}
+
 /**
- * Full-bleed course hero. When a local photo exists (public/assets/courses/<img>/hero.*)
- * it renders a responsive <picture> with the same AVIF→WebP→JPG fallback chain and
- * fetch-failure recovery as the Home masthead (Home.tsx §HeroPhoto). When no photo has
- * been supplied yet it renders a graceful typographic panel in the course's accent color
- * instead — no broken <img>, no stock photo. Course identity is overlaid near the bottom
- * over a scrim (Option A), no card.
+ * Responsive <picture> for a local course photo, with the same AVIF→WebP→JPG fallback chain
+ * and fetch-failure recovery as the Home masthead (Home.tsx §HeroPhoto): on the <img>'s
+ * onError we drop the <source>s and fall through to the JPG; if that fails too we show the
+ * AccentPlate. `base` is '<folder>/<name>' under /assets/courses/. Returns the AccentPlate
+ * outright when no photo has been supplied (base undefined) — no 404, no broken image.
  */
+function CoursePhoto({
+  base,
+  alt,
+  sizes,
+  className = 'absolute inset-0 h-full w-full object-cover',
+}: {
+  base?: string
+  alt: string
+  sizes: string
+  className?: string
+}) {
+  const [sourcesFailed, setSourcesFailed] = useState(false)
+  const [imgFailed, setImgFailed] = useState(false)
+
+  if (!base || imgFailed) return <AccentPlate />
+
+  const p = `/assets/courses/${base}`
+  return (
+    <picture>
+      {!sourcesFailed && (
+        <>
+          <source
+            type="image/avif"
+            srcSet={`${p}-640.avif 640w, ${p}-1080.avif 1080w, ${p}-1600.avif 1600w`}
+            sizes={sizes}
+          />
+          <source
+            type="image/webp"
+            srcSet={`${p}-640.webp 640w, ${p}-1080.webp 1080w, ${p}-1600.webp 1600w`}
+            sizes={sizes}
+          />
+        </>
+      )}
+      <img
+        src={`${p}.jpg`}
+        alt={alt}
+        className={className}
+        decoding="async"
+        loading="lazy"
+        onError={() => (sourcesFailed ? setImgFailed(true) : setSourcesFailed(true))}
+      />
+    </picture>
+  )
+}
+
+/** Full-bleed course hero with round identity overlaid near the bottom (no card). */
 function CourseHero({
-  img,
+  heroBase,
   alt,
   slug,
   courseName,
@@ -24,7 +83,7 @@ function CourseHero({
   architect,
   yearOpened,
 }: {
-  img?: string
+  heroBase?: string
   alt?: string
   slug: ReturnType<typeof courseSlug>
   courseName: string
@@ -32,51 +91,12 @@ function CourseHero({
   architect: string
   yearOpened: number
 }) {
-  const [sourcesFailed, setSourcesFailed] = useState(false)
-  const hasPhoto = Boolean(img)
-
   return (
     <header
-      className="round relative flex aspect-[16/9] max-h-[68vh] min-h-[300px] w-full flex-col justify-end overflow-hidden sm:aspect-[2/1]"
+      className="round relative flex aspect-[16/9] max-h-[62vh] min-h-[280px] w-full flex-col justify-end overflow-hidden sm:aspect-[5/2]"
       data-course={slug ?? undefined}
     >
-      {hasPhoto ? (
-        <picture>
-          {!sourcesFailed && (
-            <>
-              <source
-                type="image/avif"
-                srcSet={`/assets/courses/${img}/hero-640.avif 640w, /assets/courses/${img}/hero-1080.avif 1080w, /assets/courses/${img}/hero-1600.avif 1600w`}
-                sizes="100vw"
-              />
-              <source
-                type="image/webp"
-                srcSet={`/assets/courses/${img}/hero-640.webp 640w, /assets/courses/${img}/hero-1080.webp 1080w, /assets/courses/${img}/hero-1600.webp 1600w`}
-                sizes="100vw"
-              />
-            </>
-          )}
-          <img
-            src={`/assets/courses/${img}/hero.jpg`}
-            alt={alt ?? courseName}
-            className="absolute inset-0 h-full w-full object-cover"
-            decoding="async"
-            onError={() => setSourcesFailed(true)}
-          />
-        </picture>
-      ) : (
-        // Graceful fallback — an accent color plate in the course's identity color. The
-        // overlaid name below carries the identity, so the plate stays clean (no duplicate
-        // title). Swap in a photo by dropping public/assets/courses/<slug>/hero.jpg and
-        // setting heroImage in courseEditorial.ts.
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(150deg, color-mix(in srgb, var(--course, var(--paper-dim)) 90%, black) 0%, color-mix(in srgb, var(--course, var(--paper-dim)) 58%, black) 100%)',
-          }}
-        />
-      )}
+      <CoursePhoto base={heroBase} alt={alt ?? courseName} sizes="100vw" />
 
       {/* Scrim — darkens the base for the overlaid identity, dissolves into the page ground. */}
       <div
@@ -87,19 +107,19 @@ function CourseHero({
         }}
       />
 
-      <div className="relative z-10 mx-auto w-full max-w-[720px] px-5 pb-7">
+      <div className="relative z-10 mx-auto w-full max-w-[720px] px-5 pb-6">
         {eyebrow && (
           <span
-            className="block text-[0.68rem] font-semibold uppercase tracking-[0.22em]"
+            className="block text-[0.66rem] font-semibold uppercase tracking-[0.22em]"
             style={{ color: '#e6a442' }}
           >
             {eyebrow}
           </span>
         )}
-        <h1 className="fx-head mt-2 font-display text-[clamp(2.1rem,9vw,3.6rem)] font-semibold leading-[0.96] text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.5)]">
+        <h1 className="fx-head mt-1.5 font-display text-[clamp(2rem,8.5vw,3.4rem)] font-semibold leading-[0.96] text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.5)]">
           {courseName}
         </h1>
-        <p className="mt-2 text-[0.9rem] text-[#f0e9db] [text-shadow:0_1px_10px_rgba(0,0,0,0.5)]">
+        <p className="mt-1.5 text-[0.85rem] text-[#f0e9db] [text-shadow:0_1px_10px_rgba(0,0,0,0.5)]">
           {architect} · {yearOpened}
         </p>
       </div>
@@ -112,18 +132,18 @@ function CourseHero({
 function QuickFacts({ items }: { items: { label: string; value: string }[] }) {
   if (items.length === 0) return null
   return (
-    <div className="mt-8 flex flex-wrap gap-y-4 border-y border-hair py-4">
+    <div className="mt-6 flex flex-wrap gap-y-3 border-y border-hair py-3.5">
       {items.map((f, i) => (
         <div
           key={f.label}
-          className={`flex min-w-[33%] flex-col px-4 sm:min-w-0 sm:flex-1 ${
+          className={`flex min-w-[33%] flex-col px-3.5 sm:min-w-0 sm:flex-1 ${
             i === 0 ? 'pl-0' : 'border-l border-hair'
           }`}
         >
-          <span className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-paper-faint">
+          <span className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
             {f.label}
           </span>
-          <span className="fx-serif-sm tnum mt-1 font-display text-[1.15rem] text-paper">
+          <span className="fx-serif-sm tnum mt-0.5 font-display text-[1.1rem] text-paper">
             {f.value}
           </span>
         </div>
@@ -135,6 +155,10 @@ function QuickFacts({ items }: { items: { label: string; value: string }[] }) {
 export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>()
   const { vm, loading } = useCourseDetail(courseId)
+
+  // Hooks must run unconditionally — declared before the early returns. The selected
+  // scorecard tee (mobile single-column view). Initialised lazily once the VM resolves.
+  const [selectedTee, setSelectedTee] = useState<string | null>(null)
 
   if (loading) {
     return (
@@ -159,6 +183,12 @@ export default function CourseDetail() {
   const slug = courseSlug(course.name)
   const editorial = slug ? COURSE_EDITORIAL[slug] : null
 
+  // Default scorecard column: the tee the group plays this round, else a middle tee
+  // (tees are sorted longest-first), else the first tee. Never the championship back
+  // tee by default — that's rarely what four members actually play.
+  const fallbackTee = tees[Math.floor(tees.length / 2)]?.id ?? tees[0]?.id ?? null
+  const activeTee = (selectedTee ?? vm.groupTeeId ?? fallbackTee) as string | null
+
   // Overlay eyebrow: ROUND 1 · THU, FEB 4 · 1:10 PM  (built from existing VM fields only).
   const eyebrowParts = [
     vm.roundNumber !== null ? `Round ${vm.roundNumber}` : null,
@@ -167,14 +197,15 @@ export default function CourseDetail() {
   ].filter(Boolean) as string[]
   const eyebrow = eyebrowParts.length > 0 ? eyebrowParts.join(' · ').toUpperCase() : null
 
-  // Quick facts — real course/tee/round data, longest (reference) tee for the card numbers.
-  const refTee = tees[0]
+  // Quick facts — real course/tee/round data. Par/yardage/rating come from the tee the
+  // group plays (activeTee) so the headline numbers match the default scorecard column.
+  const factTee = tees.find((t) => t.id === activeTee) ?? tees[0]
   const facts: { label: string; value: string }[] = []
-  if (refTee?.par != null) facts.push({ label: 'Par', value: String(refTee.par) })
-  if (refTee?.totalYardage != null)
-    facts.push({ label: `${refTee.name} yds`, value: refTee.totalYardage.toLocaleString() })
-  if (refTee?.rating != null && refTee?.slope != null)
-    facts.push({ label: 'Rating / Slope', value: `${refTee.rating} / ${refTee.slope}` })
+  if (factTee?.par != null) facts.push({ label: 'Par', value: String(factTee.par) })
+  if (factTee?.totalYardage != null)
+    facts.push({ label: `${factTee.name} yds`, value: factTee.totalYardage.toLocaleString() })
+  if (factTee?.rating != null && factTee?.slope != null)
+    facts.push({ label: 'Rating / Slope', value: `${factTee.rating} / ${factTee.slope}` })
   if (vm.roundNumber !== null) facts.push({ label: 'Round', value: String(vm.roundNumber) })
   if (vm.teeTime) facts.push({ label: 'Tee time', value: vm.teeTime.replace(/ ET$/, '') })
 
@@ -190,9 +221,9 @@ export default function CourseDetail() {
         </Link>
       </div>
 
-      <div className="mt-3">
+      <div className="mt-2.5">
         <CourseHero
-          img={editorial?.heroImage}
+          heroBase={editorial?.heroImage ? `${editorial.heroImage}/hero` : undefined}
           alt={editorial?.heroAlt}
           slug={slug}
           courseName={course.name}
@@ -206,22 +237,24 @@ export default function CourseDetail() {
       <div className="mx-auto w-full max-w-[720px] px-5 pb-10">
         {/* Tagline — magazine intro copy, larger and looser than body. */}
         {editorial?.tagline && (
-          <p className="fx-title mt-7 font-display text-[clamp(1.25rem,5.2vw,1.7rem)] font-medium leading-snug text-paper">
+          <p className="fx-title mt-5 font-display text-[clamp(1.2rem,4.8vw,1.6rem)] font-medium leading-snug text-paper">
             {editorial.tagline}
           </p>
         )}
 
         {/* DB description — only if it adds detail beyond the tagline (setting vs strategy). */}
         {course.description && (
-          <p className="mt-5 text-[0.95rem] leading-relaxed text-paper-dim">{course.description}</p>
+          <p className="mt-3.5 text-[0.92rem] leading-relaxed text-paper-dim">
+            {course.description}
+          </p>
         )}
 
         {editorial?.summary && (
-          <p className="mt-4 text-[0.95rem] leading-relaxed text-paper-dim">{editorial.summary}</p>
+          <p className="mt-3 text-[0.92rem] leading-relaxed text-paper-dim">{editorial.summary}</p>
         )}
 
         {vm.isPlaceholder && (
-          <p className="mt-5 border-l-2 border-gold/40 pl-4 text-[0.85rem] text-gold">
+          <p className="mt-4 border-l-2 border-gold/40 pl-4 text-[0.85rem] text-gold">
             The scorecard for this course hasn’t been published yet.
           </p>
         )}
@@ -229,80 +262,84 @@ export default function CourseDetail() {
         <QuickFacts items={facts} />
 
         {/* Holes to Know */}
-        <section className="mt-12">
+        <section className="mt-9">
           <h2 className="eyebrow">Holes to Know</h2>
           {editorial && editorial.holesToKnow.length > 0 ? (
-            <div className="mt-5">
-              {editorial.holesToKnow.map((h, i) => (
-                <article
-                  key={h.hole}
-                  className={`grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 py-6 ${
-                    i > 0 ? 'border-t border-hair' : ''
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span className="text-[0.58rem] font-semibold uppercase tracking-[0.2em] text-paper-faint">
-                      Hole
-                    </span>
-                    <span className="fx-display tnum font-display text-[2.6rem] font-semibold leading-none text-paper">
-                      {h.hole}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="fx-serif-sm font-display text-[1.2rem] font-semibold leading-tight text-paper">
-                      {h.title}
-                    </h3>
-                    <p className="mt-2 text-[0.92rem] leading-relaxed text-paper-dim">
-                      {h.description}
-                    </p>
-                  </div>
-                  {h.image && editorial.heroImage && (
-                    <img
-                      src={`/assets/courses/${editorial.heroImage}/${h.image}.jpg`}
+            <div className="mt-3 grid gap-5 sm:grid-cols-2">
+              {editorial.holesToKnow.map((h) => (
+                <article key={h.hole} className="round" data-course={slug ?? undefined}>
+                  {/* Photo band with the large hole number overlaid (kept), scrim for legibility. */}
+                  <div className="relative aspect-[2/1] w-full overflow-hidden rounded-sm">
+                    <CoursePhoto
+                      base={h.image ? `${slug}/${h.image}` : undefined}
                       alt={h.imageAlt ?? `Streamsong ${course.name}, hole ${h.hole}`}
-                      className="col-span-2 mt-2 aspect-[16/9] w-full rounded-sm object-cover"
-                      loading="lazy"
-                      decoding="async"
+                      sizes="(min-width: 640px) 340px, 100vw"
                     />
-                  )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
+                    <div className="absolute bottom-2 left-3 flex items-end gap-2">
+                      <span className="text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-white/80">
+                        Hole
+                      </span>
+                      <span className="fx-display font-display text-[2.4rem] font-semibold leading-[0.8] text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.6)]">
+                        {h.hole}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="fx-serif-sm mt-2.5 font-display text-[1.1rem] font-semibold leading-tight text-paper">
+                    {h.title}
+                  </h3>
+                  <p className="mt-1 text-[0.88rem] leading-relaxed text-paper-dim">
+                    {h.description}
+                  </p>
                 </article>
               ))}
             </div>
           ) : (
-            <p className="mt-4 text-[0.92rem] leading-relaxed text-paper-dim">
+            <p className="mt-3 text-[0.9rem] leading-relaxed text-paper-dim">
               Still under wraps. We’ll add our targets once the full course guide is published.
             </p>
           )}
         </section>
 
         {/* ── Transition into the official scorecard half ── */}
-        <hr className="mt-12 border-hair" />
+        <hr className="mt-9 border-hair" />
 
         {/* Tees */}
         {tees.length > 0 && (
-          <section className="mt-10">
+          <section className="mt-8">
             <h2 className="eyebrow">Tees</h2>
-            <div className="mt-4 overflow-x-auto">
+            <div className="mt-3 overflow-x-auto">
               <table className="w-full border-collapse text-[0.85rem]">
                 <thead>
-                  <tr className="border-b border-hair-strong text-left text-[0.68rem] uppercase tracking-[0.1em] text-paper-faint">
-                    <th className="py-2 pr-3 font-semibold">Tee</th>
-                    <th className="py-2 pr-3 text-right font-semibold">Rating</th>
-                    <th className="py-2 pr-3 text-right font-semibold">Slope</th>
-                    <th className="py-2 pr-3 text-right font-semibold">Par</th>
-                    <th className="py-2 text-right font-semibold">Yards</th>
+                  <tr className="border-b border-hair-strong text-left text-[0.66rem] uppercase tracking-[0.1em] text-paper-faint">
+                    <th className="py-1.5 pr-3 font-semibold">Tee</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">Rating</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">Slope</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">Par</th>
+                    <th className="py-1.5 text-right font-semibold">Yards</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tees.map((t) => (
-                    <tr key={t.id} className="border-b border-hair">
-                      <td className="py-2 pr-3 text-paper">{t.name}</td>
-                      <td className="tnum py-2 pr-3 text-right text-paper-dim">
+                    // Active tee gets a neutral raised-surface emphasis (never gold — gold is
+                    // reserved for leader/winner status, CLAUDE.md §Conventions).
+                    <tr
+                      key={t.id}
+                      className={`border-b border-hair ${t.id === activeTee ? 'bg-ground-2' : ''}`}
+                    >
+                      <td
+                        className={`py-1.5 pr-3 text-paper ${t.id === activeTee ? 'font-semibold' : ''}`}
+                      >
+                        {t.name}
+                      </td>
+                      <td className="tnum py-1.5 pr-3 text-right text-paper-dim">
                         {t.rating ?? dash}
                       </td>
-                      <td className="tnum py-2 pr-3 text-right text-paper-dim">{t.slope ?? dash}</td>
-                      <td className="tnum py-2 pr-3 text-right text-paper-dim">{t.par}</td>
-                      <td className="tnum py-2 text-right text-paper">
+                      <td className="tnum py-1.5 pr-3 text-right text-paper-dim">
+                        {t.slope ?? dash}
+                      </td>
+                      <td className="tnum py-1.5 pr-3 text-right text-paper-dim">{t.par}</td>
+                      <td className="tnum py-1.5 text-right text-paper">
                         {t.totalYardage !== null ? t.totalYardage.toLocaleString() : dash}
                       </td>
                     </tr>
@@ -314,17 +351,42 @@ export default function CourseDetail() {
         )}
 
         {/* Scorecard */}
-        <section className="mt-10">
-          <h2 className="eyebrow">Scorecard</h2>
-          <div className="mt-4 overflow-x-auto">
+        <section className="mt-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="eyebrow">Scorecard</h2>
+            {/* Compact tee selector — drives the single yardage column shown on phones.
+                Hidden on ≥sm where every tee column is visible at once. */}
+            {tees.length > 1 && (
+              <label className="flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.1em] text-paper-faint sm:hidden">
+                Tee
+                <select
+                  value={activeTee ?? ''}
+                  onChange={(e) => setSelectedTee(e.target.value)}
+                  className="tap border-b border-hair-strong bg-transparent py-0.5 pr-1 text-[0.85rem] font-semibold normal-case tracking-normal text-paper focus:border-gold focus:outline-none"
+                >
+                  {tees.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          <div className="mt-3 overflow-x-auto">
             <table className="w-full border-collapse text-[0.82rem]">
               <thead>
-                <tr className="border-b border-hair-strong text-[0.68rem] uppercase tracking-[0.1em] text-paper-faint">
-                  <th className="py-2 pr-2 text-left font-semibold">Hole</th>
-                  <th className="py-2 pr-2 text-right font-semibold">Par</th>
-                  <th className="py-2 pr-2 text-right font-semibold">SI</th>
+                <tr className="border-b border-hair-strong text-[0.66rem] uppercase tracking-[0.1em] text-paper-faint">
+                  <th className="py-1.5 pr-2 text-left font-semibold">Hole</th>
+                  <th className="py-1.5 pr-2 text-right font-semibold">Par</th>
+                  <th className="py-1.5 pr-2 text-right font-semibold">SI</th>
                   {tees.map((t) => (
-                    <th key={t.id} className="py-2 pl-2 text-right font-semibold">
+                    <th
+                      key={t.id}
+                      className={`py-1.5 pl-2 text-right font-semibold ${
+                        t.id === activeTee ? '' : 'hidden sm:table-cell'
+                      }`}
+                    >
                       {t.name}
                     </th>
                   ))}
@@ -339,7 +401,12 @@ export default function CourseDetail() {
                       {h.strokeIndex ?? dash}
                     </td>
                     {tees.map((t) => (
-                      <td key={t.id} className="tnum py-1.5 pl-2 text-right text-paper-dim">
+                      <td
+                        key={t.id}
+                        className={`tnum py-1.5 pl-2 text-right text-paper-dim ${
+                          t.id === activeTee ? '' : 'hidden sm:table-cell'
+                        }`}
+                      >
                         {h.yardageByTee[t.id] ?? dash}
                       </td>
                     ))}
@@ -348,11 +415,16 @@ export default function CourseDetail() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-hair-strong text-[0.78rem] font-semibold text-paper">
-                  <td className="py-2 pr-2 text-left">Total</td>
-                  <td className="tnum py-2 pr-2 text-right">{tees[0] ? tees[0].par : dash}</td>
-                  <td className="py-2 pr-2" />
+                  <td className="py-1.5 pr-2 text-left">Total</td>
+                  <td className="tnum py-1.5 pr-2 text-right">{tees[0] ? tees[0].par : dash}</td>
+                  <td className="py-1.5 pr-2" />
                   {tees.map((t) => (
-                    <td key={t.id} className="tnum py-2 pl-2 text-right">
+                    <td
+                      key={t.id}
+                      className={`tnum py-1.5 pl-2 text-right ${
+                        t.id === activeTee ? '' : 'hidden sm:table-cell'
+                      }`}
+                    >
                       {t.totalYardage !== null ? t.totalYardage.toLocaleString() : dash}
                     </td>
                   ))}

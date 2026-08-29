@@ -1042,6 +1042,11 @@ export interface CourseDetailVM {
   isPlaceholder: boolean
   tees: CourseTeeVM[]
   holes: CourseHoleVM[] // always 18
+  // The tee this round is actually played from — the modal tee among the round's PLAYING
+  // players (excludes DNP). Drives the scorecard's default single-column view on phones.
+  // Null when the round has no player-tee assignments yet; the UI then falls back to a
+  // middle tee. Self-correcting: updates the instant the real tees are entered pre-trip.
+  groupTeeId: string | null
 }
 
 export function buildCourseDetail(courseId: string, dbData: Db): CourseDetailVM | null {
@@ -1115,6 +1120,24 @@ export function buildCourseDetail(courseId: string, dbData: Db): CourseDetailVM 
     }
   })
 
+  // Modal tee among this round's playing players (DNP excluded). Falls back to null when
+  // no assignments exist for the round yet — the scorecard UI then picks a middle tee.
+  let groupTeeId: string | null = null
+  if (round) {
+    const counts = new Map<string, number>()
+    for (const rp of dbData.round_players) {
+      if (rp.round_id !== round.id || rp.status === 'did_not_play') continue
+      counts.set(rp.tee_id, (counts.get(rp.tee_id) ?? 0) + 1)
+    }
+    let best = -1
+    for (const [teeId, n] of counts) {
+      if (n > best) {
+        best = n
+        groupTeeId = teeId
+      }
+    }
+  }
+
   return {
     course,
     roundNumber: round?.round_number ?? null,
@@ -1123,6 +1146,7 @@ export function buildCourseDetail(courseId: string, dbData: Db): CourseDetailVM 
     isPlaceholder: course.data_is_placeholder,
     tees,
     holes,
+    groupTeeId,
   }
 }
 

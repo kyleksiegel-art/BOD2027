@@ -58,19 +58,25 @@ export const COURSE_EDITORIAL: Record<CourseSlug, CourseEditorial> = {
         hole: 8,
         title: 'The narrowest invitation.',
         description:
-          'A short par 3 into a reverse-S green over 60 yards deep but as little as 8 yards wide from the back tees, ringed by sandbelt-style bunkering. Club and spin matter more than length — the green sheds anything not flighted to the right tier.',
+          'A short par 3 to a reverse-S green over 60 yards deep but as little as 8 wide, ringed by sandbelt bunkering. Club and spin decide it, not distance — anything mis-flighted slides off the wrong tier.',
+        image: 'hole-8',
+        imageAlt: 'Streamsong Red — the par-3 8th and its reverse-S green',
       },
       {
         hole: 15,
         title: 'Pick your side of the sand.',
         description:
-          'One of the largest, deepest waste bunkers on the course runs the whole left side. The bold line hugs it for the best angle in; bail right and the green — falling hard from right to left — pushes your ball away all afternoon.',
+          'One of the deepest waste bunkers on the course runs the entire left side. Hug it for the ideal angle in; bail out right and the green — falling hard right to left — throws your ball away.',
+        image: 'hole-15',
+        imageAlt: 'Streamsong Red — the 15th and its long left-side waste bunker',
       },
       {
         hole: 16,
         title: 'Biarritz over the water.',
         description:
-          "Coore & Crenshaw's modern Biarritz: a green nearly 60 yards long with a deep swale collecting anything short, all carried over water. Land on the wrong shelf and par becomes a genuine two-putt test.",
+          "Coore & Crenshaw's modern Biarritz — a green nearly 60 yards long with a deep swale swallowing anything short, all carried over water. Miss the right shelf and par is a real two-putt test.",
+        image: 'hole-16',
+        imageAlt: 'Streamsong Red — the par-3 16th playing over water',
       },
     ],
   },
