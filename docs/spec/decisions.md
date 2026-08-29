@@ -724,3 +724,75 @@ Now implemented in the engine:
   the open question from `§"...Round 3 first (now Blue)..."`.
 - Rules page "Ties" rewritten to state the full chain. Tests: `tiebreak.test.ts` +8 (best-round and
   full-chain-precedence branches); full suite 148.
+
+## Design refinement pass — typography, status color, course identity (2026-08-28, Kyle)
+
+Kyle supplied an external design brief (`bod27-design-implementation.md`) tuning the existing
+"Fairway Linen" language — no redesign. Built on branch `design-refinements` off `main` (Phases
+0–8 + the tiebreaker chain are already merged). Five changes, all reusing existing tokens:
+
+### Font payload grows 85 KB → 165 KB to unlock Fraunces' opsz/SOFT axes
+
+The brief's change 1 asks for `opsz`/`SOFT` variation on display type (sharper, higher-contrast
+"engraved championship" look at large sizes). The self-hosted Fraunces file shipped since Phase 1
+is Fontsource's **`wght`-only** variable subset — it silently drops the `opsz`/`SOFT` axes rather
+than erroring, so the brief's CSS would have done nothing. Swapped to Fontsource's **`full`**
+variable build (same Latin unicode-range, drop-in): `fraunces-latin-full-normal.woff2`, 121 KB
+(was 36.6 KB). Combined font payload is now ~165 KB, up from the 84.9 KB already flagged over
+target in `acceptance-checklist.md` (Phase 1, deferred to Phase 9). **Accepted** — the axes are
+the entire point of the change, and 165 KB precached (of a 4 MiB PWA budget, 1.73 MiB used) costs
+nothing on repeat visits. Checklist line updated to reflect the new number and this decision
+rather than "revisit in Phase 9."
+
+New `.fx-display`/`.fx-head`/`.fx-title`/`.fx-serif-sm` utilities in `index.css` (`@layer
+components`) set the axis tiers; applied to the home masthead, countdown digits, page titles
+(`PageHeader`), round headlines, and the leaderboard/standings/money point figures.
+
+### Leader/winner status color — gold spine + tint, reused verbatim in four places
+
+New `--leader-tint` token + `.leader-row` component class (background tint + `::before` gold
+spine). Applied to: Standings' top-position row(s), the round-detail `Leaderboard`'s rank-1 row,
+Money's "1st place overall" line, and Enter's "Round so far" footer's top player. Standings and
+Leaderboard previously colored the position number gold **unconditionally** — every row, not just
+the leader — which was the exact "gold is just decoration" problem the brief called out; now gold
+on those rows is conditional on actually being the leader.
+
+### Course identity colors — `--red`/`--blue`/`--olive`/`--paper` via `data-course`
+
+New `courseSlug(name)` helper in `format.ts` (substring match on the course name, so it works
+against both `courses.name` and the trip-config short form) feeds `.round[data-course]` in
+`index.css`. Wired into the Rounds list (rail), Home's round card list (swatch dot), and
+RoundDetail's header (swatch dot).
+
+**Cascade bug hit and fixed:** the brief's own CSS (`border-left: 3px solid var(--course)`) loses
+to any `border-{color}` Tailwind utility (e.g. `border-hair`) on the same element, regardless of
+selector specificity — Tailwind's utilities layer outranks `@layer components` outright, and
+`border-hair` sets the `border-color` shorthand (all four sides) in that higher layer. Every row
+needing the rail also carries a hairline border utility, so this fired every time. Fixed by
+expressing the rail as `box-shadow: inset 3px 0 0 var(--course)` instead — a different property,
+no layer fight. Comment left on `.round-rail` in `index.css` so the same mistake doesn't recur if
+someone "simplifies" it back to `border-left`.
+
+### Contrast + tabular-nums housekeeping
+
+`--paper-dim`/`--paper-faint` darkened ~12% per the brief (values now `#4b453c`/`#4f4a41`). A
+handful of numeral spans that had drifted from the `.tnum` convention picked it up (`Home.tsx`'s
+championship-points and thru/holesTotal lines).
+
+### Hero photo gets an error-recovery fallback (found during this pass's own browser verification)
+
+While browser-verifying the changes above, a reload against the local dev server caught the hero
+`<img>` mid-fetch and left it broken — which surfaced a real (if rare) gap: `<picture>`/`<source>`
+only negotiate by *format support*; if the browser's chosen source (say AVIF) is requested and the
+fetch itself fails — a dropped connection, a reload racing the load — there is no automatic retry
+against the next `<source>` or the plain `<img src>`. Confirmed the deployed site itself was fine
+(fresh 200 on the AVIF request); this is a client-side gap, not a bad deploy.
+
+Fixed with a small `HeroPhoto` component (`Home.tsx`): the `<img>`'s `onError` still fires in this
+case, and on the first failure it drops every `<source>`, which forces the browser to redo source
+selection and fall through to the `<img>`'s own `src` — the one guaranteed-universal JPG. A second
+failure (a genuinely dead connection) is left alone rather than looping. Verified by dispatching a
+synthetic `error` event on the `<img>` in the browser: sources went from 2 → 0 and `currentSrc`
+moved from the AVIF variant to `/assets/hero.jpg`, which then loaded.
+
+Tests: no logic changed, so the suite is unchanged at 148. `tsc -b` + `npm run build` clean.

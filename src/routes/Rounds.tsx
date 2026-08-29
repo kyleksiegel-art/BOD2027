@@ -3,7 +3,7 @@ import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
 import { useRoundsList } from '@/lib/data/selectors'
-import { formatDay, formatTeeTime } from '@/lib/format'
+import { courseSlug, formatDay, formatTeeTime } from '@/lib/format'
 
 export default function Rounds() {
   const rounds = useRoundsList()
@@ -17,16 +17,20 @@ export default function Rounds() {
       ) : (
         <ul className="mt-4">
           {rounds.map(({ round, course, leaderName, playerCount }) => (
-            <li key={round.id}>
+            <li
+              key={round.id}
+              className="round"
+              data-course={courseSlug(course.name) ?? undefined}
+            >
               <Link
                 to={`/rounds/${round.round_number}`}
-                className="tap grid grid-cols-[2rem_1fr_auto] items-center gap-x-4 border-b border-hair py-4 first:border-t first:border-t-hair-strong"
+                className="round-rail tap grid grid-cols-[2rem_1fr_auto] items-center gap-x-4 border-b border-hair py-4 pl-3 first:border-t first:border-t-hair-strong"
               >
                 <span className="font-display text-[0.8rem] uppercase tracking-[0.15em] text-paper-faint">
                   R{round.round_number}
                 </span>
                 <span className="flex flex-col gap-1">
-                  <span className="font-display text-[1.2rem] font-semibold text-paper">
+                  <span className="fx-serif-sm font-display text-[1.2rem] font-semibold text-paper">
                     {course.name}
                   </span>
                   <span className="tnum text-[0.78rem] text-paper-faint">

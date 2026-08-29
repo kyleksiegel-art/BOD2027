@@ -91,6 +91,22 @@ export function formatGap(gap: number): string {
   return gap === 0 ? '—' : `-${gap}`
 }
 
+/**
+ * Round identity for the `.round[data-course]` accent system (index.css) — Red / Black /
+ * Blue / Bone Valley get a distinct rail color so R1–R4 read at a glance. Matched on the
+ * course name substring so it works whether the caller has `courses.name` ("Streamsong Red")
+ * or the short trip-config form ("Bone Valley"). Falls back to null (no accent) for any
+ * future/placeholder course name that doesn't match.
+ */
+export function courseSlug(courseName: string): 'red' | 'black' | 'blue' | 'bone' | null {
+  const n = courseName.toLowerCase()
+  if (n.includes('red')) return 'red'
+  if (n.includes('black')) return 'black'
+  if (n.includes('blue')) return 'blue'
+  if (n.includes('bone')) return 'bone'
+  return null
+}
+
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 
 /** Integer cents → "$12.50". The ledger is always in cents; round only here (brief §Money). */
