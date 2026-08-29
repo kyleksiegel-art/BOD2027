@@ -76,21 +76,65 @@ export const COURSE_EDITORIAL: Record<CourseSlug, CourseEditorial> = {
       },
     ],
   },
-  // Blue / Black filled in when we apply the template to them; Bone Valley stays empty
-  // (no verified hole data) so the page shows the "still under wraps" note.
   blue: {
-    heroImage: undefined,
-    heroAlt: 'Streamsong Blue — Tom Doak duneland',
-    tagline: '',
-    holesToKnow: [],
+    // Hero: the par-3 7th over water (Streamsong's own og:image for the Blue page).
+    heroImage: 'blue',
+    heroAlt: 'Streamsong Blue — the par-3 7th over water, dunes behind',
+    tagline:
+      'Tom Doak routes Blue over the same mined dunescape as Red, but bigger and bolder — high tees, huge greens, and heroic carries that ask you to commit.',
+    // DB description covers the setting; tagline covers Doak's scale/character.
+    holesToKnow: [
+      {
+        hole: 1,
+        title: 'The highest point on the property.',
+        description:
+          'Blue opens from the tallest tee at Streamsong — a panoramic drop-shot view over the whole dunescape. A dramatic, downhill introduction that sets the scale of everything to come.',
+      },
+      {
+        hole: 3,
+        title: 'A true cape hole.',
+        description:
+          'Risk and reward off the tee: bite off as much of the diagonal carry as you dare for a short, open approach, or play safe and leave yourself a long one from the wrong angle.',
+      },
+      {
+        hole: 7,
+        title: 'The most photographed shot at Streamsong.',
+        description:
+          "Doak's all-world par 3 — a contoured punchbowl green nestled between water in front and towering dunes behind, reached by a walking bridge. Sister hole to Red's 16th, and the Blue's signature.",
+      },
+    ],
   },
   black: {
-    heroImage: undefined,
-    heroAlt: 'Streamsong Black — Hanse & Wagner big-scale duneland',
-    tagline: '',
-    holesToKnow: [],
+    // Hero: Streamsong's own og:image for the Black page (big-scale duneland).
+    heroImage: 'black',
+    heroAlt: 'Streamsong Black — Gil Hanse big-scale duneland',
+    tagline:
+      'Gil Hanse builds on the biggest scale of the three — vast fairways and enormous, wildly contoured greens (11,000+ sq ft) that reward running the ball and punish the timid.',
+    holesToKnow: [
+      {
+        hole: 9,
+        title: 'The Punchbowl.',
+        description:
+          'The course’s defining green — one of the largest, most undulating you will ever putt, sitting 8–10 feet below the ridge that rings it. Aim at the windmill off the tee, then fire into the funnel.',
+      },
+      {
+        hole: 13,
+        title: 'Two greens, one hole.',
+        description:
+          'A par 4 with two entirely separate greens in the spirit of Pine Valley’s 8th — the day’s pin decides your line off the tee, so look at the flag before you pull a club.',
+      },
+      {
+        hole: 17,
+        title: 'Under the oak.',
+        description:
+          'A par 3 tumbling downhill from a lone giant oak to the green, sand wrapping around the tree. One of the most photogenic — and most exposed — one-shotters on the property.',
+      },
+    ],
   },
   bone: {
+    // Bone Valley (David McLay Kidd) — scorecard + hole detail not yet public. No hero photo
+    // and no verified holes, so the page shows the accent-plate hero and the "under wraps"
+    // note rather than guessed content. Fill in once the official course guide is published.
     heroImage: undefined,
     heroAlt: 'Bone Valley — David McLay Kidd',
     tagline: '',
