@@ -298,6 +298,34 @@
     color: var(--olive);
     font-weight: 600;
   }
+  .srow.gets {
+    border-left: 2px solid var(--gold);
+    background: rgba(209, 131, 22, 0.07);
+    padding-left: 0.55rem;
+    margin-left: -0.55rem;
+  }
+  .srow .topar.stroke {
+    color: var(--gold-bright);
+    font-weight: 600;
+  }
+  .val-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  .pips {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    display: flex;
+    gap: 2px;
+  }
+  .pips i {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--gold-bright);
+    display: block;
+  }
   .stepper {
     display: flex;
     align-items: center;
@@ -613,47 +641,47 @@
             </div>
 
             <div class="scores">
-              <div class="srow">
+              <div class="srow gets">
                 <div class="who">
                   <span class="name">Kyle Siegel</span>
-                  <span class="topar good">par · 3 pts</span>
+                  <span class="topar stroke">1 stroke here · thru 6 · 8 pts</span>
                 </div>
                 <div class="stepper">
                   <button aria-label="minus">−</button>
-                  <span class="val">3</span>
+                  <span class="val-wrap"><span class="pips"><i></i></span><span class="val">3</span></span>
                   <button aria-label="plus">+</button>
                 </div>
               </div>
               <div class="srow">
                 <div class="who">
                   <span class="name">Chris Denove</span>
-                  <span class="topar good">birdie · 4 pts</span>
+                  <span class="topar">no stroke · thru 6 · 9 pts</span>
                 </div>
                 <div class="stepper">
                   <button aria-label="minus">−</button>
-                  <span class="val">2</span>
+                  <span class="val-wrap"><span class="val">2</span></span>
                   <button aria-label="plus">+</button>
                 </div>
               </div>
               <div class="srow">
                 <div class="who">
                   <span class="name">Jon Aronson</span>
-                  <span class="topar">+1 · 1 pt</span>
+                  <span class="topar">no stroke · thru 6 · 5 pts</span>
                 </div>
                 <div class="stepper">
                   <button aria-label="minus">−</button>
-                  <span class="val">4</span>
+                  <span class="val-wrap"><span class="val">4</span></span>
                   <button aria-label="plus">+</button>
                 </div>
               </div>
-              <div class="srow">
+              <div class="srow gets">
                 <div class="who">
                   <span class="name">Adam Hersh</span>
-                  <span class="topar">+1 · 1 pt</span>
+                  <span class="topar stroke">1 stroke here · thru 6 · 6 pts</span>
                 </div>
                 <div class="stepper">
                   <button aria-label="minus">−</button>
-                  <span class="val">4</span>
+                  <span class="val-wrap"><span class="pips"><i></i></span><span class="val">4</span></span>
                   <button aria-label="plus">+</button>
                 </div>
               </div>
@@ -677,8 +705,10 @@
         </div>
       </div>
       <figcaption>
-        <b>The pick, in context.</b> Two eligible (made par+), two dimmed and
-        untappable. Tap a name — it autosaves through the outbox, no Save button.
+        <b>The pick, in context.</b> The per-hole stroke treatment is untouched —
+        gold rail, “1 stroke here,” and pips all stay. CTP just slots in below.
+        Note Adam: he <em>gets a stroke</em> (net) but made bogey gross, so he's
+        dimmed for CTP — the gross-vs-net line made visible.
       </figcaption>
     </figure>
 
