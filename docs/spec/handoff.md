@@ -1,19 +1,36 @@
 # Handoff
 
-**Phase just finished:** 0 — spec split, decisions, phase plan, schema draft.
+**Phase just finished:** 8 — Info + admin editors. Built on branch `phase-8-info` (off
+`phase-7-money`; Phases 4–8 unmerged, `origin/main` is still only the countdown page — Kyle's
+call). **Not yet committed** — commit and push `phase-8-info`. Nothing stubbed.
 
-**Next phase:** 1 — Vite/React/TS/Tailwind scaffold, routing, app shell, design tokens, Netlify deploy.
+**No migration, no new RPC.** The three Info RPCs (`rpc_upsert_itinerary` / `_lodging` /
+`_lodging_assignment`) and `rpc_upsert_round` already existed + gated (Phase 5B). Phase 8 is
+client wiring + UI only, so `supabase test db` is unchanged (232).
 
-**Half-finished work:** none.
+**Built:** Dexie **v6** (`itinerary_items`/`lodging`/`lodging_assignments` — plain reference
+tables, hydrated + read); compute `buildItinerary`/`buildLodging`/`buildCoursesIndex`/
+`buildCourseDetail`/`buildPlayerCourseHandicaps`; selectors + `PlayerCardVM.courseHandicaps`.
+Public pages: Itinerary timeline (current-day highlight), Courses index + `/info/courses/:id`
+scorecard, Players (per-course handicap, live from index), Rules (money section rewritten to the
+buy-in model). Admin: Itinerary + Lodging editors, tee-time field in RoundsEditor, two new tabs,
+writes in `admin.ts`. Time helpers in `format.ts`, all `America/New_York`. See CLAUDE.md §"Info +
+admin editors (Phase 8)" and `decisions.md §"Phase 8"`.
 
-**Decisions Kyle still owes:**
-- Nothing blocking Phase 1. `CONFIG` items (indexes, tees, lodging, purse) can stay TODO until their relevant phase.
-- **Phase 3:** confirm tiebreaker countback preference after the course swap (see decisions.md "Actual tee sheet"). R3 is now Blue, Black is R2.
+**Verified:** `vitest run` → **140** (+10 `info.test.ts`); `tsc -b` + `npm run build` clean.
+Browser (local Supabase, 375 px): all four Info pages render on real data; a real itinerary add
+via the admin editor round-tripped through the server to the public timeline ("Thu Feb 4 · 7:00
+PM ET"); demo row cleaned up via SQL.
 
-**Tee times received (2025-07-31, all EST):** R1 Red Thu 1:10 PM · R2 Black Fri 10:33 AM · R3 Blue Sat 10:35 AM · R4 Bone Valley Sun 8:28 AM. Recorded in decisions.md; Phase 2 seeds `rounds.tee_time` + course order from it. Note Fri/Sat course swap vs the brief.
+**Deviations (in `decisions.md` + checklist):** no delete path for Info editors (Kyle — small
+fixed data set); Rules money copy corrected to the buy-in model. Player photo **upload** stays
+Phase 9.
 
-**Interim countdown page:** a standalone `index.html` + `assets/` (Streamsong hero, logo) live at the site root as a shareable landing page. Phase 1 replaces it with the DB-backed Home route; carry over the countdown target (1:10 PM EST Feb 4 = 18:10 UTC).
+**Kyle still owes (carried):** real indexes/tees/PIN secrets (`APP_PIN_ARGON2_HASH` +
+`APP_PIN_BCRYPT_HASH`), hosted Supabase + `db push`, Netlify env. PWA install/two-phone/airplane
+are pre-trip manual checks. **PIN is `1922`.** Local admin session had gone stale (server
+token) — re-unlock with the PIN after a `db reset`.
 
-**Read at start of next session:** `CLAUDE.md`, `docs/spec/acceptance-checklist.md`, this file, `docs/spec/phase-plan.md` §"Phase 1".
-
-**Push status:** Phase 0 files committed locally to `main` at first commit. Kyle to run `git push -u origin main` from `~/projects/BOD2027` to publish. Then Netlify → Add new site → Import from GitHub → `kyleksiegel-art/BOD2027`.
+**Next phase:** 9 — Polish (incl. player photo upload Edge Function). Read CLAUDE.md §"Info +
+admin editors (Phase 8)", `acceptance-checklist.md` §Phase 9, this file, Phase 9 in
+`phase-plan.md`.

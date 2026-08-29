@@ -1,0 +1,58 @@
+# Netlify build + serving config.
+#
+# This file governs builds of ANY branch that contains it — i.e. the Phase 1+
+# SPA and its deploy previews. The production `main` branch (the live static
+# countdown) has no netlify.toml and keeps using the dashboard's static-publish
+# settings, so it is unaffected until this branch is merged.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Pin the Node version so local, CI, and Netlify builds match.
+  NODE_VERSION = "22"
+
+# SPA fallback: client-side routes resolve to the app shell. Netlify serves a
+# real file first when one exists at the path, so hashed assets are unaffected.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# --- Caching -------------------------------------------------------------- #
+
+# App shell must revalidate on every load so a new deploy is picked up at once,
+# never served stale from the CDN edge. The service worker precaches a hashed copy
+# of the shell too; this header governs the network copy the SW updates against.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Service worker script (vite-plugin-pwa, registerType: 'prompt'): never cache, so a new
+# deploy's sw.js is fetched every load and the update prompt can fire.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# The web manifest changes rarely and only with a deploy; revalidate rather than pin.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Content-addressed build output — filename changes on every content change,
+# so it is safe to cache forever.
+[[headers]]
+  for = "/_assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Stable public files (hero image, logo). Cached, but revalidated daily since
+# their names don't change when the content does.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"

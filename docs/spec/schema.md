@@ -266,6 +266,17 @@ alter table public.settings            enable row level security;
 alter table public.sessions            enable row level security;
 alter table public.pin_attempts        enable row level security;
 
+-- Grant the underlying SELECT privilege to anon. An RLS SELECT policy does nothing
+-- without the table-level grant, and Supabase local does NOT auto-grant anon on
+-- user-created tables (verified in Phase 2 — the policies alone left anon with
+-- "permission denied"). sessions/pin_attempts are excluded and stay unreadable.
+grant select on
+  public.players, public.courses, public.tees, public.holes, public.hole_yardages,
+  public.rounds, public.round_players, public.scores, public.ctp_results,
+  public.round_money, public.itinerary_items, public.lodging,
+  public.lodging_assignments, public.settings
+to anon;
+
 -- Public SELECT for anon on public tables
 create policy p_read on public.players             for select to anon using (true);
 create policy p_read on public.courses             for select to anon using (true);
@@ -385,11 +396,21 @@ rpc_validate_and_publish_course(session_token, course_id uuid) → jsonb
   --   * every hole has non-null stroke_index
   --   * stroke indexes form a complete permutation of 1..18
   --   * every tee for the course has yardages for every hole
+  --   * every tee has a non-null rating AND slope  (added Phase 5B — see decisions.md
+  --     §"Publishing a course also requires a rating and slope on every tee")
+  --   * the course has at least one tee
   -- If all pass: atomically sets data_is_placeholder = false and returns {published: true}.
   -- Otherwise returns {published: false, errors: [...]}.
+  -- The ONLY function that may clear the flag. rpc_upsert_course creates new courses with
+  -- data_is_placeholder = true, and rpc_upsert_hole SETS it back to true on any edit.
 
 rpc_upsert_round(session_token, id?, round_number, date, course_id, tee_time) → jsonb
   -- Cannot mutate status or holes_counted directly.
+
+rpc_start_round(session_token, round_id uuid) → jsonb
+  -- Added in Phase 5B; see decisions.md §"Starting a round". 'upcoming' -> 'in_progress'.
+  -- Refuses (with reasons, not an exception) if the course card is unpublished or the
+  -- round has no round_players rows. {started: bool, errors: [...]}
 
 rpc_upsert_round_player_admin(session_token, entries jsonb) → jsonb
   -- Same table as the outbox variant, but online-only and without the comparator.
@@ -399,9 +420,12 @@ rpc_resnapshot_round_handicaps(session_token, round_id uuid) → jsonb
   -- Re-derives every round_players row for the round from current players + tees + settings.
 
 rpc_finalize_round(session_token, round_id uuid, holes_counted int null) → jsonb
-  -- Requires: every hole either scored or picked_up for every playing participant.
+  -- Requires: holes 1..coalesce(holes_counted, 18) either scored or picked_up for every
+  -- participant with status='playing'. DNP players are excluded, as they are everywhere.
+  -- Refuses with a per-player list rather than throwing: {finalized: false, errors: [...]}.
   -- On success: sets status='final', writes a round_money row with frozen figures
-  -- derived from current settings + par-3 count.
+  -- derived from current settings + par-3 count. championship_share_cents is THIS ROUND'S
+  -- even share of the championship pot, not the whole pot — see decisions.md.
 
 rpc_abandon_round(session_token, round_id uuid) → jsonb
   -- Status transitions to 'abandoned'. No round_money row.

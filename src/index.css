@@ -1,0 +1,85 @@
+/* Self-hosted, Latin-subset variable fonts. No CDN, works offline. */
+@import './fonts.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------ */
+/* Design tokens — the single source of truth for the palette.        */
+/* Light-mode only ("Fairway Linen"); high contrast for direct sun.    */
+/* Streamsong-derived palette: cream ground, brass accents.            */
+/* ------------------------------------------------------------------ */
+:root {
+  /* Fairway Linen — light "sun mode" (Kyle 2026-08-24; see decisions.md). On a light
+     ground the accent must read as TEXT, so gold/gold-bright are deep brasses (both ≥4.5:1
+     on cream); emphasis comes from weight, not a brighter hue that would fail on light. */
+  --ground: #e9e1d0; /* warm sand base — softer than cream, less glare in sun */
+  --ground-2: #f2ecdd; /* raised surfaces — lighter than ground */
+  --paper: #1b1e1c; /* ink — body text */
+  --paper-dim: #5c584f; /* secondary text */
+  --paper-faint: #635d54; /* labels, captions — ≥4.5:1 on the sand ground */
+  --gold: #8f5410; /* deep brass accent — ≥4.5:1 as small text on the sand ground */
+  --gold-bright: #935608; /* emphasis / warnings / indicators */
+  --gold-fill: #d18316; /* bright brass — solid fills (buttons, active toggles) with dark text */
+  --blue: #345f7c; /* steel blue */
+  --olive: #6f7511; /* olive */
+  --hair: rgba(27, 30, 28, 0.14); /* hairline border */
+  --hair-strong: rgba(27, 30, 28, 0.24);
+
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    background: var(--ground);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ground text-paper font-sans antialiased;
+    min-height: 100dvh;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Numbers are tabular everywhere — scores, money, countdowns. */
+  .tnum,
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* iOS: never zoom on input focus. 16px minimum. */
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+
+  /* Respect reduced-motion for the countdown and any future transitions. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Uppercase spaced eyebrow used throughout the annual-report treatment. */
+  .eyebrow {
+    @apply text-gold font-semibold uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.28em;
+  }
+
+  /* Minimum 44px tap target helper for interactive controls. */
+  .tap {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
