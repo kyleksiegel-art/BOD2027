@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { useCoursesIndex } from '@/lib/data/selectors'
+import { courseSlug } from '@/lib/format'
 
 export default function Courses() {
   const courses = useCoursesIndex()
@@ -20,7 +21,8 @@ export default function Courses() {
             <li key={c.id}>
               <Link
                 to={c.id}
-                className="tap block rounded-xl border border-hair bg-ground-2 px-4 py-4 transition-colors hover:border-hair-strong"
+                data-course={courseSlug(c.name) ?? undefined}
+                className="round round-rail tap block rounded-xl border border-hair bg-ground-2 px-4 py-4 transition-colors hover:border-hair-strong"
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="font-display text-[1.2rem] font-semibold text-paper">
