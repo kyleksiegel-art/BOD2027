@@ -701,3 +701,26 @@ Phase 9 listed "photos uploaded via Edge Function" for player avatars. Cut: the 
 need a photo per player. The Players page already falls back to initials monograms when
 `players.photo_url` is null (which it always is now), so nothing to build or change. The
 `photo_url` column stays (harmless); no upload path, no Storage bucket, no Edge Function.
+
+### Overall tiebreaker is a real decide-the-champion chain, not pool-and-split (2026-08-27, Kyle)
+
+Kyle confirmed the Overall Championship must be *decided* on a points tie, per the brief's chain:
+**① best single round (then 2nd, 3rd) → ② most holes won outright → ③ countback (Round 3, then
+4, 2, 1; holes 10–18 / 13–18 / 16–18 / 18).** This had drifted: the money-model revision left the
+standings sharing a position on a points tie and pooling/splitting the money, and the Rules page
+described only "holes won → countback" (missing step 1). Step 1 (best single round) had never been
+implemented at all.
+
+Now implemented in the engine:
+- `tiebreak.ts` gains `compareBestRounds` (step 1) and `compareOverall` (the full chain, in order),
+  built on the existing `tallyHolesWon` + `compareCountback`.
+- `computeStandings` takes an optional `breakTie` comparator; equal totals are separated by it and
+  share a position ONLY when it returns 0 (a genuinely unbreakable tie).
+- `buildStandings` assembles the `OverallTiebreakContext` from the same round details it uses for
+  the totals (one source of truth) and passes `compareOverall`. Pool-and-split now fires only for a
+  true unbreakable tie; otherwise the chain crowns a distinct champion and the money follows the
+  distinct places.
+- The countback preference order stays positional **[3, 4, 2, 1]** (Kyle's "R3→R4→R2→R1"), resolving
+  the open question from `§"...Round 3 first (now Blue)..."`.
+- Rules page "Ties" rewritten to state the full chain. Tests: `tiebreak.test.ts` +8 (best-round and
+  full-chain-precedence branches); full suite 148.
