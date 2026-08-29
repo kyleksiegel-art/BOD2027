@@ -302,6 +302,9 @@ export default function CourseDetail() {
         {tees.length > 0 && (
           <section className="mt-8">
             <h2 className="eyebrow">Tees</h2>
+            <p className="mt-1 text-[0.72rem] text-paper-faint sm:hidden">
+              Tap a tee to set the scorecard yardages below.
+            </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full border-collapse text-[0.85rem]">
                 <thead>
@@ -314,30 +317,46 @@ export default function CourseDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tees.map((t) => (
-                    // Active tee gets a neutral raised-surface emphasis (never gold — gold is
-                    // reserved for leader/winner status, CLAUDE.md §Conventions).
-                    <tr
-                      key={t.id}
-                      className={`border-b border-hair ${t.id === activeTee ? 'bg-ground-2' : ''}`}
-                    >
-                      <td
-                        className={`py-1.5 pr-3 text-paper ${t.id === activeTee ? 'font-semibold' : ''}`}
+                  {tees.map((t) => {
+                    const active = t.id === activeTee
+                    // The Tees table IS the scorecard's tee picker — tap a row to switch the
+                    // yardage column shown below (on phones) and highlight the tee. Active row
+                    // gets a neutral raised-surface emphasis (never gold — gold is reserved for
+                    // leader/winner status, CLAUDE.md §Conventions).
+                    return (
+                      <tr
+                        key={t.id}
+                        onClick={() => setSelectedTee(t.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setSelectedTee(t.id)
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={active}
+                        aria-label={`Show ${t.name} tee yardages on the scorecard`}
+                        className={`cursor-pointer border-b border-hair transition-colors ${
+                          active ? 'bg-ground-2' : 'hover:bg-ground-2/60'
+                        }`}
                       >
-                        {t.name}
-                      </td>
-                      <td className="tnum py-1.5 pr-3 text-right text-paper-dim">
-                        {t.rating ?? dash}
-                      </td>
-                      <td className="tnum py-1.5 pr-3 text-right text-paper-dim">
-                        {t.slope ?? dash}
-                      </td>
-                      <td className="tnum py-1.5 pr-3 text-right text-paper-dim">{t.par}</td>
-                      <td className="tnum py-1.5 text-right text-paper">
-                        {t.totalYardage !== null ? t.totalYardage.toLocaleString() : dash}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className={`py-2.5 pr-3 text-paper ${active ? 'font-semibold' : ''}`}>
+                          {t.name}
+                        </td>
+                        <td className="tnum py-2.5 pr-3 text-right text-paper-dim">
+                          {t.rating ?? dash}
+                        </td>
+                        <td className="tnum py-2.5 pr-3 text-right text-paper-dim">
+                          {t.slope ?? dash}
+                        </td>
+                        <td className="tnum py-2.5 pr-3 text-right text-paper-dim">{t.par}</td>
+                        <td className="tnum py-2.5 text-right text-paper">
+                          {t.totalYardage !== null ? t.totalYardage.toLocaleString() : dash}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -346,27 +365,7 @@ export default function CourseDetail() {
 
         {/* Scorecard */}
         <section className="mt-8">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="eyebrow">Scorecard</h2>
-            {/* Compact tee selector — drives the single yardage column shown on phones.
-                Hidden on ≥sm where every tee column is visible at once. */}
-            {tees.length > 1 && (
-              <label className="flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.1em] text-paper-faint sm:hidden">
-                Tee
-                <select
-                  value={activeTee ?? ''}
-                  onChange={(e) => setSelectedTee(e.target.value)}
-                  className="tap border-b border-hair-strong bg-transparent py-0.5 pr-1 text-[0.85rem] font-semibold normal-case tracking-normal text-paper focus:border-gold focus:outline-none"
-                >
-                  {tees.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </div>
+          <h2 className="eyebrow">Scorecard</h2>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full border-collapse text-[0.82rem]">
               <thead>
