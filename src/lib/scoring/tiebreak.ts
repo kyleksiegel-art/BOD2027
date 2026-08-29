@@ -165,3 +165,57 @@ export function resolveCountback(tiedPlayerIds: string[], ctx: CountbackContext)
 
   return { order, resolved, decidedBy }
 }
+
+// ---------------------------------------------------------------------------
+// Step 1 — best single round
+// ---------------------------------------------------------------------------
+
+/**
+ * Compare two players by their best single round: highest one-round points wins; if
+ * equal, second-best, then third, and so on. Each argument is the player's per-round
+ * counted points (order irrelevant — sorted here). A DNP round is 0 and stays in the list.
+ * Returns < 0 when `a` ranks ahead, > 0 when `b` does, 0 when every ranked round is equal.
+ */
+export function compareBestRounds(aPoints: readonly number[], bPoints: readonly number[]): number {
+  const a = [...aPoints].sort((x, y) => y - x)
+  const b = [...bPoints].sort((x, y) => y - x)
+  const n = Math.max(a.length, b.length)
+  for (let i = 0; i < n; i++) {
+    const av = a[i] ?? 0
+    const bv = b[i] ?? 0
+    if (av !== bv) return bv - av // higher wins → a ahead (negative) when av > bv
+  }
+  return 0
+}
+
+// ---------------------------------------------------------------------------
+// The overall chain — best single round → holes won → countback
+// ---------------------------------------------------------------------------
+
+/** Everything the overall tiebreaker needs, precomputed once for the whole field. */
+export interface OverallTiebreakContext {
+  /** playerId -> that player's per-round counted points (DNP = 0). Step 1. */
+  roundPointsById: Map<string, readonly number[]>
+  /** playerId -> outright holes won across counting rounds (tallyHolesWon). Step 2. */
+  holesWonById: Map<string, number>
+  /** Round data + preference order for the countback. Step 3. */
+  countback: CountbackContext
+}
+
+/**
+ * The Overall Championship tiebreaker, run only on players level on total points:
+ *   1. Best single round (then second-best, then third …)
+ *   2. Most holes won outright
+ *   3. Countback on the latest counting round (preference order, closing-hole windows)
+ * Returns < 0 when `a` ranks ahead, > 0 when `b` does, 0 for a genuinely unbreakable tie.
+ */
+export function compareOverall(a: string, b: string, ctx: OverallTiebreakContext): number {
+  const s1 = compareBestRounds(ctx.roundPointsById.get(a) ?? [], ctx.roundPointsById.get(b) ?? [])
+  if (s1 !== 0) return s1
+
+  const ha = ctx.holesWonById.get(a) ?? 0
+  const hb = ctx.holesWonById.get(b) ?? 0
+  if (ha !== hb) return hb - ha // more holes won ranks ahead
+
+  return compareCountback(a, b, ctx.countback).cmp
+}

@@ -111,13 +111,35 @@ export default function Rules() {
         </p>
       </Section>
 
-      <Section title="Ties">
+      <Section title="Ties — Overall Championship">
         <p>
-          A tie for a paid overall place pools those spots’ money and splits it evenly — two tied for
-          1st share 1st and 2nd between them. Round-winner ties split the round’s payout the same
-          way. Deadlocks are broken first by holes won, then by a countback over the closing holes. A
-          round that’s abandoned doesn’t count; a round cut short counts only the holes everyone
-          finished.
+          A tie on total points is broken in this order:
+        </p>
+        <ol className="ml-4 list-decimal space-y-1">
+          <li>
+            <strong className="font-semibold text-paper">Best single round</strong> — highest
+            one-round total. If equal, second-best, then third.
+          </li>
+          <li>
+            <strong className="font-semibold text-paper">Most holes won outright</strong> — the
+            single lowest net score on a hole. A shared low, a pick-up, or an unplayed hole wins
+            nothing.
+          </li>
+          <li>
+            <strong className="font-semibold text-paper">Countback</strong> on the latest counting
+            round — in the order Round 3, then 4, 2, 1 — summing Stableford points over holes 10–18,
+            then 13–18, then 16–18, then the 18th. Higher points win each stage.
+          </li>
+        </ol>
+        <p>
+          Only a tie that survives all three is declared level — then those places pool their money
+          and split it evenly (two tied for 1st share 1st and 2nd between them).
+        </p>
+        <p>
+          A <strong className="font-semibold text-paper">round winner</strong> tie is broken by a
+          countback on that round, then split. A round that’s abandoned is skipped; a round cut short
+          counts only the holes everyone finished, and the countback falls back to the last holes
+          played.
         </p>
       </Section>
     </Page>

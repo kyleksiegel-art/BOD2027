@@ -11,6 +11,9 @@ import {
   computeStandings,
   standingsThroughRound,
   resolveStrokesReceived,
+  tallyHolesWon,
+  compareOverall,
+  DEFAULT_COUNTBACK_ROUND_ORDER,
 } from '@/lib/scoring'
 import type {
   HoleInfo,
@@ -21,6 +24,10 @@ import type {
   PlayerChampionship,
   RoundPointsEntry,
   StandingRow,
+  HoleNetCell,
+  CountbackRound,
+  CountbackContext,
+  OverallTiebreakContext,
 } from '@/lib/scoring'
 import type {
   PlayerRow,
@@ -258,12 +265,18 @@ export interface RoundColumn {
   counts: boolean
 }
 
-export function buildChampionships(dbData: Db): PlayerChampionship[] {
+export function buildChampionships(
+  dbData: Db,
+  prebuiltDetails?: Map<number, RoundDetailVM | null>,
+): PlayerChampionship[] {
   const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
   // Build each round once and read points from it, so the cumulative board uses the SAME
   // low-handicap allocation as the round screen and the money page (one source of truth).
-  const detailByRound = new Map<number, RoundDetailVM | null>()
-  for (const round of rounds) detailByRound.set(round.round_number, buildRoundDetail(round.round_number, dbData))
+  // buildStandings passes its already-built details so we don't build them twice.
+  const detailByRound = prebuiltDetails ?? new Map<number, RoundDetailVM | null>()
+  if (!prebuiltDetails) {
+    for (const round of rounds) detailByRound.set(round.round_number, buildRoundDetail(round.round_number, dbData))
+  }
 
   return dbData.players
     .slice()
@@ -297,13 +310,18 @@ export interface StandingsVM {
 }
 
 export function buildStandings(dbData: Db): StandingsVM {
-  const champs = buildChampionships(dbData)
-  const byRoundByPlayer = new Map(champs.map((c) => [c.playerId, c.byRound]))
-  const nameById = new Map(dbData.players.map((p) => [p.id, p]))
-
   const counts = (s: RoundRow['status']) => s === 'final' || s === 'in_progress'
 
   const orderedRounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
+
+  // Build every round's detail once; reuse it for the totals AND the tiebreak chain.
+  const detailByRound = new Map<number, RoundDetailVM | null>()
+  for (const r of orderedRounds) detailByRound.set(r.round_number, buildRoundDetail(r.round_number, dbData))
+
+  const champs = buildChampionships(dbData, detailByRound)
+  const byRoundByPlayer = new Map(champs.map((c) => [c.playerId, c.byRound]))
+  const nameById = new Map(dbData.players.map((p) => [p.id, p]))
+
   const roundColumns: RoundColumn[] = orderedRounds.map((r) => ({
     roundNumber: r.round_number,
     status: r.status,
@@ -315,6 +333,51 @@ export function buildStandings(dbData: Db): StandingsVM {
     .filter((r) => r.status === 'in_progress')
     .map((r) => r.round_number)
 
+  // ── Overall tiebreak context: best single round → holes won → countback ──
+  // Everything is drawn from the SAME round details used for the totals, so a tie is broken
+  // on exactly the numbers shown on the board. Built over counting rounds only.
+  const roundPointsById = new Map<string, readonly number[]>(
+    champs.map((c) => [c.playerId, c.byRound.filter((r) => r.counts).map((r) => r.points)]),
+  )
+  const holeCells: HoleNetCell[][] = []
+  const cbRounds = new Map<number, CountbackRound>()
+  for (const rn of countingRoundNumbers) {
+    const d = detailByRound.get(rn)
+    if (!d) continue
+    const playing = d.players.filter((p) => p.status === 'playing')
+    // Holes-won: one cell-set per counted hole.
+    if (d.holes) {
+      for (let holeNo = 1; holeNo <= d.holesCounted; holeNo++) {
+        holeCells.push(
+          playing.map((p) => {
+            const hr = p.holeResults.find((h) => h.holeNumber === holeNo)
+            return { playerId: p.playerId, net: hr?.net ?? null, completed: hr?.completed ?? false }
+          }),
+        )
+      }
+    }
+    // Countback: per-player per-hole Stableford points.
+    const pointsByPlayerHole = new Map<string, Map<number, number>>()
+    for (const p of playing) {
+      const m = new Map<number, number>()
+      for (const hr of p.holeResults) m.set(hr.holeNumber, hr.points ?? 0)
+      pointsByPlayerHole.set(p.playerId, m)
+    }
+    cbRounds.set(rn, {
+      roundNumber: rn,
+      status: d.round.status,
+      holesCounted: d.holesCounted,
+      pointsByPlayerHole,
+    })
+  }
+  const countback: CountbackContext = { rounds: cbRounds, roundOrder: DEFAULT_COUNTBACK_ROUND_ORDER }
+  const tbCtx: OverallTiebreakContext = {
+    roundPointsById,
+    holesWonById: tallyHolesWon(holeCells),
+    countback,
+  }
+  const breakTie = (a: string, b: string) => compareOverall(a, b, tbCtx)
+
   // Position change is movement between the two most recent counting rounds.
   let previousPositions: Map<string, number> | undefined
   if (countingRoundNumbers.length >= 2) {
@@ -323,7 +386,7 @@ export function buildStandings(dbData: Db): StandingsVM {
     previousPositions = new Map(prev.map((r) => [r.playerId, r.position]))
   }
 
-  const rows = computeStandings(champs, previousPositions).map((r) => {
+  const rows = computeStandings(champs, previousPositions, breakTie).map((r) => {
     const p = nameById.get(r.playerId)
     return {
       ...r,

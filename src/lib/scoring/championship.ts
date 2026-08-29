@@ -40,23 +40,30 @@ export interface StandingRow {
  * (1, 2, 2, 4). `previousPositions` (playerId -> position after the prior round) drives
  * the position-change arrow; omit it for the first counting round.
  *
- * NOTE: equal totals share a rank here. Breaking that tie for a single champion is
- * tiebreak.ts's job (holes won, then countback); this function reports the raw standing.
+ * Equal totals are separated by `breakTie` (the overall chain: best single round → holes
+ * won → countback), which returns < 0 when its first argument ranks ahead. Two players
+ * share a position only when their totals are equal AND `breakTie` returns 0 (a genuinely
+ * unbreakable tie). Omit `breakTie` and equal totals simply share a rank (raw standing).
  */
 export function computeStandings(
   players: PlayerChampionship[],
   previousPositions?: Map<string, number>,
+  breakTie?: (a: string, b: string) => number,
 ): StandingRow[] {
+  const tie = breakTie ?? (() => 0)
   const totals = players.map((p) => ({ playerId: p.playerId, total: totalPoints(p.byRound) }))
-  totals.sort((a, b) => b.total - a.total)
+  totals.sort((a, b) => b.total - a.total || tie(a.playerId, b.playerId))
 
   const leaderTotal = totals.length > 0 ? totals[0].total : 0
 
   const rows: StandingRow[] = []
   for (let i = 0; i < totals.length; i++) {
     const { playerId, total } = totals[i]
-    // Competition ranking: position is 1 + count of players strictly ahead.
-    const position = i > 0 && totals[i - 1].total === total ? rows[i - 1].position : i + 1
+    // Competition ranking: share a position only with an equal total the tiebreak can't split.
+    const position =
+      i > 0 && totals[i - 1].total === total && tie(totals[i - 1].playerId, playerId) === 0
+        ? rows[i - 1].position
+        : i + 1
     const prev = previousPositions?.get(playerId)
     rows.push({
       playerId,
