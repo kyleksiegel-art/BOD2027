@@ -29,7 +29,9 @@ export const FIRST_TEE_ISO = '2027-02-04T13:10:00-05:00'
  * Countdown target: midnight ET as the calendar flips from Feb 3 to Feb 4.
  * The counter hits zero when we wake up on day one, so the hero is already
  * showing the live board (see Home's `showLive`) rather than a clock, before
- * anyone tees off. An admin flipping a round live still trips `showLive` early.
+ * anyone tees off. The flip is driven by this clock alone, not by round status,
+ * so the countdown holds through the whole pre-trip window even while demo/test
+ * rounds sit in the database.
  */
 export const COUNTDOWN_TARGET_ISO = '2027-02-04T00:00:00-05:00'
 

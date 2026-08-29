@@ -355,7 +355,6 @@ function CardRound({
 export default function Home() {
   const [r, setR] = useState<Remaining>(() => remainingFrom(Date.now()))
   const [openRound, setOpenRound] = useState<number | null>(null)
-  const roundsList = useRoundsList()
 
   useEffect(() => {
     if (r.done) return
@@ -364,12 +363,11 @@ export default function Home() {
     // Re-arm only when we cross into the "done" state.
   }, [r.done])
 
-  // The tournament is "started" either when the clock passes first tee, or the moment an
-  // admin flips a round live (which can precede the booked tee time). Either flips the hero's
-  // countdown over to the live board.
-  const anyLive =
-    roundsList?.some((r) => r.round.status !== 'upcoming') ?? false
-  const showLive = r.done || anyLive
+  // The hero counts down until day one (midnight ET, Feb 4), then flips to the live board —
+  // driven by the clock alone, not round status. This keeps the countdown showing through the
+  // whole pre-trip window even while demo/test rounds sit in the database, and it flips over on
+  // its own the morning of the 4th.
+  const showLive = r.done
 
   return (
     <div>
