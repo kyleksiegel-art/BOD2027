@@ -46,28 +46,41 @@ export default function Standings() {
       ) : (
         <>
           <ol className="mt-6">
-            {rows.map((r) => (
-              <li
-                key={r.playerId}
-                className="grid grid-cols-[1.6rem_1.5rem_1fr_auto] items-center gap-x-3 border-b border-hair py-4 first:border-t first:border-t-hair-strong"
-              >
-                <span className="tnum font-display text-[1.35rem] font-semibold text-gold">
-                  {r.position}
-                </span>
-                <span className="text-center text-[0.85rem]">
-                  <Movement change={r.positionChange} />
-                </span>
-                <span className="flex flex-col">
-                  <span className="text-[1.05rem] text-paper">{r.name}</span>
-                  <span className="tnum text-[0.72rem] text-paper-faint">
-                    {r.gapToLeader === 0 ? 'Leader' : `${formatGap(r.gapToLeader)} pts`}
+            {rows.map((r) => {
+              const isLeader = r.position === 1
+              return (
+                <li
+                  key={r.playerId}
+                  className={`grid grid-cols-[1.6rem_1.5rem_1fr_auto] items-center gap-x-3 border-b border-hair py-4 first:border-t first:border-t-hair-strong ${
+                    isLeader ? 'leader-row' : ''
+                  }`}
+                >
+                  <span
+                    className={`tnum fx-title font-display text-[1.35rem] font-semibold ${
+                      isLeader ? 'text-gold' : 'text-paper-faint'
+                    }`}
+                  >
+                    {r.position}
                   </span>
-                </span>
-                <span className="tnum text-right font-display text-[1.6rem] font-semibold text-paper">
-                  {r.total}
-                </span>
-              </li>
-            ))}
+                  <span className="text-center text-[0.85rem]">
+                    <Movement change={r.positionChange} />
+                  </span>
+                  <span className="flex flex-col">
+                    <span className="text-[1.05rem] text-paper">{r.name}</span>
+                    <span className="tnum text-[0.72rem] text-paper-faint">
+                      {r.gapToLeader === 0 ? 'Leader' : `${formatGap(r.gapToLeader)} pts`}
+                    </span>
+                  </span>
+                  <span
+                    className={`tnum fx-title text-right font-display text-[1.6rem] font-semibold ${
+                      isLeader ? 'text-gold-bright' : 'text-paper'
+                    }`}
+                  >
+                    {r.total}
+                  </span>
+                </li>
+              )
+            })}
           </ol>
 
           {live && (

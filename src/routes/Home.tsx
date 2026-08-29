@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { COUNTDOWN_TARGET_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
 import { useRoundsList, useStandings, useRoundDetail } from '@/lib/data/selectors'
+import { courseSlug } from '@/lib/format'
 
 const TARGET = new Date(COUNTDOWN_TARGET_ISO).getTime()
 
@@ -31,7 +32,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 function CountdownUnit({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex w-full flex-col items-center">
-      <span className="tnum font-display text-[clamp(2.5rem,15vw,4.6rem)] font-semibold leading-none tracking-tight text-paper">
+      <span className="fx-display tnum font-display text-[clamp(2.5rem,15vw,4.6rem)] font-semibold leading-none text-paper">
         {value}
       </span>
       <span className="mt-2 text-[0.6rem] font-semibold uppercase tracking-[0.24em] text-paper-faint">
@@ -61,6 +62,48 @@ function Countdown({ r }: { r: Remaining }) {
         Streamsong Red
       </p>
     </div>
+  )
+}
+
+/**
+ * Responsive hero photo — AVIF/WebP per viewport, JPG fallback. The browser downloads one
+ * variant sized to the screen (~40–90 KB on a phone) instead of the 369 KB source.
+ *
+ * `<picture>`/`<source>` only negotiate by *format support* — if the browser's chosen source
+ * (say AVIF) is fetched and the request itself fails (a dropped connection, a reload racing
+ * the load), there's no automatic retry against the next `<source>` or the plain `<img src>`;
+ * the element just shows broken. `onError` on the `<img>` still fires in that case, so on the
+ * first failure we drop every `<source>` — that forces the browser to redo source selection
+ * and fall through to the `<img>`'s own `src`, the one guaranteed-universal JPG. A second
+ * failure (a genuinely dead connection) is left alone rather than looping.
+ */
+function HeroPhoto() {
+  const [sourcesFailed, setSourcesFailed] = useState(false)
+
+  return (
+    <picture>
+      {!sourcesFailed && (
+        <>
+          <source
+            type="image/avif"
+            srcSet="/assets/hero/hero-640.avif 640w, /assets/hero/hero-1080.avif 1080w, /assets/hero/hero-1600.avif 1600w"
+            sizes="100vw"
+          />
+          <source
+            type="image/webp"
+            srcSet="/assets/hero/hero-640.webp 640w, /assets/hero/hero-1080.webp 1080w, /assets/hero/hero-1600.webp 1600w"
+            sizes="100vw"
+          />
+        </>
+      )}
+      <img
+        src="/assets/hero.jpg"
+        alt="Streamsong Resort — the Black course windmill and sand bunkers"
+        className="absolute inset-0 h-full w-full object-cover [object-position:center_42%]"
+        decoding="async"
+        onError={() => setSourcesFailed(true)}
+      />
+    </picture>
   )
 }
 
@@ -183,7 +226,7 @@ function OnCourse({
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-gold-bright" />
         <span className="eyebrow">On the course now</span>
       </div>
-      <h2 className="mt-3 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none tracking-tight text-paper">
+      <h2 className="fx-head mt-3 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none text-paper">
         {course}
       </h2>
       <p className="mt-2 text-center text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
@@ -194,7 +237,7 @@ function OnCourse({
           <>
             <strong className="font-semibold text-paper">{leader!.name}</strong> leads{' '}
             <span className="tnum text-gold">{leader!.totalPoints} pts</span>
-            <span className="text-paper-faint"> · thru {leader!.thru}/{holesTotal}</span>
+            <span className="tnum text-paper-faint"> · thru {leader!.thru}/{holesTotal}</span>
           </>
         ) : (
           <span className="text-paper-dim">No scores in yet — tee it up.</span>
@@ -211,7 +254,7 @@ function BetweenRounds({ course, roundNo }: { course: string; roundNo: number })
       <div className="mt-6 text-center">
         <span className="eyebrow">Up next</span>
       </div>
-      <h2 className="mt-3 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none tracking-tight text-paper">
+      <h2 className="fx-head mt-3 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none text-paper">
         {course}
       </h2>
       <p className="mt-2 text-center text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
@@ -242,10 +285,10 @@ function Complete({
           <p className="mt-3 text-center text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
             {overall.tied ? 'Shared title' : 'Champion'}
           </p>
-          <h2 className="mt-2 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none tracking-tight text-gold-bright">
+          <h2 className="fx-head mt-2 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none text-gold-bright">
             {overall.text}
           </h2>
-          <p className="mt-3 text-center text-[0.95rem] text-paper-dim">
+          <p className="tnum mt-3 text-center text-[0.95rem] text-paper-dim">
             {overall.points} points · Streamsong 2027
           </p>
         </>
@@ -295,7 +338,10 @@ function CardRound({
   const panelId = `round-leaderboard-${round.no}`
 
   return (
-    <div className="border-b border-hair first:border-t first:border-t-hair-strong">
+    <div
+      className="round border-b border-hair first:border-t first:border-t-hair-strong"
+      data-course={courseSlug(round.course) ?? undefined}
+    >
       <button
         type="button"
         onClick={onToggle}
@@ -307,8 +353,11 @@ function CardRound({
           R{round.no}
         </span>
         <span className="flex flex-col gap-0.5">
-          <span className="font-display text-[1.14rem] font-semibold text-paper">
-            {round.course}
+          <span className="flex items-center gap-2">
+            <span className="round-swatch h-[9px] w-[9px] flex-none rounded-full" aria-hidden />
+            <span className="fx-serif-sm font-display text-[1.14rem] font-semibold text-paper">
+              {round.course}
+            </span>
           </span>
           <span className="text-[0.76rem] text-paper-faint">{round.architect}</span>
         </span>
@@ -373,26 +422,7 @@ export default function Home() {
     <div>
       {/* Hero */}
       <header className="relative flex min-h-[clamp(420px,72vh,640px)] flex-col justify-between overflow-hidden px-5 pb-10 pt-4">
-        {/* Responsive hero photo — AVIF/WebP per viewport, JPG fallback. The browser downloads
-            one variant sized to the screen (~40–90 KB on a phone) instead of the 369 KB source. */}
-        <picture>
-          <source
-            type="image/avif"
-            srcSet="/assets/hero/hero-640.avif 640w, /assets/hero/hero-1080.avif 1080w, /assets/hero/hero-1600.avif 1600w"
-            sizes="100vw"
-          />
-          <source
-            type="image/webp"
-            srcSet="/assets/hero/hero-640.webp 640w, /assets/hero/hero-1080.webp 1080w, /assets/hero/hero-1600.webp 1600w"
-            sizes="100vw"
-          />
-          <img
-            src="/assets/hero.jpg"
-            alt="Streamsong Resort — the Black course windmill and sand bunkers"
-            className="absolute inset-0 h-full w-full object-cover [object-position:center_42%]"
-            decoding="async"
-          />
-        </picture>
+        <HeroPhoto />
         {/* Scrim: darkens for the cover text, dissolves into the page ground at the base. */}
         <div
           className="absolute inset-0"
@@ -411,7 +441,7 @@ export default function Home() {
           <span className="eyebrow block" style={{ color: '#e6a442' }}>
             {TRIP.name}
           </span>
-          <h1 className="mt-3 font-display text-[clamp(2.6rem,13vw,4.8rem)] font-semibold leading-[0.94] tracking-tight text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.5)]">
+          <h1 className="fx-display mt-3 font-display text-[clamp(2.6rem,13vw,4.8rem)] font-semibold leading-[0.94] text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.5)]">
             Streamsong
             <br />
             20<span className="text-[#e6a442]">2</span>7

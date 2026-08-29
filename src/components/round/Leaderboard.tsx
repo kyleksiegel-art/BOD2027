@@ -25,12 +25,21 @@ export function Leaderboard({ vm }: { vm: RoundDetailVM }) {
           const rank = lastPoints !== null && p.totalPoints === lastPoints ? lastRank : i + 1
           lastPoints = p.totalPoints
           lastRank = rank
+          const isLeader = rank === 1 && p.totalPoints > 0
           return (
             <li
               key={p.playerId}
-              className="grid grid-cols-[1.4rem_1fr_auto] items-center gap-x-3 border-b border-hair py-3 first:border-t first:border-t-hair-strong"
+              className={`grid grid-cols-[1.4rem_1fr_auto] items-center gap-x-3 border-b border-hair py-3 first:border-t first:border-t-hair-strong ${
+                isLeader ? 'leader-row' : ''
+              }`}
             >
-              <span className="tnum font-display text-[1.1rem] font-semibold text-gold">{rank}</span>
+              <span
+                className={`tnum fx-serif-sm font-display text-[1.1rem] font-semibold ${
+                  isLeader ? 'text-gold' : 'text-paper-faint'
+                }`}
+              >
+                {rank}
+              </span>
               <span className="flex flex-col">
                 <span className="text-paper">{p.name}</span>
                 {live && (
@@ -40,7 +49,11 @@ export function Leaderboard({ vm }: { vm: RoundDetailVM }) {
                   </span>
                 )}
               </span>
-              <span className="tnum text-right font-display text-[1.35rem] font-semibold text-paper">
+              <span
+                className={`tnum fx-title text-right font-display text-[1.35rem] font-semibold ${
+                  isLeader ? 'text-gold-bright' : 'text-paper'
+                }`}
+              >
                 {p.totalPoints}
                 <span className="ml-1 text-[0.68rem] font-normal text-paper-faint">pts</span>
               </span>

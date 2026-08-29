@@ -45,14 +45,19 @@ function PotSummary({ money }: { money: MoneyVM }) {
     <section className="mt-8">
       <div className="rounded-lg border border-hair-strong bg-ground-2 p-5">
         <span className="eyebrow block">Total purse</span>
-        <div className="mt-1 font-display text-4xl font-semibold tnum text-gold">
+        <div className="fx-display mt-1 font-display text-4xl font-semibold tnum text-gold">
           {formatMoney(money.totalPotCents)}
         </div>
         <p className="mt-1 text-[0.8rem] text-paper-faint">
           {formatMoney(money.buyInPerPlayerCents)}/man × {money.players.length}
         </p>
         <dl className="mt-4 space-y-2">
-          <PotLine label="1st place overall" value={money.champFirstCents} winner={money.firstPlace} />
+          <PotLine
+            label="1st place overall"
+            value={money.champFirstCents}
+            winner={money.firstPlace}
+            highlight
+          />
           <PotLine label="2nd place overall" value={money.champSecondCents} winner={money.secondPlace} />
           <PotLine
             label="Daily round winners"
@@ -70,14 +75,23 @@ function PotLine({
   value,
   note,
   winner,
+  highlight,
 }: {
   label: string
   value: number
   note?: string
   winner?: WinnerVM | null
+  /** The winning row — same gold spine + tint as Standings' leader, reserved for the
+      single trip champion so gold still reads as status, not decoration. */
+  highlight?: boolean
 }) {
+  const isLeader = Boolean(highlight && winner)
   return (
-    <div className="flex items-baseline justify-between gap-3 border-t border-hair pt-2">
+    <div
+      className={`flex items-baseline justify-between gap-3 border-t border-hair pt-2 ${
+        isLeader ? 'leader-row' : ''
+      }`}
+    >
       <span className="text-paper">
         {label}
         {winner ? (
@@ -86,7 +100,9 @@ function PotLine({
           <span className="ml-2 text-[0.75rem] text-paper-faint">{note}</span>
         ) : null}
       </span>
-      <span className="tnum text-paper">{formatMoney(value)}</span>
+      <span className={`tnum ${isLeader ? 'text-gold-bright font-semibold' : 'text-paper'}`}>
+        {formatMoney(value)}
+      </span>
     </div>
   )
 }
@@ -109,7 +125,7 @@ function RoundCard({ r }: { r: RoundMoneyVM }) {
   return (
     <div className={`rounded-lg border border-hair bg-ground-2 p-4 ${abandoned ? 'opacity-50' : ''}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="font-display text-xl text-paper">
+        <span className="fx-title font-display text-xl text-paper">
           Round {r.roundNumber} · {r.courseName}
         </span>
         {r.frozen ? (

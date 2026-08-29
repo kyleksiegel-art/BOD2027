@@ -352,3 +352,41 @@ Things that will bite if forgotten:
 - Course handicap on the Players page is the player's **own** handicap (post cap/override), NOT
   the play-off-the-low relative figure the scorecard uses.
 - Tests: `info.test.ts` (10). Full `vitest run` → **140**. `tsc -b` + `npm run build` clean.
+
+## Design refinement pass (2026-08-28) — the shape to reuse
+
+Not a numbered phase — a tuning pass over the existing "Fairway Linen" language from an external
+design brief, on branch `design-refinements` off `main`. No new tables, no logic changes.
+
+- **Fraunces is now the `full` Fontsource build, not `wght`-only** (`src/assets/fonts/
+  fraunces-latin-full-normal.woff2`, 121 KB, was 36.6 KB). The `wght`-only subset silently drops
+  the `opsz`/`SOFT` axes instead of erroring — needed for the `.fx-*` classes below. Combined font
+  payload is ~169 KB, over the Phase 1 checklist's ≤80 KB target; accepted, see `decisions.md
+  §"Design refinement pass"`. Refresh procedure is in the `fonts.css` header comment.
+- **`.fx-display` / `.fx-head` / `.fx-title` / `.fx-serif-sm`** (`index.css`, `@layer components`)
+  set `opsz`/`SOFT`/`wght` tiers by rendered size — display masthead/countdown down to small serif
+  labels. Applied on the home masthead, countdown digits, `PageHeader` (all page titles), round
+  headlines, and the leaderboard/standings/money point figures.
+- **`.leader-row`** (+ `--leader-tint` token) is the one leader/winner treatment — gold spine +
+  tint background — reused verbatim on Standings' top row, the round-detail `Leaderboard`'s rank-1
+  row, Money's "1st place overall" line, and Enter's "Round so far" top player. Gold is reserved
+  for this; it no longer colors every row's position number unconditionally (that was the bug the
+  brief called out).
+- **`courseSlug(name)`** (`src/lib/format.ts`) maps a course name to `red`/`black`/`blue`/`bone`
+  for the `.round[data-course]` accent system (`--red`/`--blue`/`--olive`/`--paper`). Wired into
+  the Rounds list (rail), Home's round card list (swatch dot), RoundDetail's header (swatch dot).
+  **The rail is `box-shadow: inset 3px 0 0 var(--course))`, not `border-left`** — a `border-left`
+  version silently loses to any `border-{color}` Tailwind utility (e.g. `border-hair`) on the same
+  element, because Tailwind's utilities layer outranks `@layer components` regardless of
+  specificity, and `border-hair` sets all four sides via the `border-color` shorthand. Every
+  element needing the rail also carries a hairline border utility, so this isn't a corner case —
+  don't "simplify" it back.
+- `--paper-dim`/`--paper-faint` darkened ~12% (`#4b453c`/`#4f4a41`) for direct-sun legibility —
+  headroom above AA, not a contrast fix.
+- **`HeroPhoto` (`Home.tsx`) recovers from a failed hero fetch.** `<picture>`/`<source>` only
+  negotiate by format support — if the chosen source's *fetch* fails (dropped connection, a
+  reload racing the load) there's no automatic fallback to the next source or the `<img>`'s own
+  `src`. On the `<img>`'s `onError`, drop every `<source>`; the browser redoes selection and falls
+  through to the guaranteed JPG. Found via a real (client-side, not deploy) failure during this
+  pass's own browser verification.
+- Tests: unchanged, **148** (no logic touched). `tsc -b` + `npm run build` clean.

@@ -324,14 +324,22 @@ export default function Enter() {
           <div className="mt-6 border-t border-hair pt-4">
             <span className="eyebrow block">Round {vm.round.round_number} so far</span>
             <ul className="mt-2 space-y-1">
-              {vm.standing.map((s) => (
-                <li key={s.name} className="flex justify-between text-[0.9rem] text-paper">
-                  <span>{s.name}</span>
-                  <span className="tnum text-paper-dim">
-                    {s.points} pts · thru {s.thru}
-                  </span>
-                </li>
-              ))}
+              {vm.standing.map((s, i) => {
+                const isLeader = i === 0 && s.thru > 0
+                return (
+                  <li
+                    key={s.name}
+                    className={`flex justify-between text-[0.9rem] text-paper ${
+                      isLeader ? 'leader-row py-0.5' : ''
+                    }`}
+                  >
+                    <span>{s.name}</span>
+                    <span className={`tnum ${isLeader ? 'text-gold-bright font-semibold' : 'text-paper-dim'}`}>
+                      {s.points} pts · thru {s.thru}
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         </>

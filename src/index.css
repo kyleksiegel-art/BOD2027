@@ -17,15 +17,21 @@
   --ground: #e9e1d0; /* warm sand base — softer than cream, less glare in sun */
   --ground-2: #f2ecdd; /* raised surfaces — lighter than ground */
   --paper: #1b1e1c; /* ink — body text */
-  --paper-dim: #5c584f; /* secondary text */
-  --paper-faint: #635d54; /* labels, captions — ≥4.5:1 on the sand ground */
+  --paper-dim: #4b453c; /* secondary text — darkened ~12% (was #5c584f) for direct-sun legibility, still reads as secondary against --paper */
+  --paper-faint: #4f4a41; /* labels, captions — darkened ~12% (was #635d54); ≥6.6:1 on the sand ground, headroom above AA */
   --gold: #8f5410; /* deep brass accent — ≥4.5:1 as small text on the sand ground */
   --gold-bright: #935608; /* emphasis / warnings / indicators */
   --gold-fill: #d18316; /* bright brass — solid fills (buttons, active toggles) with dark text */
-  --blue: #345f7c; /* steel blue */
-  --olive: #6f7511; /* olive */
+  --blue: #345f7c; /* steel blue — Streamsong Blue round identity */
+  --olive: #6f7511; /* olive — Bone Valley round identity */
+  --red: #9a3412; /* Streamsong Red round identity, warm to match the palette */
   --hair: rgba(27, 30, 28, 0.14); /* hairline border */
   --hair-strong: rgba(27, 30, 28, 0.24);
+
+  /* Status tint reserved for "leader" — Standings' top row, Money's winning row. Gold is
+     status-only; it never doubles as a round/course identity color (see --red/--blue/--olive
+     above and .round[data-course] below). */
+  --leader-tint: rgba(209, 131, 22, 0.09); /* --gold-fill @ 9% */
 
   color-scheme: light;
 }
@@ -81,5 +87,77 @@
   .tap {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Fraunces opsz/SOFT tiers. Higher opsz + SOFT 0 = sharper, higher-
+     contrast — reserved for the biggest type so it reads as engraved
+     championship, not a scaled-up body serif. Weight stays 600
+     throughout; only the axes change. Apply the smallest tier that
+     fits the element's rendered size. */
+  .fx-display {
+    font-variation-settings: 'opsz' 144, 'SOFT' 0, 'wght' 600;
+    letter-spacing: -0.02em;
+  }
+  .fx-head {
+    font-variation-settings: 'opsz' 110, 'SOFT' 0, 'wght' 600;
+    letter-spacing: -0.015em;
+  }
+  .fx-title {
+    font-variation-settings: 'opsz' 72, 'wght' 600;
+  }
+  .fx-serif-sm {
+    font-variation-settings: 'opsz' 40, 'wght' 600;
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Leader / winner status. Gold marks status only — the championship
+     leader on Standings, the winning row on Money — never anything
+     else (round identity below uses --red/--blue/--olive/--paper
+     instead). Reused verbatim on the round-detail leaderboard and the
+     "Round so far" block on Enter so the whole app reads as one
+     package. */
+  .leader-row {
+    position: relative;
+    padding-left: 0.9rem;
+    background: var(--leader-tint);
+    border-radius: 2px;
+  }
+  .leader-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--gold-fill);
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Round/course identity — R1-R4 distinguishable at a glance. Used
+     lightly (a rail, a dot), never as a fill, and never gold (gold is
+     reserved for leader/winner status above). */
+  .round[data-course='red'] {
+    --course: var(--red);
+  }
+  .round[data-course='black'] {
+    --course: var(--paper);
+  }
+  .round[data-course='blue'] {
+    --course: var(--blue);
+  }
+  .round[data-course='bone'] {
+    --course: var(--olive);
+  }
+  /* box-shadow, not border-left: elements carrying this also carry a border-{color}
+     utility (e.g. border-hair) for the row's hairline, and Tailwind's border-color
+     utilities live in the (higher-priority) utilities layer — a border-left-color here
+     would silently lose that cascade fight regardless of selector specificity. */
+  .round-rail {
+    box-shadow: inset 3px 0 0 var(--course);
+  }
+  .round-swatch {
+    background: var(--course);
   }
 }

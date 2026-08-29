@@ -1,36 +1,24 @@
 # Handoff
 
-**Phase just finished:** 8 — Info + admin editors. Built on branch `phase-8-info` (off
-`phase-7-money`; Phases 4–8 unmerged, `origin/main` is still only the countdown page — Kyle's
-call). **Not yet committed** — commit and push `phase-8-info`. Nothing stubbed.
+**Not a numbered phase.** Design-refinement pass from Kyle's external brief (typography axes,
+leader/winner color hierarchy, course identity colors, contrast). Branch `design-refinements` off
+`main` (Phases 0–8 + the tiebreaker chain are merged to `main`; not yet pushed).
 
-**No migration, no new RPC.** The three Info RPCs (`rpc_upsert_itinerary` / `_lodging` /
-`_lodging_assignment`) and `rpc_upsert_round` already existed + gated (Phase 5B). Phase 8 is
-client wiring + UI only, so `supabase test db` is unchanged (232).
+**Built:** Fraunces swapped to Fontsource's `full` build (was `wght`-only) to unlock `opsz`/`SOFT`
+— font payload ~169 KB, over the ≤80 KB checklist target, accepted (`decisions.md`). New
+`.fx-display/.fx-head/.fx-title/.fx-serif-sm` axis utilities; `.leader-row` gold spine/tint reused
+on Standings, round Leaderboard, Money's 1st place, Enter's round-so-far; `courseSlug()` +
+`.round[data-course]` accent rails/swatches on Rounds/Home/RoundDetail (rail uses `box-shadow`,
+not `border-left` — see CLAUDE.md for why); `--paper-dim`/`--paper-faint` darkened ~12%. Also:
+`HeroPhoto` now recovers from a failed hero-image fetch (drops `<source>`s on `onError`, falls
+through to the JPG) — found live during this session's own browser verification, not a bad deploy.
 
-**Built:** Dexie **v6** (`itinerary_items`/`lodging`/`lodging_assignments` — plain reference
-tables, hydrated + read); compute `buildItinerary`/`buildLodging`/`buildCoursesIndex`/
-`buildCourseDetail`/`buildPlayerCourseHandicaps`; selectors + `PlayerCardVM.courseHandicaps`.
-Public pages: Itinerary timeline (current-day highlight), Courses index + `/info/courses/:id`
-scorecard, Players (per-course handicap, live from index), Rules (money section rewritten to the
-buy-in model). Admin: Itinerary + Lodging editors, tee-time field in RoundsEditor, two new tabs,
-writes in `admin.ts`. Time helpers in `format.ts`, all `America/New_York`. See CLAUDE.md §"Info +
-admin editors (Phase 8)" and `decisions.md §"Phase 8"`.
+**Verified:** `vitest run` → 148 (unchanged, no logic touched). `tsc -b` + `npm run build` clean.
+Browser-checked Home, Standings, Money, Rounds, RoundDetail on the local dev server — leader
+spine/tint, course rails, and sharper display type all confirmed live (some via computed-style
+JS checks, not just screenshots).
 
-**Verified:** `vitest run` → **140** (+10 `info.test.ts`); `tsc -b` + `npm run build` clean.
-Browser (local Supabase, 375 px): all four Info pages render on real data; a real itinerary add
-via the admin editor round-tripped through the server to the public timeline ("Thu Feb 4 · 7:00
-PM ET"); demo row cleaned up via SQL.
+Committed and pushed to `design-refinements`; Kyle to review the Netlify deploy preview and merge.
 
-**Deviations (in `decisions.md` + checklist):** no delete path for Info editors (Kyle — small
-fixed data set); Rules money copy corrected to the buy-in model. Player photo **upload** stays
-Phase 9.
-
-**Kyle still owes (carried):** real indexes/tees/PIN secrets (`APP_PIN_ARGON2_HASH` +
-`APP_PIN_BCRYPT_HASH`), hosted Supabase + `db push`, Netlify env. PWA install/two-phone/airplane
-are pre-trip manual checks. **PIN is `1922`.** Local admin session had gone stale (server
-token) — re-unlock with the PIN after a `db reset`.
-
-**Next phase:** 9 — Polish (incl. player photo upload Edge Function). Read CLAUDE.md §"Info +
-admin editors (Phase 8)", `acceptance-checklist.md` §Phase 9, this file, Phase 9 in
-`phase-plan.md`.
+**Next:** Phase 9 — Polish (Lighthouse pass, README) is still the next numbered phase; this
+session didn't touch it.

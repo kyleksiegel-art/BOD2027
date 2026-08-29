@@ -6,7 +6,7 @@ import { Scorecard } from '@/components/round/Scorecard'
 import { HandicapWorksheet } from '@/components/round/HandicapWorksheet'
 import { CtpEntry } from '@/components/round/CtpEntry'
 import { useRoundCtp } from '@/lib/data/selectors'
-import { formatDay, formatTeeTime } from '@/lib/format'
+import { courseSlug, formatDay, formatTeeTime } from '@/lib/format'
 
 export default function RoundDetail() {
   const { roundNumber } = useParams()
@@ -39,9 +39,10 @@ export default function RoundDetail() {
     <Page>
       <BackLink />
 
-      <header className="mt-4">
+      <header className="round mt-4" data-course={courseSlug(course.name) ?? undefined}>
         <span className="eyebrow block">Round {round.round_number}</span>
-        <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight text-paper">
+        <h1 className="fx-head mt-2 flex items-center gap-3 font-display text-4xl font-semibold text-paper">
+          <span className="round-swatch h-3 w-3 flex-none rounded-full" aria-hidden />
           {course.name}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
