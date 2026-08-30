@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import {
   buildStandings,
   buildRoundDetail,
+  buildRoundRecap,
   buildRoundsList,
   buildChampionships,
   buildEnterHole,
@@ -22,6 +23,7 @@ import {
   type EnterDraft,
   type StandingsVM,
   type RoundDetailVM,
+  type RoundRecapVM,
   type RoundListItemVM,
   type ItineraryVM,
   type LodgingVM,
@@ -84,6 +86,12 @@ export function useRoundDetail(roundNumber: number): { vm: RoundDetailVM | null;
   const data = useDbData()
   const vm = useMemo(() => (data ? buildRoundDetail(roundNumber, data) : null), [data, roundNumber])
   return { vm, loading: data === undefined }
+}
+
+/** The post-round recap for one round, or null until play has begun. */
+export function useRoundRecap(roundNumber: number): RoundRecapVM | null {
+  const data = useDbData()
+  return useMemo(() => (data ? buildRoundRecap(roundNumber, data) : null), [data, roundNumber])
 }
 
 export interface PlayerCardVM {

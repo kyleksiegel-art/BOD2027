@@ -1206,3 +1206,188 @@ export function buildPlayerCourseHandicaps(dbData: Db): Map<string, PlayerCourse
 
   return out
 }
+
+// ── Round recap ──────────────────────────────────────────────────────────────
+// A deterministic post-round report, assembled from the same round detail and
+// championship data every other screen uses — no new scoring math. Rendered on
+// /rounds/:n once play has begun; `official` gates the "Official" badge on final.
+export interface RecapWinner {
+  name: string
+  points: number
+}
+export interface RecapCtpWinner {
+  holeNumber: number
+  name: string | null // null => carry / no winner recorded
+}
+export interface RecapMover {
+  name: string
+  from: number // position through the prior round
+  to: number // position through this round
+  change: number // from - to; > 0 means moved up
+}
+export interface RecapHoleLeaders {
+  holeNumber: number
+  order: string[] // playing playerIds ranked by cumulative points through this hole, desc
+  inPlay: boolean // at least one player has completed this hole
+}
+export interface RecapPlayerColor {
+  playerId: string
+  name: string
+  short: string // first name / short label for chips + legend
+}
+export interface RoundRecapVM {
+  round: RoundRow
+  course: CourseRow
+  complete: boolean // every playing player thru the counted window
+  official: boolean // round.status === 'final'
+  winners: RecapWinner[] // co-winners share the top on a tie
+  margin: number // top points minus the best non-winner; 0 when tied at the top
+  runnerUp: RecapWinner | null
+  standing: RecapWinner[] // this round's order (playing only), desc
+  roundWinnerCents: number
+  bestClosingNine: RecapWinner | null
+  biggestMove: RecapMover | null
+  ctpWinners: RecapCtpWinner[]
+  parThreeCount: number
+  leadChangeCount: number
+  holeLeaders: RecapHoleLeaders[]
+  players: RecapPlayerColor[] // playing players, leaderboard order
+}
+
+function firstName(name: string): string {
+  return name.split(/\s+/)[0] || name
+}
+
+export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM | null {
+  const detail = buildRoundDetail(roundNumber, dbData)
+  if (!detail) return null
+  const { round, course, holes, holesCounted } = detail
+
+  // Nothing to recap until a real, started round has scores on the board.
+  if (round.status === 'upcoming' || round.status === 'abandoned') return null
+  if (!holes || course.data_is_placeholder) return null
+
+  const playing = detail.leaderboard // already playing-only, desc by points
+  if (playing.length === 0 || playing.every((p) => p.thru === 0)) return null
+
+  const complete = playing.every((p) => p.thru === holesCounted)
+  const official = round.status === 'final'
+
+  // Winner(s) + margin.
+  const top = playing[0].totalPoints
+  const winners: RecapWinner[] = playing
+    .filter((p) => p.totalPoints === top)
+    .map((p) => ({ name: p.name, points: p.totalPoints }))
+  const firstLoser = playing.find((p) => p.totalPoints < top) ?? null
+  const margin = firstLoser ? top - firstLoser.totalPoints : 0
+  const runnerUp = firstLoser ? { name: firstLoser.name, points: firstLoser.totalPoints } : null
+  const standing: RecapWinner[] = playing.map((p) => ({ name: p.name, points: p.totalPoints }))
+
+  const roundWinnerCents = settingValue<{ round_winner_cents?: number }>(
+    dbData.settings,
+    'purse_amounts',
+    {},
+  ).round_winner_cents ?? 0
+
+  // Best closing nine — points over holes 10..cutoff (only meaningful once the round reaches 10).
+  let bestClosingNine: RecapWinner | null = null
+  if (holesCounted >= 10) {
+    for (const p of playing) {
+      const back = p.holeResults
+        .filter((h) => h.holeNumber >= 10 && h.holeNumber <= holesCounted && h.completed)
+        .reduce((s, h) => s + (h.points ?? 0), 0)
+      if (!bestClosingNine || back > bestClosingNine.points) {
+        bestClosingNine = { name: p.name, points: back }
+      }
+    }
+  }
+
+  // Biggest move in the overall standings — this round's positions vs. the prior counting round.
+  let biggestMove: RecapMover | null = null
+  const countingBefore = dbData.rounds.some(
+    (r) => r.round_number < roundNumber && (r.status === 'final' || r.status === 'in_progress'),
+  )
+  if (countingBefore) {
+    const champs = buildChampionships(dbData)
+    const nameById = new Map(dbData.players.map((p) => [p.id, p.name]))
+    const before = new Map(
+      standingsThroughRound(champs, roundNumber - 1).map((r) => [r.playerId, r.position]),
+    )
+    const after = standingsThroughRound(champs, roundNumber)
+    for (const row of after) {
+      const from = before.get(row.playerId)
+      if (from === undefined) continue
+      const change = from - row.position
+      if (change > 0 && (!biggestMove || change > biggestMove.change)) {
+        biggestMove = { name: nameById.get(row.playerId) ?? 'Unknown', from, to: row.position, change }
+      }
+    }
+  }
+
+  // Closest to pin — every par 3, with its winner or a carry.
+  const parThrees = holes.filter((h) => h.par === 3).map((h) => h.holeNumber).sort((a, b) => a - b)
+  const ctpByHole = new Map<number, string | null>()
+  const nameById = new Map(dbData.players.map((p) => [p.id, p.name]))
+  for (const c of dbData.ctp_results) {
+    if (c.round_id !== round.id) continue
+    ctpByHole.set(c.hole_number, c.player_id ? nameById.get(c.player_id) ?? null : null)
+  }
+  const ctpWinners: RecapCtpWinner[] = parThrees.map((holeNumber) => ({
+    holeNumber,
+    name: ctpByHole.has(holeNumber) ? ctpByHole.get(holeNumber) ?? null : null,
+  }))
+
+  // Lead-change timeline — cumulative points per player through each counted hole. The leader
+  // per hole is a prefix sum over holeResults; a change of identity is one lead change.
+  const players: RecapPlayerColor[] = playing.map((p) => ({
+    playerId: p.playerId,
+    name: p.name,
+    short: firstName(p.name),
+  }))
+  const running = new Map<string, number>(playing.map((p) => [p.playerId, 0]))
+  const holeLeaders: RecapHoleLeaders[] = []
+  let leadChangeCount = 0
+  let prevLeader: string | null = null
+  for (let hole = 1; hole <= holesCounted; hole++) {
+    let inPlay = false
+    for (const p of playing) {
+      const hr = p.holeResults.find((h) => h.holeNumber === hole)
+      if (hr?.completed) {
+        running.set(p.playerId, (running.get(p.playerId) ?? 0) + (hr.points ?? 0))
+        inPlay = true
+      }
+    }
+    const order = playing
+      .slice()
+      .sort(
+        (a, b) =>
+          (running.get(b.playerId) ?? 0) - (running.get(a.playerId) ?? 0) || a.sortOrder - b.sortOrder,
+      )
+      .map((p) => p.playerId)
+    holeLeaders.push({ holeNumber: hole, order, inPlay })
+    if (inPlay) {
+      const leader = order[0]
+      if (prevLeader !== null && leader !== prevLeader) leadChangeCount++
+      prevLeader = leader
+    }
+  }
+
+  return {
+    round,
+    course,
+    complete,
+    official,
+    winners,
+    margin,
+    runnerUp,
+    standing,
+    roundWinnerCents,
+    bestClosingNine,
+    biggestMove,
+    ctpWinners,
+    parThreeCount: parThrees.length,
+    leadChangeCount,
+    holeLeaders,
+    players,
+  }
+}
