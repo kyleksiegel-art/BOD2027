@@ -88,20 +88,31 @@ export function PlayerEntryRow({
               ) : null}
               {player.pickedUp ? (
                 <span className="font-display text-3xl text-paper-faint">—</span>
+              ) : entered ? (
+                <span className="font-display text-3xl tnum text-paper">{shown}</span>
               ) : (
-                <span
-                  className={`font-display text-3xl tnum ${
-                    entered ? 'text-paper' : 'text-paper-faint'
-                  }`}
+                // Blank: the row shows par as a hint, not a record. Tapping the number logs
+                // par in ONE tap (onStep(0) commits the shown value) — no more nudge-and-back.
+                <button
+                  type="button"
+                  onClick={() => onStep(0)}
+                  aria-label={`Log par (${shown}) for ${player.name}`}
+                  className="tap mx-auto block font-display text-3xl tnum text-paper-faint underline decoration-dotted decoration-hair-strong underline-offset-4"
                 >
                   {shown}
-                </span>
+                </button>
               )}
               <div
                 className={`text-[0.7rem] tnum ${unsaved ? 'text-gold-bright' : 'text-paper-faint'}`}
               >
-                {unsaved ? '• ' : ''}
-                {player.points === null ? '—' : `${player.points} pt`}
+                {player.pickedUp || entered ? (
+                  <>
+                    {unsaved ? '• ' : ''}
+                    {player.points === null ? '—' : `${player.points} pt`}
+                  </>
+                ) : (
+                  <span className="not-italic text-paper-faint">tap = par</span>
+                )}
               </div>
             </div>
 
