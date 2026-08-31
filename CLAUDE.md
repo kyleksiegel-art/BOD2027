@@ -295,8 +295,14 @@ money** (CTP is still entered on the round screen for bragging rights, it just p
   mirror, but under the new model it freezes **`round_purse_cents = round_winner_cents`** and
   **0** for championship_share and ctp (championship is trip-level; CTP pays nothing). The table
   shape is unchanged. Migration: `20260823120000_money_model_revision.sql`.
-- **CTP entry: `src/components/round/CtpEntry.tsx`, inside `/rounds/:n`** — unchanged, still
-  records winners through the outbox. It just no longer feeds the money ledger.
+- **CTP entry now lives in the Enter flow (`src/routes/Enter.tsx`), not on `/rounds/:n`**
+  (2026-08-30, `recap-mockup` branch — Kyle, "score it with everything else"). On a par-3
+  hole an inline "Closest to pin" picker appears below the player rows; the *same* hole Save
+  records scores and the CTP winner together (`saveCtp` folded into `saveHole`, dirty state
+  is `holeIsDirty || ctpIsDirty`). `EnterHoleVM` gained `ctpEligible` (par 3 within
+  `holesCounted`) and `ctpWinnerId`. Still records through the outbox; still $0. The
+  standalone `CtpEntry.tsx` component and the `useRoundCtp` selector are **deleted** —
+  `/rounds/:n` only *reports* CTP now, via the RoundRecap's "Closest to Pin" fact.
 - **Money page: `src/routes/Money.tsx`** — total purse + 1st/2nd/round-winner breakdown, buy-in
   reconciliation, per-round winner cards (no CTP section), per-player ledger, settlement.
 - **Settings: `SettingsEditor.tsx` "Money" card** — four dollar fields (buy-in, round winner,

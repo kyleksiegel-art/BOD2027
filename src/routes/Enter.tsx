@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { PlayerEntryRow } from '@/components/enter/PlayerEntryRow'
 import { useEnterHole, usePendingHoles, useRoundChoices } from '@/lib/data/selectors'
 import type { EnterDraft } from '@/lib/data/compute'
-import { saveCells, subscribeWriteState, getWriteState } from '@/lib/data/mutations'
+import { saveCells, saveCtp, subscribeWriteState, getWriteState } from '@/lib/data/mutations'
 
 function useWriteState() {
   return useSyncExternalStore(subscribeWriteState, getWriteState, getWriteState)
@@ -29,6 +29,9 @@ export default function Enter() {
   // Nothing is written until Save is tapped, so unsaved edits have to survive paging
   // between holes — otherwise walking back to check hole 12 would throw away hole 13.
   const [drafts, setDrafts] = useState<DraftsByHole>({})
+  // Closest-to-pin winner per hole, unsaved until Save. undefined key = untouched; a value
+  // of null is the explicit "no winner". Cleared for a hole once its save succeeds.
+  const [ctpDrafts, setCtpDrafts] = useState<Record<number, string | null>>({})
   // The same map in a ref. React state does not settle within a single frame, so two taps
   // landing in one frame would both read the pre-tap value and one increment would vanish.
   // The ref is the value the next tap computes from; the state is what renders.
@@ -79,6 +82,15 @@ export default function Enter() {
     .sort((a, b) => a - b)
   const holeIsDirty = Object.keys(holeDrafts).length > 0
 
+  // Closest-to-pin, scored inline on the par 3s. The stored winner comes from the VM; an
+  // unsaved pick overlays it. null = "no winner", undefined = untouched.
+  const ctpEligible = vm.hole?.ctpEligible ?? false
+  const ctpStored = vm.hole?.ctpWinnerId
+  const ctpTouched = Object.prototype.hasOwnProperty.call(ctpDrafts, hole)
+  const ctpCurrent = ctpTouched ? ctpDrafts[hole] : ctpStored
+  const ctpIsDirty = ctpTouched && ctpDrafts[hole] !== ctpStored
+  const dirty = holeIsDirty || ctpIsDirty
+
   // A hole isn't saved until every playing player has a score on it — a gross or a pick-up.
   // Drafts are already overlaid into vm.players (buildEnterHole), so this counts unsaved
   // edits alongside cells saved earlier: editing one player of an already-complete hole
@@ -102,23 +114,39 @@ export default function Enter() {
   }
 
   async function saveHole() {
-    if (!vm || !holeIsDirty) return
-    const ok = await saveCells(
-      Object.entries(holeDrafts).map(([playerId, d]) => ({
-        roundId: vm.round.id,
-        playerId,
-        holeNumber: hole,
-        grossStrokes: d.grossStrokes,
-        pickedUp: d.pickedUp,
-      })),
-    )
-    // saveCells resolves true once the hole is durably queued — offline included. It is
-    // false only if this device could not record it at all, and then the edits stay put.
-    if (!ok) return
-    const rest = { ...draftsRef.current }
-    delete rest[hole]
-    draftsRef.current = rest
-    setDrafts(rest)
+    if (!vm || !dirty) return
+    // Scores and CTP are one Save. saveCells/saveCtp each resolve true once the entry is
+    // durably queued — offline included — and false only if this device could not record it
+    // at all, and then the edits stay put.
+    if (holeIsDirty) {
+      const ok = await saveCells(
+        Object.entries(holeDrafts).map(([playerId, d]) => ({
+          roundId: vm.round.id,
+          playerId,
+          holeNumber: hole,
+          grossStrokes: d.grossStrokes,
+          pickedUp: d.pickedUp,
+        })),
+      )
+      if (!ok) return
+      const rest = { ...draftsRef.current }
+      delete rest[hole]
+      draftsRef.current = rest
+      setDrafts(rest)
+    }
+    if (ctpIsDirty) {
+      const ok = await saveCtp({
+        round_id: vm.round.id,
+        hole_number: hole,
+        player_id: ctpDrafts[hole], // string winner, or null for "no winner"
+        distance_feet: null, // distance is not tracked
+      })
+      if (!ok) return
+      setCtpDrafts((prev) => {
+        const { [hole]: _drop, ...rest } = prev
+        return rest
+      })
+    }
     setJustSaved(hole)
   }
 
@@ -137,6 +165,7 @@ export default function Enter() {
               setHole(1)
               draftsRef.current = {}
               setDrafts({})
+              setCtpDrafts({})
             }}
             className={`tap rounded-md border px-2 py-2 text-[0.78rem] leading-tight ${
               r.roundNumber === roundNumber
@@ -278,18 +307,61 @@ export default function Enter() {
             ))}
           </div>
 
+          {/* Closest to pin — only on the par 3s, scored in the same flow as the hole and
+              saved by the same tap. Reported on the round page and recap; entered here. */}
+          {ctpEligible ? (
+            <div className="mt-3 rounded-lg border border-hair bg-ground-2 p-3">
+              <div className="flex items-baseline justify-between">
+                <span className="eyebrow">Closest to pin</span>
+                <span className="text-[0.72rem] text-paper-faint">par or better to claim</span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {playing.map((p) => {
+                  const sel = ctpCurrent === p.playerId
+                  return (
+                    <button
+                      key={p.playerId}
+                      type="button"
+                      aria-pressed={sel}
+                      onClick={() => setCtpDrafts((d) => ({ ...d, [hole]: p.playerId }))}
+                      className={`tap rounded-md border px-3 text-[0.85rem] ${
+                        sel
+                          ? 'border-gold bg-gold-fill text-paper font-semibold'
+                          : 'border-hair-strong text-paper'
+                      }`}
+                    >
+                      {p.name}
+                    </button>
+                  )
+                })}
+                <button
+                  type="button"
+                  aria-pressed={ctpCurrent === null}
+                  onClick={() => setCtpDrafts((d) => ({ ...d, [hole]: null }))}
+                  className={`tap rounded-md border px-3 text-[0.85rem] ${
+                    ctpCurrent === null
+                      ? 'border-gold bg-gold-fill text-paper font-semibold'
+                      : 'border-hair-strong text-paper-dim'
+                  }`}
+                >
+                  No winner
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {/* Save. Nothing reaches the database without this tap — which is also what keeps
               a defaulted par from being recorded just by paging past a hole. */}
           <div className="mt-5">
             <button
               type="button"
-              disabled={!holeIsDirty || !allEntered || write.status === 'saving'}
+              disabled={!dirty || !allEntered || write.status === 'saving'}
               onClick={() => void saveHole()}
               className="tap w-full rounded-md bg-gold-fill px-4 py-3 font-semibold text-paper disabled:bg-transparent disabled:text-paper-faint disabled:outline disabled:outline-1 disabled:outline-hair"
             >
               {write.status === 'saving'
                 ? 'Saving…'
-                : !holeIsDirty
+                : !dirty
                   ? justSaved === hole
                     ? 'Saved'
                     : 'No changes'
@@ -301,7 +373,7 @@ export default function Enter() {
             <div className="mt-2 min-h-[1.25rem] text-[0.82rem] tnum" aria-live="polite">
               {write.status === 'error' ? (
                 <span className="text-gold-bright">{write.message}</span>
-              ) : holeIsDirty && !allEntered ? (
+              ) : dirty && !allEntered ? (
                 // The hole can't be saved until the whole group is in — say who's left.
                 <span className="text-gold-bright">
                   Enter every score to save — still need {stillNeed.join(', ')}.

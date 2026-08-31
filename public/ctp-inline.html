@@ -1,0 +1,800 @@
+<title>Inline Closest-to-Pin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&display=swap"
+/>
+
+<style>
+  :root {
+    /* Fairway Linen — verbatim from src/index.css */
+    --ground: #e9e1d0;
+    --ground-2: #f2ecdd;
+    --paper: #1b1e1c;
+    --paper-dim: #4b453c;
+    --paper-faint: #4f4a41;
+    --gold: #8f5410;
+    --gold-bright: #935608;
+    --gold-fill: #d18316;
+    --blue: #345f7c;
+    --olive: #6f7511;
+    --red: #9a3412;
+    --hair: rgba(27, 30, 28, 0.14);
+    --hair-strong: rgba(27, 30, 28, 0.24);
+    --leader-tint: rgba(209, 131, 22, 0.09);
+    --ctp-fill: rgba(209, 131, 22, 0.1);
+
+    --sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --serif: "Fraunces", ui-serif, Georgia, serif;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--paper);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    line-height: 1.5;
+  }
+
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 2.5rem) 4rem;
+  }
+
+  /* ---- masthead ---- */
+  .masthead {
+    border-bottom: 1px solid var(--hair-strong);
+    padding-bottom: 1.4rem;
+    margin-bottom: 2.2rem;
+  }
+  .kicker {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 0 0 0.5rem;
+  }
+  .masthead h1 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 132, "SOFT" 0, "wght" 600;
+    letter-spacing: -0.02em;
+    font-size: clamp(2.1rem, 6vw, 3.3rem);
+    line-height: 1;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+  }
+  .masthead p {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--paper-dim);
+    font-size: 0.98rem;
+  }
+  .rulecheck {
+    margin-top: 1.2rem;
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    background: var(--ground-2);
+    border: 1px solid var(--hair);
+    border-left: 3px solid var(--gold-fill);
+    border-radius: 3px;
+    padding: 0.8rem 1rem;
+    max-width: 64ch;
+    font-size: 0.86rem;
+    color: var(--paper-dim);
+  }
+  .rulecheck strong { color: var(--paper); font-weight: 600; }
+  .rulecheck .q {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 40, "wght" 600;
+    color: var(--gold-bright);
+    font-size: 1.1rem;
+    line-height: 1.2;
+  }
+
+  /* ---- section headings ---- */
+  .change {
+    margin: 2.8rem 0 1.3rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 0.6rem;
+  }
+  .change .tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--paper);
+    background: var(--gold-fill);
+    border-radius: 2px;
+    padding: 0.18rem 0.5rem;
+  }
+  .change h2 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 60, "wght" 600;
+    font-size: 1.5rem;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .change .sub {
+    color: var(--paper-faint);
+    font-size: 0.85rem;
+    margin-left: auto;
+  }
+
+  .stage {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem 2.4rem;
+    align-items: flex-start;
+  }
+
+  /* ---- phone ---- */
+  .phone {
+    background: var(--ground);
+    border: 1px solid var(--hair-strong);
+    border-radius: 30px;
+    padding: 0.5rem;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 22px 46px -26px rgba(27, 30, 28, 0.55);
+    width: 372px;
+    max-width: 100%;
+    flex: 0 0 auto;
+  }
+  .screen {
+    background: var(--ground);
+    border-radius: 24px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 680px;
+  }
+  .statusbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 1.2rem 0.35rem;
+    font-size: 0.72rem;
+    color: var(--paper-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .statusbar .dots { letter-spacing: 0.14em; cursor: pointer; user-select: none; }
+  .statusbar .dots.off { color: var(--red); }
+  .screen-body { padding: 0.3rem 1.1rem 1.15rem; flex: 1; }
+
+  /* ---- hole header ---- */
+  .hole-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--paper-faint);
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.2rem 0 0.55rem;
+  }
+  .hole-nav .arrow {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border: 1px solid var(--hair);
+    border-radius: 999px;
+    color: var(--paper-dim);
+    font-size: 0.95rem;
+    background: none; cursor: pointer;
+    font-family: var(--sans);
+  }
+  .hole-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 0.7rem;
+    box-shadow: inset 3px 0 0 var(--red);
+    padding-left: 0.7rem;
+    margin-left: -0.3rem;
+  }
+  .hole-num { display: flex; align-items: baseline; gap: 0.5rem; }
+  .hole-num .lbl {
+    font-size: 0.66rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--paper-faint);
+  }
+  .hole-num .n {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 90, "SOFT" 0, "wght" 600;
+    font-size: 2.4rem; line-height: 0.9; letter-spacing: -0.02em;
+  }
+  .hole-meta {
+    text-align: right; font-size: 0.74rem; color: var(--paper-faint);
+    font-variant-numeric: tabular-nums; line-height: 1.45;
+  }
+  .hole-meta .par { color: var(--paper); font-weight: 600; }
+
+  /* ---- score rows ---- */
+  .scores { display: flex; flex-direction: column; margin-top: 0.45rem; }
+  .srow {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.5rem 0; border-bottom: 1px solid var(--hair);
+  }
+  .srow .who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .srow .name { font-size: 0.95rem; font-weight: 500; white-space: nowrap; }
+  .srow .topar { font-size: 0.72rem; color: var(--paper-faint); font-variant-numeric: tabular-nums; }
+  .srow .topar.good { color: var(--olive); font-weight: 600; }
+  .srow .topar.stroke { color: var(--gold-bright); font-weight: 600; }
+  .srow .topar .was { color: var(--red); }
+  .srow.gets {
+    box-shadow: inset 2px 0 0 var(--gold);
+    background: rgba(209, 131, 22, 0.07);
+    padding-left: 0.55rem; margin-left: -0.55rem;
+  }
+  .stepper { display: flex; align-items: center; gap: 0.45rem; }
+  .stepper button {
+    width: 34px; height: 34px; border-radius: 999px;
+    border: 1px solid var(--hair-strong);
+    background: var(--ground-2); color: var(--paper-dim);
+    font-size: 1.1rem; line-height: 1; cursor: pointer; font-family: var(--sans);
+  }
+  .stepper button:active { background: var(--gold-fill); color: var(--paper); }
+  .stepper .val {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 40, "wght" 600;
+    font-size: 1.4rem; min-width: 1.4ch; text-align: center;
+    font-variant-numeric: tabular-nums; cursor: pointer;
+  }
+  .stepper .val.empty { color: var(--paper-faint); font-variation-settings: "opsz" 40, "wght" 400; }
+  .stepper .val.pu { color: var(--paper-faint); font-size: 1.1rem; }
+  .pu-toggle {
+    font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--paper-faint); background: none; border: none; cursor: pointer;
+    padding: 0.15rem 0; font-family: var(--sans);
+  }
+  .pu-toggle.on { color: var(--gold-bright); font-weight: 600; }
+
+  /* ---- CTP control ---- */
+  .ctp { margin-top: 0.95rem; padding-top: 0.85rem; border-top: 1px solid var(--hair); }
+  .ctp.is-locked { opacity: 0.5; }
+  .ctp-head { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.6rem; }
+  .ctp-label {
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--gold);
+  }
+  .ctp-hint { font-size: 0.72rem; color: var(--paper-faint); margin-left: auto; }
+  .ctp-choices { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .ctp-pick, .ctp-none {
+    font: inherit; font-size: 0.9rem; padding: 0.5rem 0.85rem; min-height: 44px;
+    border: 1px solid var(--hair-strong); border-radius: 3px;
+    background: var(--ground-2); color: var(--paper); cursor: pointer;
+  }
+  .ctp-none { color: var(--paper-dim); }
+  .ctp-pick[aria-checked="true"], .ctp-none[aria-checked="true"] {
+    border-color: var(--gold); background: var(--ctp-fill);
+    color: var(--gold-bright); font-weight: 600;
+  }
+  .ctp-pick:disabled { opacity: 0.34; cursor: not-allowed; }
+  .ctp-none:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ctp-pick:focus-visible, .ctp-none:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .ctp-note {
+    margin-top: 0.65rem; font-size: 0.78rem; color: var(--gold-bright);
+    background: var(--ctp-fill); border-radius: 3px; padding: 0.5rem 0.65rem;
+    display: flex; gap: 0.45rem; align-items: flex-start;
+  }
+
+  /* ---- save ---- */
+  .save-wrap { margin-top: 1.1rem; }
+  .save {
+    width: 100%; min-height: 50px; border-radius: 4px; border: none;
+    background: var(--gold-fill); color: var(--paper);
+    font: inherit; font-weight: 600; font-size: 1rem; cursor: pointer;
+  }
+  .save:disabled {
+    background: transparent; color: var(--paper-faint);
+    outline: 1px solid var(--hair); cursor: not-allowed;
+  }
+  .save-msg {
+    margin-top: 0.55rem; min-height: 1.2rem; font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .save-msg.pending { color: var(--paper-dim); }
+  .save-msg.ok { color: var(--olive); font-weight: 600; }
+  .save-msg.warn { color: var(--gold-bright); }
+
+  /* ---- controls rail ---- */
+  .rail { flex: 1 1 300px; min-width: 280px; max-width: 420px; }
+  .rail h3 {
+    font-family: var(--serif); font-variation-settings: "opsz" 40, "wght" 600;
+    font-size: 1.05rem; margin: 0 0 0.2rem;
+  }
+  .rail p { font-size: 0.86rem; color: var(--paper-dim); margin: 0 0 1rem; }
+  .rail .grp { margin-bottom: 1.3rem; }
+  .rail .grp-h {
+    font-size: 0.66rem; font-weight: 600; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--gold); margin: 0 0 0.5rem;
+  }
+  .scen { display: flex; flex-direction: column; gap: 0.4rem; }
+  .scen button {
+    text-align: left; font: inherit; font-size: 0.85rem;
+    padding: 0.55rem 0.7rem; border: 1px solid var(--hair-strong);
+    border-radius: 3px; background: var(--ground-2); color: var(--paper); cursor: pointer;
+  }
+  .scen button:hover { border-color: var(--gold); }
+  .scen button b { display: block; font-weight: 600; }
+  .scen button span { color: var(--paper-faint); font-size: 0.78rem; }
+
+  .statechips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .statechip {
+    font-size: 0.72rem; padding: 0.28rem 0.55rem; border-radius: 999px;
+    border: 1px solid var(--hair); color: var(--paper-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .statechip.hot { border-color: var(--gold); background: var(--ctp-fill); color: var(--gold-bright); font-weight: 600; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1.3rem; margin: 1.4rem 0 0; font-size: 0.8rem; color: var(--paper-dim); }
+  .legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .chip { width: 0.85rem; height: 0.85rem; border-radius: 2px; border: 1px solid var(--hair-strong); }
+  .chip.sel { background: var(--ctp-fill); border-color: var(--gold); }
+  .chip.out { background: var(--ground-2); opacity: 0.4; }
+  .chip.ok { background: var(--ground-2); }
+
+  /* ---- round summary phone (Change B) ---- */
+  .page-head { padding: 0.3rem 0 0.6rem; }
+  .page-head .eye {
+    font-size: 0.66rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--gold); font-weight: 600;
+  }
+  .page-head h3 {
+    font-family: var(--serif); font-variation-settings: "opsz" 72, "SOFT" 0, "wght" 600;
+    font-size: 1.7rem; margin: 0.25rem 0 0; letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 0.55rem;
+  }
+  .swatch { width: 0.62rem; height: 0.62rem; border-radius: 999px; background: var(--red); display: inline-block; }
+  .page-head .day { font-size: 0.76rem; color: var(--paper-faint); margin-top: 0.15rem; }
+
+  .honors { margin-top: 1.5rem; padding: 0.9rem 0.95rem; border: 1px solid var(--hair); border-radius: 4px; background: var(--ground-2); }
+  .honors-h {
+    font-size: 0.64rem; font-weight: 600; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--gold); margin: 0 0 0.55rem;
+  }
+  .honors-row { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.2rem 0; }
+  .honors-row .h { font-size: 0.72rem; color: var(--paper-faint); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; width: 3.2rem; }
+  .honors-row .w { font-weight: 500; font-size: 0.92rem; }
+
+  .ctp-summary { margin-top: 1.6rem; }
+  .ctp-summary-h {
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--gold); margin: 0 0 0.2rem;
+  }
+  .ctp-list { list-style: none; margin: 0.4rem 0 0; padding: 0; }
+  .ctp-list li {
+    display: flex; align-items: center; gap: 0.9rem;
+    padding: 0.78rem 0.2rem; border-bottom: 1px solid var(--hair); cursor: pointer;
+  }
+  .ctp-list li:hover { background: var(--ground-2); }
+  .ctp-hole { font-variant-numeric: tabular-nums; color: var(--paper-faint); width: 2.4rem; font-size: 0.78rem; letter-spacing: 0.04em; font-weight: 500; }
+  .ctp-win { font-weight: 500; font-size: 0.98rem; flex: 1; }
+  .ctp-win.none { color: var(--paper-dim); font-weight: 400; }
+  .ctp-win.pending { color: var(--paper-faint); }
+  .ctp-list .go { color: var(--paper-faint); font-size: 0.95rem; }
+  .ctp-foot { font-size: 0.76rem; color: var(--paper-faint); margin-top: 0.9rem; line-height: 1.5; }
+
+  .colnote { flex: 1 1 280px; min-width: 260px; max-width: 380px; }
+  .colnote h3 { font-family: var(--serif); font-variation-settings: "opsz" 48, "wght" 600; font-size: 1.15rem; margin: 0 0 0.7rem; }
+  .colnote ul { margin: 0; padding-left: 1.1rem; font-size: 0.9rem; color: var(--paper-dim); line-height: 1.7; }
+  .colnote li b { color: var(--paper); font-weight: 600; }
+  .colnote code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82em; background: var(--ground-2); padding: 0.05rem 0.3rem; border-radius: 3px;
+  }
+  .colnote .tail { font-size: 0.82rem; color: var(--paper-faint); margin-top: 1.1rem; line-height: 1.55; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .phone { animation: rise 0.5s ease both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+    .flash { animation: flash 0.5s ease; }
+    @keyframes flash { from { background: var(--ctp-fill); } }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="kicker">BOD·27 — Interaction Mockup</p>
+    <h1>Closest&nbsp;to&nbsp;the&nbsp;Pin, in the score flow</h1>
+    <p>
+      CTP entry moves off the round page and into hole-by-hole scoring, where it
+      actually happens. Eligibility is derived from the gross scores you've
+      already tapped — and it's live. Tap the steppers on the left phone and watch
+      who can win change in real time.
+    </p>
+    <div class="rulecheck">
+      <span class="q">!</span>
+      <div>
+        <strong>Rule as built here:</strong> a player qualifies only by making
+        <strong>exactly gross par</strong> — a 3 on this par 3. A birdie (2) does
+        <em>not</em> qualify; bogey+ and pick-ups don't either. Handicap strokes,
+        net and Stableford points are irrelevant to CTP. This departs from the
+        earlier mockup's “par or better.”
+      </div>
+    </div>
+  </header>
+
+  <div class="change">
+    <span class="tag">A</span>
+    <h2>Live inline control, in the Enter flow</h2>
+    <span class="sub">try it — it's interactive</span>
+  </div>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span class="dots" id="conn" title="tap to toggle online/offline">●●● online</span>
+        </div>
+        <div class="screen-body">
+          <div class="hole-nav">
+            <button class="arrow" id="prev" aria-label="Previous hole">‹</button>
+            <span id="holecrumb">Hole 6 of 18 · Streamsong Red</span>
+            <button class="arrow" id="next" aria-label="Next hole">›</button>
+          </div>
+          <div class="hole-head">
+            <div class="hole-num">
+              <span class="lbl">Hole</span><span class="n" id="holenum">6</span>
+            </div>
+            <div class="hole-meta">
+              <div><span class="par">Par 3</span></div>
+              <div id="holemeta">SI 15 · 168 yds</div>
+            </div>
+          </div>
+
+          <div class="scores" id="scores"></div>
+
+          <div class="ctp" id="ctp">
+            <div class="ctp-head">
+              <span class="ctp-label">Closest to the pin</span>
+              <span class="ctp-hint" id="ctphint">gross par to claim</span>
+            </div>
+            <div class="ctp-choices" id="ctpchoices" role="radiogroup" aria-label="Closest to pin"></div>
+            <div id="ctpnote"></div>
+          </div>
+
+          <div class="save-wrap">
+            <button class="save" id="save">All 4 scores needed</button>
+            <div class="save-msg" id="savemsg" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <h3>Drive the states</h3>
+      <p>One save action handles the scores and the CTP result together. Jump to a
+        scenario, then edit the steppers to see eligibility and the Save button react.</p>
+
+      <div class="grp">
+        <div class="grp-h">Scenarios</div>
+        <div class="scen" id="scen"></div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-h">Live state</div>
+        <div class="statechips" id="chips"></div>
+      </div>
+
+      <div class="legend">
+        <span><span class="chip sel"></span> selected winner</span>
+        <span><span class="chip ok"></span> eligible — gross par</span>
+        <span><span class="chip out"></span> ineligible</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="change">
+    <span class="tag">B</span>
+    <h2>The round page becomes a read-only record</h2>
+    <span class="sub">~20 buttons off the review screen</span>
+  </div>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots">●●● online</span></div>
+        <div class="screen-body">
+          <div class="page-head">
+            <span class="eye">Round 1 · Thu, Feb 4</span>
+            <h3><span class="swatch"></span>Streamsong Red</h3>
+            <div class="day">Coore &amp; Crenshaw · Par 72</div>
+          </div>
+
+          <div class="honors">
+            <div class="honors-h">Today's honors</div>
+            <div class="honors-row"><span class="h">CTP 6</span><span class="w">Kyle Siegel</span></div>
+            <div class="honors-row"><span class="h">CTP 16</span><span class="w">Adam Hersh</span></div>
+          </div>
+
+          <div class="ctp-summary">
+            <h4 class="ctp-summary-h">Closest to the pin</h4>
+            <ul class="ctp-list">
+              <li><span class="ctp-hole">H6</span><span class="ctp-win">Kyle Siegel</span><span class="go">›</span></li>
+              <li><span class="ctp-hole">H8</span><span class="ctp-win none">No winner</span><span class="go">›</span></li>
+              <li><span class="ctp-hole">H14</span><span class="ctp-win pending">—</span><span class="go">›</span></li>
+              <li><span class="ctp-hole">H16</span><span class="ctp-win">Adam Hersh</span><span class="go">›</span></li>
+            </ul>
+            <p class="ctp-foot">
+              Bragging rights only — pays nothing. Tap any hole to jump back to it
+              in Enter and correct the result. Only recorded winners appear up top
+              in Today's Honors; “no winner” and undecided (—) stay out of it.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="colnote">
+      <h3>What changes in code</h3>
+      <ul>
+        <li><b>No schema change.</b> Same <code>ctp_results</code> row per par 3: a
+          winner, an explicit null (“no winner”), or no row (undecided).</li>
+        <li><b>One derive.</b> <code>eligible = !pickedUp &amp;&amp; gross === par</code>,
+          run live off the draft-overlaid scores already on screen.</li>
+        <li><b>One save.</b> A combined <code>saveHole()</code> queues the score
+          cells and the CTP row through the existing outbox, one flush — durable
+          offline, advances only if both queue.</li>
+        <li><b>Self-heals.</b> If a score edit makes the stored winner ineligible,
+          the pick clears and the hole flags for a re-pick.</li>
+        <li><b>Round page: read-only.</b> Four entry cards become one glanceable
+          list that deep-links back to Enter.</li>
+      </ul>
+      <p class="tail">Net effect: one data-entry pass instead of two, the
+        “must make par” rule enforced from the data itself, and a review screen
+        that's finally just a review.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var PAR = 3;
+  var ROSTER = ["Kyle Siegel", "Chris Denove", "Jon Aronson", "Adam Hersh"];
+  // strokes = net stroke received on this hole (cosmetic, matches the app rail)
+  var STROKE = { "Kyle Siegel": 1, "Chris Denove": 0, "Jon Aronson": 0, "Adam Hersh": 1 };
+
+  var SCEN = {
+    normal:  { label: "Normal", desc: "Kyle 3 · one winner",   scores: { "Kyle Siegel":3, "Chris Denove":2, "Jon Aronson":4, "Adam Hersh":4 }, pu:{} , ctp:"Kyle Siegel", saved:"Kyle Siegel" },
+    two:     { label: "Two make par", desc: "Kyle 3 & Chris 3", scores: { "Kyle Siegel":3, "Chris Denove":3, "Jon Aronson":4, "Adam Hersh":5 }, pu:{}, ctp:undefined, saved:undefined },
+    none:    { label: "Nobody qualifies", desc: "bogey+ / pick-up", scores: { "Kyle Siegel":4, "Chris Denove":5, "Jon Aronson":null, "Adam Hersh":4 }, pu:{ "Jon Aronson":true }, ctp:undefined, saved:undefined },
+    empty:   { label: "Fresh hole", desc: "nothing entered yet", scores: { "Kyle Siegel":null, "Chris Denove":null, "Jon Aronson":null, "Adam Hersh":null }, pu:{}, ctp:undefined, saved:undefined },
+    birdie:  { label: "Birdie is NOT a win", desc: "Kyle makes 2", scores: { "Kyle Siegel":2, "Chris Denove":3, "Jon Aronson":4, "Adam Hersh":4 }, pu:{}, ctp:undefined, saved:undefined }
+  };
+
+  var state = null;   // { hole, scores, pu, ctp, saved, online }
+  var HOLE = 6;
+  var online = true;
+
+  function load(key) {
+    var s = SCEN[key];
+    state = {
+      scores: Object.assign({}, s.scores),
+      pu: Object.assign({}, s.pu),
+      ctp: s.ctp,          // undefined | null | name
+      saved: s.saved,      // last persisted value
+      note: null
+    };
+    render();
+  }
+
+  function grossOf(n) { return state.pu[n] ? null : state.scores[n]; }
+  function eligible(n) { return !state.pu[n] && state.scores[n] === PAR; }
+  function eligibleSet() { return ROSTER.filter(eligible); }
+  function allEntered() { return ROSTER.every(function (n) { return state.pu[n] || state.scores[n] != null; }); }
+  function validDecision() {
+    if (state.ctp === undefined) return false;
+    if (state.ctp === null) return true;
+    return eligible(state.ctp);
+  }
+  function scoreDirty() {
+    var s = currentSavedScenario();
+    return true; // treat every edit as potentially dirty for the mock; save always available when valid
+  }
+  function currentSavedScenario() { return null; }
+
+  function setScore(n, delta) {
+    if (state.pu[n]) { state.pu[n] = false; }
+    var cur = state.scores[n];
+    if (cur == null) cur = PAR;
+    state.scores[n] = Math.min(12, Math.max(1, cur + delta));
+    reconcileCtp();
+    render(true);
+  }
+  function togglePU(n) {
+    state.pu[n] = !state.pu[n];
+    if (state.pu[n]) state.scores[n] = null;
+    reconcileCtp();
+    render(true);
+  }
+  function reconcileCtp() {
+    // Auto-clear a player winner who is no longer eligible.
+    if (typeof state.ctp === "string" && !eligible(state.ctp)) {
+      var who = state.ctp;
+      state.ctp = undefined;
+      state.note = "CTP cleared — " + who.split(" ")[0] + " no longer made par. Re-pick a winner.";
+    }
+  }
+
+  function pickCtp(v) {
+    if (!allEntered()) return;
+    if (typeof v === "string" && !eligible(v)) return;
+    state.ctp = v;
+    state.note = null;
+    render();
+  }
+
+  function doSave() {
+    if (!allEntered() || !validDecision()) return;
+    state.saved = state.ctp;
+    state.note = null;
+    var msg = document.getElementById("savemsg");
+    var winnerTxt = state.ctp === null ? "no winner" : (state.ctp ? state.ctp.split(" ")[0] : "");
+    if (HOLE < 18) {
+      msg.className = "save-msg ok";
+      msg.textContent = online
+        ? "✓ Saved (" + winnerTxt + ") — advancing to hole " + (HOLE + 1)
+        : "✓ Saved on this phone (" + winnerTxt + ") — will sync · hole " + (HOLE + 1);
+      setTimeout(function () { HOLE++; load("empty"); }, 950);
+    } else {
+      msg.className = "save-msg ok";
+      msg.textContent = "✓ Round complete — every hole saved.";
+    }
+    render();
+  }
+
+  // ---------- rendering ----------
+  function render(flash) {
+    var elig = eligibleSet();
+    var all = allEntered();
+
+    // hole header
+    document.getElementById("holenum").textContent = HOLE;
+    document.getElementById("holecrumb").textContent = "Hole " + HOLE + " of 18 · Streamsong Red";
+
+    // score rows
+    var box = document.getElementById("scores");
+    box.innerHTML = "";
+    ROSTER.forEach(function (n) {
+      var g = state.scores[n];
+      var isPU = !!state.pu[n];
+      var gets = STROKE[n] > 0;
+      var row = document.createElement("div");
+      row.className = "srow" + (gets ? " gets" : "");
+
+      var toparCls = "topar", toparTxt;
+      if (isPU) { toparTxt = "picked up"; }
+      else if (g == null) { toparTxt = "not entered"; }
+      else {
+        var d = g - PAR;
+        if (d === 0) { toparCls += " good"; toparTxt = "par"; }
+        else if (d < 0) { toparCls += " good"; toparTxt = d + " (birdie)"; }
+        else { toparTxt = "+" + d; }
+        if (gets) toparCls = "topar stroke";
+        toparTxt += gets ? " · 1 stroke here" : "";
+      }
+
+      var valTxt = isPU ? "✕" : (g == null ? "–" : g);
+      var valCls = "val" + (isPU ? " pu" : (g == null ? " empty" : ""));
+
+      row.innerHTML =
+        '<div class="who"><span class="name">' + n + '</span>' +
+        '<span class="' + toparCls + '">' + toparTxt + '</span>' +
+        '<button class="pu-toggle' + (isPU ? " on" : "") + '" data-pu="' + n + '">' +
+          (isPU ? "undo pick-up" : "pick up") + '</button></div>' +
+        '<div class="stepper">' +
+          '<button data-step="-1" data-n="' + n + '" aria-label="minus">−</button>' +
+          '<span class="' + valCls + '">' + valTxt + '</span>' +
+          '<button data-step="1" data-n="' + n + '" aria-label="plus">+</button>' +
+        '</div>';
+      box.appendChild(row);
+    });
+
+    // ctp control
+    var ctpEl = document.getElementById("ctp");
+    ctpEl.className = "ctp" + (all ? "" : " is-locked");
+    document.getElementById("ctphint").textContent = all
+      ? (elig.length ? "gross par to claim" : "nobody made par")
+      : "enter scores first";
+
+    var choices = document.getElementById("ctpchoices");
+    choices.innerHTML = "";
+    ROSTER.forEach(function (n) {
+      var b = document.createElement("button");
+      b.className = "ctp-pick";
+      b.setAttribute("role", "radio");
+      var on = state.ctp === n;
+      b.setAttribute("aria-checked", on ? "true" : "false");
+      b.disabled = !all || !eligible(n);
+      b.textContent = n.split(" ")[0];
+      b.addEventListener("click", function () { pickCtp(n); });
+      choices.appendChild(b);
+    });
+    var none = document.createElement("button");
+    none.className = "ctp-none";
+    none.setAttribute("role", "radio");
+    none.setAttribute("aria-checked", state.ctp === null ? "true" : "false");
+    none.disabled = !all;
+    none.textContent = "No winner";
+    none.addEventListener("click", function () { pickCtp(null); });
+    choices.appendChild(none);
+
+    // note
+    var noteEl = document.getElementById("ctpnote");
+    noteEl.innerHTML = state.note
+      ? '<div class="ctp-note"><span>⚠</span><span>' + state.note + '</span></div>'
+      : "";
+
+    // save button
+    var save = document.getElementById("save");
+    var msg = document.getElementById("savemsg");
+    if (!all) {
+      save.disabled = true;
+      save.textContent = "All 4 scores needed";
+    } else if (!validDecision()) {
+      save.disabled = true;
+      save.textContent = "Choose CTP winner";
+    } else {
+      save.disabled = false;
+      save.textContent = HOLE < 18 ? "Save & Next" : "Save & Finish";
+    }
+    if (!msg.classList.contains("ok")) { msg.textContent = ""; msg.className = "save-msg"; }
+
+    // connection pill
+    var conn = document.getElementById("conn");
+    conn.textContent = online ? "●●● online" : "●●● offline · queued";
+    conn.className = "dots" + (online ? "" : " off");
+
+    // live-state chips
+    var chips = document.getElementById("chips");
+    chips.innerHTML = "";
+    function chip(txt, hot) {
+      var c = document.createElement("span");
+      c.className = "statechip" + (hot ? " hot" : "");
+      c.textContent = txt;
+      chips.appendChild(c);
+    }
+    chip("scores " + (all ? "complete" : "incomplete"), all);
+    chip("eligible: " + (elig.length ? elig.map(function (n) { return n.split(" ")[0]; }).join(", ") : "none"), elig.length > 0);
+    chip("decision " + (validDecision() ? "valid" : "needed"), validDecision());
+    chip(save.disabled ? "save: locked" : "save: ready", !save.disabled);
+
+    if (flash) { box.classList.remove("flash"); void box.offsetWidth; box.classList.add("flash"); }
+  }
+
+  // event delegation for steppers / pick-up
+  document.getElementById("scores").addEventListener("click", function (e) {
+    var t = e.target;
+    if (t.dataset && t.dataset.step) { setScore(t.dataset.n, parseInt(t.dataset.step, 10)); }
+    else if (t.dataset && t.dataset.pu) { togglePU(t.dataset.pu); }
+  });
+  document.getElementById("save").addEventListener("click", doSave);
+  document.getElementById("conn").addEventListener("click", function () { online = !online; render(); });
+  document.getElementById("next").addEventListener("click", function () { if (HOLE < 18) { HOLE++; load("empty"); } });
+  document.getElementById("prev").addEventListener("click", function () { if (HOLE > 1) { HOLE--; load("empty"); } });
+
+  // scenario buttons
+  var scen = document.getElementById("scen");
+  Object.keys(SCEN).forEach(function (key) {
+    var s = SCEN[key];
+    var b = document.createElement("button");
+    b.innerHTML = "<b>" + s.label + "</b><span>" + s.desc + "</span>";
+    b.addEventListener("click", function () { HOLE = 6; load(key); });
+    scen.appendChild(b);
+  });
+
+  load("normal");
+})();
+</script>
