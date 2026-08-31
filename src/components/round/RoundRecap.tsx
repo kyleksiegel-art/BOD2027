@@ -1,193 +1,264 @@
 import { Link } from 'react-router-dom'
-import type { RoundRecapVM } from '@/lib/data/compute'
+import type { RoundRecapVM, RecapAct } from '@/lib/data/compute'
 import { courseSlug, formatDay, formatMoney } from '@/lib/format'
 
-// Non-gold identity palette (gold is reserved for leader/winner status — see index.css).
-const PLAYER_COLORS = ['var(--blue)', 'var(--olive)', 'var(--red)', 'var(--paper-faint)']
+// Stable non-gold identity palette (gold is reserved for leader/winner status; red is the
+// course rail). Indexed by RecapPlayer.colorIndex so a player keeps one colour all round.
+const PLAYER_COLORS = ['var(--blue)', 'var(--gold-fill)', 'var(--olive)', 'var(--paper-faint)']
 
 /**
- * Deterministic post-round report, rendered above the leaderboard once play has begun.
- * Every fact comes from buildRoundRecap — no scoring math here, no network. The same view
- * model will drive the shareable image; this is the in-context card.
+ * The live round story: ONE card driven by round state. It opens as a live leaderboard, becomes
+ * the round's story through the turn, tightens into late-round drama, and settles into the final
+ * recap — all from buildRoundRecap, re-derived on every score change via the normal useLiveQuery
+ * path (so it's live on every phone). The rest of /rounds/:n is untouched.
  */
 export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
   const slug = courseSlug(vm.course.name) ?? undefined
-  const colorOf = new Map(vm.players.map((p, i) => [p.playerId, PLAYER_COLORS[i % PLAYER_COLORS.length]]))
+  const colorOf = new Map(vm.players.map((p) => [p.playerId, PLAYER_COLORS[p.colorIndex % PLAYER_COLORS.length]]))
 
-  const winnerNames = vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')
-  const multi = vm.winners.length > 1
-  const verb =
-    vm.complete || vm.official ? (multi ? 'share' : 'takes') : multi ? 'lead' : 'leads'
-  const winPoints = vm.winners[0]?.points ?? 0
+  // Ribbon: leader per hole, and where the lead flipped.
+  let prevLeader: string | null = null
+  const cells = vm.holeLeaders.map((h) => {
+    const leader = h.inPlay ? h.order[0] : null
+    const flip = h.inPlay && prevLeader !== null && leader !== prevLeader
+    if (h.inPlay) prevLeader = leader
+    return { holeNumber: h.holeNumber, inPlay: h.inPlay, color: leader ? colorOf.get(leader) : undefined, flip }
+  })
+  const ribbonRight = ribbonCaption(vm.act, vm.leadChangeCount)
 
   return (
     <section
       className="round round-rail mt-6 overflow-hidden rounded-lg border border-hair bg-ground-2"
       data-course={slug}
     >
-      {/* header band */}
-      <div className="border-b border-hair p-5">
-        <div className="flex items-center gap-2">
-          <span className="round-swatch h-2.5 w-2.5 flex-none rounded-full" aria-hidden />
-          <span className="eyebrow">Round Recap</span>
-          <span
-            className={`ml-auto rounded-sm border px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.14em] ${
-              vm.official
-                ? 'border-hair-strong text-paper-faint'
-                : 'border-gold/40 text-gold'
-            }`}
-          >
-            {vm.official ? 'Official' : 'Provisional'}
-          </span>
-        </div>
-        <p className="fx-serif-sm mt-3 font-display text-[0.95rem] text-paper-dim">
+      {/* header */}
+      <div className="flex items-center gap-2 border-b border-hair px-4 py-3">
+        <span className={`h-2 w-2 flex-none rounded-full ${vm.live ? 'recap-pulse' : 'round-swatch'}`} aria-hidden />
+        <span className="eyebrow">{vm.live ? `Live · Round ${vm.round.round_number}` : 'Round Recap'}</span>
+        <span
+          className={`ml-auto rounded-sm border px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.14em] tnum ${
+            vm.official ? 'border-gold text-gold' : 'border-hair-strong text-paper-faint'
+          }`}
+        >
+          {vm.official ? 'Official' : vm.live ? `Thru ${vm.roundThru}` : 'Final'}
+        </span>
+      </div>
+
+      {/* hero: course, headline, narrative */}
+      <div className="px-4 pb-3 pt-3">
+        <p className="fx-serif-sm font-display text-[0.86rem] text-paper-dim">
           {vm.course.name} · {formatDay(vm.round.date)}
         </p>
-        <h2 className="fx-head mt-1 font-display text-[1.9rem] font-semibold leading-none text-paper">
-          <span className="text-gold-bright">{winnerNames}</span> {verb} it.
+        <h2 className="fx-head mt-0.5 font-display text-[1.75rem] font-semibold leading-none text-paper">
+          {vm.headline.map((seg, i) => (
+            <span key={i} className={seg.gold ? 'text-gold-bright' : undefined}>
+              {seg.text}
+            </span>
+          ))}
         </h2>
-        <p className="mt-2 text-[0.92rem] text-paper-dim">
-          <b className="font-semibold text-paper tnum">{winPoints} pts</b>
-          {vm.margin > 0 ? (
-            <>
-              {' '}— a <b className="font-semibold text-paper tnum">{vm.margin}-point</b> margin
-              {vm.runnerUp ? ` over ${vm.runnerUp.name.split(/\s+/)[0]}` : ''}.
-            </>
-          ) : vm.winners.length > 1 ? (
-            <> — dead level at the top.</>
-          ) : (
-            <> so far.</>
-          )}
-        </p>
+        <p className="mt-2 text-[0.92rem] text-paper-dim">{vm.narrative}</p>
       </div>
 
-      {/* fact grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2">
-        <Fact label={`Round Winner${vm.roundWinnerCents ? ' · Pays' : ''}`}>
-          <span className="tnum">
-            {winnerNames}
-            {vm.roundWinnerCents ? ` · ${formatMoney(vm.roundWinnerCents)}` : ''}
+      {/* leader ribbon */}
+      <div className="px-4 pb-3">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
+            How the lead moved
           </span>
-          <Detail>
-            {vm.standing
-              .slice(0, 4)
-              .map((s) => `${s.name.split(/\s+/)[0]} ${s.points}`)
-              .join(' · ')}
-          </Detail>
-        </Fact>
-
-        <Fact label="Biggest Move">
-          {vm.biggestMove ? (
-            <>
-              <span>{vm.biggestMove.name}</span>
-              <Detail>
-                <span className="font-semibold text-olive">▲{vm.biggestMove.change}</span>{' '}
-                {ordinal(vm.biggestMove.from)} → {ordinal(vm.biggestMove.to)} overall
-              </Detail>
-            </>
-          ) : (
-            <span className="text-paper-faint">—</span>
-          )}
-        </Fact>
-
-        <Fact label="Best Closing Nine">
-          {vm.bestClosingNine ? (
-            <>
-              <span className="tnum">
-                {vm.bestClosingNine.name} · {vm.bestClosingNine.points}
-              </span>
-              <Detail>back-nine net points — round high</Detail>
-            </>
-          ) : (
-            <span className="text-paper-faint">—</span>
-          )}
-        </Fact>
-
-        <Fact label={`Closest to Pin · ${vm.parThreeCount} par 3s`}>
-          <div className="mt-0.5 flex flex-wrap gap-1.5">
-            {vm.ctpWinners.map((c) => (
-              <span
-                key={c.holeNumber}
-                className={`tnum rounded-full border px-2 py-0.5 text-[0.76rem] ${
-                  c.name
-                    ? 'border-hair bg-[var(--leader-tint)] text-paper'
-                    : 'border-hair text-paper-faint'
-                }`}
-              >
-                <b className="font-semibold">{c.holeNumber}</b> {c.name ? c.name.split(/\s+/)[0] : 'carry'}
-              </span>
-            ))}
-            {vm.ctpWinners.length === 0 && <span className="text-paper-faint">—</span>}
-          </div>
-        </Fact>
-
-        {/* lead-change strip spans the grid */}
-        <div className="border-t border-hair p-4 sm:col-span-2">
-          <p className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
-            Lead changed hands {vm.leadChangeCount} {vm.leadChangeCount === 1 ? 'time' : 'times'}
-          </p>
-          <div className="mt-2 flex h-11 items-end gap-px">
-            {vm.holeLeaders.map((h) => (
-              <div key={h.holeNumber} className="flex h-full flex-1 flex-col-reverse justify-start gap-0.5">
-                {h.order.map((pid, idx) => (
-                  <span
-                    key={pid}
-                    className="rounded-[1px]"
-                    style={{
-                      background: h.inPlay ? colorOf.get(pid) : 'var(--hair)',
-                      flex: vm.players.length - idx,
-                      opacity: h.inPlay ? (idx === 0 ? 1 : 0.28) : 0.5,
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.74rem] text-paper-dim">
-            {vm.players.map((p) => (
-              <span key={p.playerId} className="inline-flex items-center gap-1.5">
-                <i
-                  className="inline-block h-2.5 w-2.5 rounded-[2px]"
-                  style={{ background: colorOf.get(p.playerId) }}
+          <span className="ml-auto text-[0.74rem] text-paper-dim">{ribbonRight}</span>
+        </div>
+        <div className="mt-1.5 flex gap-px">
+          {cells.map((c) => (
+            <span
+              key={c.holeNumber}
+              className="relative h-5 flex-1 rounded-[2px]"
+              style={{ background: c.inPlay ? c.color : 'var(--hair)', opacity: c.inPlay ? 1 : 0.45 }}
+            >
+              {c.flip && (
+                <span
+                  className="absolute -top-[5px] left-[-1px] right-[-1px] h-[3px] rounded-[2px]"
+                  style={{ background: 'var(--gold-fill)' }}
                   aria-hidden
                 />
-                {p.short}
-              </span>
-            ))}
-          </div>
+              )}
+            </span>
+          ))}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.72rem] text-paper-dim">
+          {vm.players.map((p) => (
+            <span key={p.playerId} className="inline-flex items-center gap-1.5">
+              <i className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: colorOf.get(p.playerId) }} aria-hidden />
+              {p.short}
+            </span>
+          ))}
+          <span className="text-gold-bright">▏ lead flip</span>
         </div>
       </div>
 
+      {/* leaderboard */}
+      <ol className="border-t border-hair">
+        {vm.standing.map((p, i) => {
+          const leader = i === 0
+          return (
+            <li
+              key={p.playerId}
+              className={`grid grid-cols-[1.2rem_1fr_auto] items-center gap-x-3 border-b border-hair px-4 py-2 last:border-b-0 ${
+                leader ? 'leader-row' : ''
+              }`}
+            >
+              <span className={`tnum fx-serif-sm font-display text-[0.95rem] font-semibold ${leader ? 'text-gold' : 'text-paper-faint'}`}>
+                {i + 1}
+              </span>
+              <span className="flex flex-col">
+                <span className="text-paper">{p.name}</span>
+                {vm.live && (
+                  <span className="tnum text-[0.7rem] text-paper-faint">
+                    thru {p.thru}
+                    {leader && p.projection !== null ? ` · proj ${p.projection}` : ''}
+                    {!leader && p.gapToLeader > 0 ? ` · −${p.gapToLeader}` : ''}
+                  </span>
+                )}
+              </span>
+              <span className={`tnum fx-title text-right font-display text-[1.25rem] font-semibold ${leader ? 'text-gold-bright' : 'text-paper'}`}>
+                {p.points}
+                <span className="ml-0.5 text-[0.6rem] font-normal text-paper-faint">pts</span>
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+
+      {/* act-specific facts */}
+      <ActFacts vm={vm} />
+
       {/* footer */}
-      <div className="flex items-center gap-3 border-t border-hair bg-ground p-3">
-        <span className="text-[0.74rem] text-paper-faint">
-          {vm.official ? 'Final · ' : 'Live · '}derived on-device
+      <div className="flex items-center gap-2.5 border-t border-hair bg-ground px-4 py-2.5">
+        <span className="tnum text-[0.72rem] text-paper-faint">
+          {vm.live ? `Live · thru ${vm.roundThru} · updating` : 'Final · derived on-device'}
         </span>
         <Link
           to="/standings"
-          className="tap ml-auto inline-flex items-center rounded border border-hair-strong px-3 text-[0.85rem] font-semibold text-paper"
+          className="tap ml-auto inline-flex items-center rounded border border-hair-strong px-3 text-[0.82rem] font-semibold text-paper"
         >
           Standings
         </Link>
-        <ShareButton vm={vm} winnerNames={winnerNames} verb={verb} />
+        {!vm.live && <ShareButton vm={vm} />}
       </div>
     </section>
   )
 }
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+function ribbonCaption(act: RecapAct, changes: number): string {
+  if (act === 'opening' && changes === 0) return 'wire to wire so far'
+  if (changes === 0) return 'no change yet'
+  return `${changes} lead change${changes === 1 ? '' : 's'}`
+}
+
+/** The facts row, chosen by act — nothing shows until it has signal. */
+function ActFacts({ vm }: { vm: RoundRecapVM }) {
+  const rows: { k: string; v: React.ReactNode }[] = []
+
+  if (vm.act === 'moving') {
+    if (vm.holesWonLeader)
+      rows.push({ k: 'Holes won', v: `${vm.holesWonLeader.name} · ${vm.holesWonLeader.count} of ${vm.holesWonLeader.of}` })
+    if (vm.shotOfTheDay)
+      rows.push({
+        k: 'Shot of the day',
+        v: (
+          <>
+            {vm.shotOfTheDay.name} <Small>— {vm.shotOfTheDay.label}, {ordinal(vm.shotOfTheDay.holeNumber)}</Small>
+          </>
+        ),
+      })
+  } else if (vm.act === 'closing') {
+    rows.push({ k: 'To play', v: <ToPlay vm={vm} /> })
+    if (vm.parThreeCount > 0) rows.push({ k: 'Closest to pin', v: <CtpChips vm={vm} /> })
+  } else if (vm.act === 'final') {
+    rows.push({
+      k: vm.roundWinnerCents ? 'Winner · pays' : 'Winner',
+      v: (
+        <>
+          {vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')}
+          {vm.roundWinnerCents ? ` · ${formatMoney(vm.roundWinnerCents)}` : ''}{' '}
+          <Small>
+            {vm.winners[0]?.points} pts{vm.margin > 0 ? `, by ${vm.margin}` : ''}
+          </Small>
+        </>
+      ),
+    })
+    if (vm.biggestMove)
+      rows.push({
+        k: 'Biggest move',
+        v: (
+          <>
+            <span className="text-olive">▲{vm.biggestMove.change}</span> {vm.biggestMove.name}{' '}
+            <Small>
+              {ordinal(vm.biggestMove.from)} → {ordinal(vm.biggestMove.to)} overall
+            </Small>
+          </>
+        ),
+      })
+    else if (vm.holesWonLeader)
+      rows.push({ k: 'Holes won', v: `${vm.holesWonLeader.name} · ${vm.holesWonLeader.count} of ${vm.holesWonLeader.of}` })
+    if (vm.parThreeCount > 0) rows.push({ k: 'Closest to pin', v: <CtpChips vm={vm} /> })
+  }
+
+  if (rows.length === 0) return null
+
   return (
-    <div className="border-t border-hair p-4 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(odd)]:border-r-hair">
-      <p className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">{label}</p>
-      <div className="fx-serif-sm mt-1.5 font-display text-[1.1rem] font-semibold leading-tight text-paper">
-        {children}
-      </div>
+    <div className="border-t border-hair">
+      {rows.map((r, i) => (
+        <div key={i} className="flex items-baseline gap-3 border-b border-hair px-4 py-2 last:border-b-0">
+          <span className="w-[7rem] flex-none text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-paper-faint">
+            {r.k}
+          </span>
+          <span className="fx-serif-sm font-display text-[0.98rem] font-semibold text-paper">{r.v}</span>
+        </div>
+      ))}
     </div>
   )
 }
 
-function Detail({ children }: { children: React.ReactNode }) {
-  return <p className="mt-1 font-sans text-[0.8rem] font-normal text-paper-dim">{children}</p>
+function ToPlay({ vm }: { vm: RoundRecapVM }) {
+  const holes: number[] = []
+  for (let h = vm.roundThru + 1; h <= vm.roundThru + vm.remaining; h++) holes.push(h)
+  return (
+    <span className="tnum">
+      {holes.map((h, i) => (
+        <span key={h}>
+          {i > 0 ? ' · ' : ''}
+          {h === vm.nextPar3 ? (
+            <b>
+              {h} <span className="font-sans text-[0.72rem] font-normal text-paper-dim">par 3</span>
+            </b>
+          ) : (
+            h
+          )}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function CtpChips({ vm }: { vm: RoundRecapVM }) {
+  return (
+    <span className="flex flex-wrap gap-1">
+      {vm.ctpWinners.map((c) => (
+        <span
+          key={c.holeNumber}
+          className={`tnum rounded-full border px-2 py-0.5 text-[0.74rem] ${
+            c.name ? 'border-hair bg-[var(--leader-tint)] text-paper' : 'border-hair text-paper-faint'
+          }`}
+        >
+          <b className="font-semibold">{c.holeNumber}</b> {c.name ? c.name.split(/\s+/)[0] : c.open ? 'open' : 'carry'}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function Small({ children }: { children: React.ReactNode }) {
+  return <span className="font-sans text-[0.78rem] font-normal text-paper-dim">{children}</span>
 }
 
 function ordinal(n: number): string {
@@ -198,29 +269,21 @@ function ordinal(n: number): string {
 
 /**
  * Share the recap as text via the Web Share API where available (needs HTTPS — the deploy
- * preview qualifies). The shareable IMAGE export is a deliberate follow-up; this ships the
- * group-text hand-off now without the canvas-rasterisation work.
+ * preview qualifies). The shareable IMAGE export is a deliberate follow-up.
  */
-function ShareButton({
-  vm,
-  winnerNames,
-  verb,
-}: {
-  vm: RoundRecapVM
-  winnerNames: string
-  verb: string
-}) {
+function ShareButton({ vm }: { vm: RoundRecapVM }) {
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   if (!canShare) return null
 
   const onShare = () => {
+    const winnerNames = vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')
     const lines = [
-      `${vm.course.name} — ${winnerNames} ${verb} it (${vm.winners[0]?.points ?? 0} pts${
-        vm.margin > 0 ? `, by ${vm.margin}` : ''
-      }).`,
+      `${vm.course.name} — ${winnerNames} ${vm.winners.length > 1 ? 'share it' : 'takes it'} (${
+        vm.winners[0]?.points ?? 0
+      } pts${vm.margin > 0 ? `, by ${vm.margin}` : ''}).`,
     ]
     if (vm.biggestMove) lines.push(`Biggest move: ${vm.biggestMove.name} ▲${vm.biggestMove.change}.`)
-    if (vm.bestClosingNine) lines.push(`Best back nine: ${vm.bestClosingNine.name} (${vm.bestClosingNine.points}).`)
+    if (vm.holesWonLeader) lines.push(`Holes won: ${vm.holesWonLeader.name} ${vm.holesWonLeader.count}.`)
     const ctp = vm.ctpWinners.filter((c) => c.name).map((c) => c.name!.split(/\s+/)[0])
     if (ctp.length) lines.push(`CTP: ${ctp.join(', ')}.`)
     void navigator.share({ title: `${vm.course.name} recap`, text: lines.join('\n') }).catch(() => {})
@@ -230,7 +293,7 @@ function ShareButton({
     <button
       type="button"
       onClick={onShare}
-      className="tap inline-flex items-center gap-1 rounded border border-gold-bright bg-gold-fill px-3 text-[0.85rem] font-semibold text-paper"
+      className="tap inline-flex items-center gap-1 rounded border border-gold-bright bg-gold-fill px-3 text-[0.82rem] font-semibold text-paper"
     >
       Share ↗
     </button>

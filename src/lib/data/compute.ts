@@ -455,6 +455,10 @@ export interface EnterHoleVM {
   strokeIndex: number
   yardage: number | null
   teeName: string | null
+  /** Par 3 within the counting holes — the only holes that carry a closest-to-pin. */
+  ctpEligible: boolean
+  /** Stored CTP for this hole: a winner id, null for "no winner", undefined if unentered. */
+  ctpWinnerId: string | null | undefined
 }
 
 export interface EnterVM {
@@ -605,12 +609,18 @@ export function buildEnterHole(
       ? (dbData.hole_yardages.find((y) => y.hole_id === holeRow.id && y.tee_id === soleTee.id)
           ?.yardage ?? null)
       : null
+    const holesCounted = detail?.holesCounted ?? 18
+    const ctpRow = dbData.ctp_results.find(
+      (c) => c.round_id === round.id && c.hole_number === holeNumber,
+    )
     hole = {
       holeNumber,
       par: holeRow.par,
       strokeIndex: holeRow.stroke_index,
       yardage,
       teeName: soleTee?.name ?? null,
+      ctpEligible: holeRow.par === 3 && holeNumber <= holesCounted,
+      ctpWinnerId: ctpRow ? ctpRow.player_id : undefined,
     }
   }
 
@@ -1207,22 +1217,35 @@ export function buildPlayerCourseHandicaps(dbData: Db): Map<string, PlayerCourse
   return out
 }
 
-// ── Round recap ──────────────────────────────────────────────────────────────
-// A deterministic post-round report, assembled from the same round detail and
-// championship data every other screen uses — no new scoring math. Rendered on
-// /rounds/:n once play has begun; `official` gates the "Official" badge on final.
+// ── Round recap — the live round story ───────────────────────────────────────
+// ONE view model driven by round state: the same card evolves opening → moving →
+// closing → final as scores come in, then settles into the recap. No new scoring
+// math — everything is assembled from the round detail + championship data every
+// other screen uses. Rendered on /rounds/:n once play has begun; it re-derives on
+// every score change through the normal useLiveQuery path (live on all four phones).
+export type RecapAct = 'opening' | 'moving' | 'closing' | 'final'
+
 export interface RecapWinner {
   name: string
   points: number
 }
+export interface RecapStanding {
+  playerId: string
+  name: string
+  points: number
+  thru: number
+  projection: number | null
+  gapToLeader: number // points behind the leader (0 for the leader)
+}
 export interface RecapCtpWinner {
   holeNumber: number
   name: string | null // null => carry / no winner recorded
+  open: boolean // hole not yet played (live) — distinct from a played-but-no-winner carry
 }
 export interface RecapMover {
   name: string
-  from: number // position through the prior round
-  to: number // position through this round
+  from: number
+  to: number
   change: number // from - to; > 0 means moved up
 }
 export interface RecapHoleLeaders {
@@ -1230,32 +1253,62 @@ export interface RecapHoleLeaders {
   order: string[] // playing playerIds ranked by cumulative points through this hole, desc
   inPlay: boolean // at least one player has completed this hole
 }
-export interface RecapPlayerColor {
+export interface RecapPlayer {
   playerId: string
   name: string
-  short: string // first name / short label for chips + legend
+  short: string // first name, for chips + legend
+  colorIndex: number // STABLE identity slot (by sort order) — never re-keyed as the board moves
+}
+/** One headline is a few segments; `gold` marks the part rendered as leader/winner status. */
+export interface RecapHeadlineSeg {
+  text: string
+  gold?: boolean
+}
+export interface RecapHighlight {
+  name: string
+  holeNumber: number
+  points: number
+  label: string // "net eagle" | "net birdie"
 }
 export interface RoundRecapVM {
   round: RoundRow
   course: CourseRow
+  act: RecapAct
   complete: boolean // every playing player thru the counted window
   official: boolean // round.status === 'final'
+  live: boolean // still in progress (drives the pulse dot / present tense)
+  roundThru: number // furthest any playing player has reached
+  remaining: number // counted holes still to play
+  headline: RecapHeadlineSeg[]
+  narrative: string
   winners: RecapWinner[] // co-winners share the top on a tie
   margin: number // top points minus the best non-winner; 0 when tied at the top
   runnerUp: RecapWinner | null
-  standing: RecapWinner[] // this round's order (playing only), desc
+  standing: RecapStanding[] // this round's order (playing only), desc
   roundWinnerCents: number
-  bestClosingNine: RecapWinner | null
+  holesWonLeader: { name: string; count: number; of: number } | null
+  shotOfTheDay: RecapHighlight | null
   biggestMove: RecapMover | null
   ctpWinners: RecapCtpWinner[]
+  nextPar3: number | null // next unplayed par 3 (live drama)
   parThreeCount: number
   leadChangeCount: number
   holeLeaders: RecapHoleLeaders[]
-  players: RecapPlayerColor[] // playing players, leaderboard order
+  players: RecapPlayer[] // playing players, leaderboard order
 }
 
 function firstName(name: string): string {
   return name.split(/\s+/)[0] || name
+}
+
+function ordinalOf(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
+}
+
+function courseShortName(name: string): string {
+  return name.replace(/^Streamsong\s+/i, '')
 }
 
 export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM | null {
@@ -1272,16 +1325,31 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
 
   const complete = playing.every((p) => p.thru === holesCounted)
   const official = round.status === 'final'
+  const live = !official && !complete
+  const roundThru = Math.max(...playing.map((p) => p.thru))
+  const remaining = Math.max(0, holesCounted - roundThru)
 
-  // Winner(s) + margin.
+  // The act is derived purely from progress + status — this is the state machine.
+  const act: RecapAct =
+    official || complete ? 'final' : remaining <= 4 ? 'closing' : roundThru >= 6 ? 'moving' : 'opening'
+
+  // Winner(s) / current leader(s) + margin.
   const top = playing[0].totalPoints
   const winners: RecapWinner[] = playing
     .filter((p) => p.totalPoints === top)
     .map((p) => ({ name: p.name, points: p.totalPoints }))
+  const multi = winners.length > 1
   const firstLoser = playing.find((p) => p.totalPoints < top) ?? null
   const margin = firstLoser ? top - firstLoser.totalPoints : 0
   const runnerUp = firstLoser ? { name: firstLoser.name, points: firstLoser.totalPoints } : null
-  const standing: RecapWinner[] = playing.map((p) => ({ name: p.name, points: p.totalPoints }))
+  const standing: RecapStanding[] = playing.map((p) => ({
+    playerId: p.playerId,
+    name: p.name,
+    points: p.totalPoints,
+    thru: p.thru,
+    projection: p.projection,
+    gapToLeader: top - p.totalPoints,
+  }))
 
   const roundWinnerCents = settingValue<{ round_winner_cents?: number }>(
     dbData.settings,
@@ -1289,15 +1357,47 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     {},
   ).round_winner_cents ?? 0
 
-  // Best closing nine — points over holes 10..cutoff (only meaningful once the round reaches 10).
-  let bestClosingNine: RecapWinner | null = null
-  if (holesCounted >= 10) {
-    for (const p of playing) {
-      const back = p.holeResults
-        .filter((h) => h.holeNumber >= 10 && h.holeNumber <= holesCounted && h.completed)
-        .reduce((s, h) => s + (h.points ?? 0), 0)
-      if (!bestClosingNine || back > bestClosingNine.points) {
-        bestClosingNine = { name: p.name, points: back }
+  // Holes won — outright net winner per played hole (reuses the tiebreak tally). Replaces the
+  // old "best back nine", which was undefined mid-round. Available from the first hole.
+  const playedHoleCells: HoleNetCell[][] = []
+  for (let holeNo = 1; holeNo <= holesCounted; holeNo++) {
+    const cells = playing.map((p) => {
+      const hr = p.holeResults.find((h) => h.holeNumber === holeNo)
+      return { playerId: p.playerId, net: hr?.net ?? null, completed: hr?.completed ?? false }
+    })
+    if (cells.some((c) => c.completed)) playedHoleCells.push(cells)
+  }
+  const holesWonTally = tallyHolesWon(playedHoleCells)
+  let holesWonLeader: { name: string; count: number; of: number } | null = null
+  {
+    let bestId: string | null = null
+    let bestCount = 0
+    const orderById = new Map(playing.map((p, i) => [p.playerId, i]))
+    for (const [pid, count] of holesWonTally) {
+      if (count > bestCount || (count === bestCount && (orderById.get(pid) ?? 99) < (orderById.get(bestId ?? '') ?? 99))) {
+        bestId = pid
+        bestCount = count
+      }
+    }
+    if (bestId && bestCount > 0) {
+      const name = playing.find((p) => p.playerId === bestId)?.name ?? 'Unknown'
+      holesWonLeader = { name, count: bestCount, of: playedHoleCells.length }
+    }
+  }
+
+  // Shot of the day — best single-hole Stableford (net birdie or better) so far.
+  let shotOfTheDay: RecapHighlight | null = null
+  for (const p of playing) {
+    for (const hr of p.holeResults) {
+      if (!hr.completed) continue
+      const pts = hr.points ?? 0
+      if (pts >= 3 && (!shotOfTheDay || pts > shotOfTheDay.points)) {
+        shotOfTheDay = {
+          name: p.name,
+          holeNumber: hr.holeNumber,
+          points: pts,
+          label: pts >= 4 ? 'net eagle' : 'net birdie',
+        }
       }
     }
   }
@@ -1324,7 +1424,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     }
   }
 
-  // Closest to pin — every par 3, with its winner or a carry.
+  // Closest to pin — every par 3: a winner, a played carry, or still open (live).
   const parThrees = holes.filter((h) => h.par === 3).map((h) => h.holeNumber).sort((a, b) => a - b)
   const ctpByHole = new Map<number, string | null>()
   const nameById = new Map(dbData.players.map((p) => [p.id, p.name]))
@@ -1335,15 +1435,26 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
   const ctpWinners: RecapCtpWinner[] = parThrees.map((holeNumber) => ({
     holeNumber,
     name: ctpByHole.has(holeNumber) ? ctpByHole.get(holeNumber) ?? null : null,
+    open: !ctpByHole.has(holeNumber) && holeNumber > roundThru,
   }))
+  const nextPar3 = parThrees.find((h) => h > roundThru) ?? null
 
-  // Lead-change timeline — cumulative points per player through each counted hole. The leader
-  // per hole is a prefix sum over holeResults; a change of identity is one lead change.
-  const players: RecapPlayerColor[] = playing.map((p) => ({
+  // Stable identity colours: keyed by sort order, so a player's ribbon colour never changes as
+  // the board reshuffles mid-round.
+  const colorRank = new Map(
+    playing
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((p, i) => [p.playerId, i]),
+  )
+  const players: RecapPlayer[] = playing.map((p) => ({
     playerId: p.playerId,
     name: p.name,
     short: firstName(p.name),
+    colorIndex: colorRank.get(p.playerId) ?? 0,
   }))
+
+  // Lead-change timeline — cumulative points per player through each counted hole.
   const running = new Map<string, number>(playing.map((p) => [p.playerId, 0]))
   const holeLeaders: RecapHoleLeaders[] = []
   let leadChangeCount = 0
@@ -1372,19 +1483,91 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     }
   }
 
+  // ── Headline + narrative, templated per act (deterministic, no AI) ──
+  const leadLabel = winners.map((w) => firstName(w.name)).join(' & ')
+  const runnerFirst = runnerUp ? firstName(runnerUp.name) : null
+  const short = courseShortName(course.name)
+  // "the Red / the Black" reads right; "the Bone Valley" doesn't — article only for the colours.
+  const theShort = /^(Red|Blue|Black)$/i.test(short) ? `the ${short}` : short
+  const winPoints = winners[0]?.points ?? 0
+
+  let headline: RecapHeadlineSeg[]
+  switch (act) {
+    case 'opening':
+      headline = [{ text: leadLabel, gold: true }, { text: ' out of the gate.' }]
+      break
+    case 'moving':
+      headline = [
+        { text: leadLabel, gold: true },
+        { text: multi ? ' share the lead.' : roundThru <= 10 ? ' leads at the turn.' : ' out front.' },
+      ]
+      break
+    case 'closing':
+      headline =
+        margin > 0
+          ? [{ text: `${margin} to hold, ${remaining} to play.` }]
+          : [{ text: `All square, ${remaining} to play.` }]
+      break
+    default: // final
+      headline = [{ text: leadLabel, gold: true }, { text: multi ? ` share ${theShort}.` : ` takes ${theShort}.` }]
+  }
+
+  const marginPhrase = margin > 0 ? ` — ${margin} clear of ${runnerFirst}` : multi ? ' — level at the top' : ''
+  let narrative: string
+  switch (act) {
+    case 'opening':
+      narrative = `${roundThru} hole${roundThru === 1 ? '' : 's'} into ${theShort}, ${leadLabel} ${
+        multi ? 'set' : 'sets'
+      } the early pace${marginPhrase}.`
+      break
+    case 'moving':
+      narrative = `${leadLabel} ${multi ? 'lead' : 'leads'} through ${roundThru}${marginPhrase}.`
+      break
+    case 'closing':
+      narrative =
+        margin > 0
+          ? `${leadLabel} ${multi ? 'carry' : 'carries'} a ${margin}-point lead into the closing stretch${
+              nextPar3 ? `; the par-3 ${ordinalOf(nextPar3)} still to come` : ''
+            }.`
+          : `Nothing between them with ${remaining} to play${
+              nextPar3 ? ` — the par-3 ${ordinalOf(nextPar3)} could decide it` : ''
+            }.`
+      break
+    default: {
+      // final. The holes-won / biggest-move numbers show as their own fact rows, so the
+      // narrative only adds the mover storyline (round 2+), never a line that repeats them.
+      const moverClause = biggestMove
+        ? ` ${firstName(biggestMove.name)} was the big mover, ${ordinalOf(biggestMove.from)} to ${ordinalOf(
+            biggestMove.to,
+          )} overall.`
+        : ''
+      narrative = `${leadLabel} ${multi ? 'share' : 'takes'} ${theShort}${
+        margin > 0 ? ` by ${margin}` : ''
+      } — a round of ${winPoints}.${moverClause}`
+    }
+  }
+
   return {
     round,
     course,
+    act,
     complete,
     official,
+    live,
+    roundThru,
+    remaining,
+    headline,
+    narrative,
     winners,
     margin,
     runnerUp,
     standing,
     roundWinnerCents,
-    bestClosingNine,
+    holesWonLeader,
+    shotOfTheDay,
     biggestMove,
     ctpWinners,
+    nextPar3,
     parThreeCount: parThrees.length,
     leadChangeCount,
     holeLeaders,
