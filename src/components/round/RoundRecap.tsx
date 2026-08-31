@@ -24,7 +24,8 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
     if (h.inPlay) prevLeader = leader
     return { holeNumber: h.holeNumber, inPlay: h.inPlay, color: leader ? colorOf.get(leader) : undefined, flip }
   })
-  const ribbonRight = ribbonCaption(vm.act, vm.leadChangeCount)
+  const total = vm.holeLeaders.length
+  const ribbonRight = ribbonCaption(vm.act, vm.leadChangeCount, vm.roundThru, total)
 
   return (
     <section
@@ -67,22 +68,26 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
           </span>
           <span className="ml-auto text-[0.74rem] text-paper-dim">{ribbonRight}</span>
         </div>
-        <div className="mt-1.5 flex gap-px">
-          {cells.map((c) => (
-            <span
-              key={c.holeNumber}
-              className="relative h-5 flex-1 rounded-[2px]"
-              style={{ background: c.inPlay ? c.color : 'var(--hair)', opacity: c.inPlay ? 1 : 0.45 }}
-            >
-              {c.flip && (
-                <span
-                  className="absolute -top-[5px] left-[-1px] right-[-1px] h-[3px] rounded-[2px]"
-                  style={{ background: 'var(--gold-fill)' }}
-                  aria-hidden
-                />
-              )}
-            </span>
-          ))}
+        <div className="mt-1.5 flex h-5 items-center gap-px">
+          {cells.map((c) =>
+            c.inPlay ? (
+              <span key={c.holeNumber} className="relative h-full flex-1 rounded-[2px]" style={{ background: c.color }}>
+                {c.flip && (
+                  <span
+                    className="absolute -top-[5px] left-[-1px] right-[-1px] h-[3px] rounded-[2px]"
+                    style={{ background: 'var(--gold-fill)' }}
+                    aria-hidden
+                  />
+                )}
+              </span>
+            ) : (
+              // Holes still to come: a slim track, not a full grey block — so an early ribbon
+              // reads as "more to come", never as a broken/half-loaded bar.
+              <span key={c.holeNumber} className="flex h-full flex-1 items-center">
+                <span className="h-[3px] w-full rounded-full bg-hair" />
+              </span>
+            ),
+          )}
         </div>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.72rem] text-paper-dim">
           {vm.players.map((p) => (
@@ -148,17 +153,18 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
   )
 }
 
-function ribbonCaption(act: RecapAct, changes: number): string {
-  if (act === 'opening' && changes === 0) return 'wire to wire so far'
-  if (changes === 0) return 'no change yet'
-  return `${changes} lead change${changes === 1 ? '' : 's'}`
+function ribbonCaption(act: RecapAct, changes: number, thru: number, total: number): string {
+  if (act === 'final') return `${changes} lead change${changes === 1 ? '' : 's'}`
+  // Live: lead with progress, then the movement story once there is one.
+  const moved = changes === 0 ? (act === 'opening' ? 'wire to wire' : 'no change') : `${changes} lead change${changes === 1 ? '' : 's'}`
+  return `thru ${thru} of ${total} · ${moved}`
 }
 
 /** The facts row, chosen by act — nothing shows until it has signal. */
 function ActFacts({ vm }: { vm: RoundRecapVM }) {
   const rows: { k: string; v: React.ReactNode }[] = []
 
-  if (vm.act === 'moving') {
+  if (vm.act === 'opening' || vm.act === 'moving') {
     if (vm.holesWonLeader)
       rows.push({ k: 'Holes won', v: `${vm.holesWonLeader.name} · ${vm.holesWonLeader.count} of ${vm.holesWonLeader.of}` })
     if (vm.shotOfTheDay)
@@ -167,6 +173,20 @@ function ActFacts({ vm }: { vm: RoundRecapVM }) {
         v: (
           <>
             {vm.shotOfTheDay.name} <Small>— {vm.shotOfTheDay.label}, {ordinal(vm.shotOfTheDay.holeNumber)}</Small>
+          </>
+        ),
+      })
+    // Early on there may be no par 3 played and no birdie yet — surface the pace fight instead
+    // of an empty card, so the leaderboard gap has a companion fact.
+    if (rows.length === 0 && vm.runnerUp)
+      rows.push({
+        k: 'On the chase',
+        v: (
+          <>
+            {vm.runnerUp.name.split(/\s+/)[0]}{' '}
+            <Small>
+              {vm.margin > 0 ? `${vm.margin} back` : 'level'}, {vm.remaining} to play
+            </Small>
           </>
         ),
       })
