@@ -75,8 +75,9 @@ export default function RoundDetail() {
         </p>
       ) : (
         <>
-          {recap && <RoundRecap vm={recap} />}
-          <Leaderboard vm={vm} />
+          {/* The recap card carries its own "This round" leaderboard; only fall back to the
+              standalone one when there's no recap yet (e.g. started but no scores in). */}
+          {recap ? <RoundRecap vm={recap} /> : <Leaderboard vm={vm} />}
           <Scorecard vm={vm} />
           <HandicapWorksheet vm={vm} />
         </>
