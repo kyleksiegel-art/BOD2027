@@ -32,6 +32,7 @@
      status-only; it never doubles as a round/course identity color (see --red/--blue/--olive
      above and .round[data-course] below). */
   --leader-tint: rgba(209, 131, 22, 0.09); /* --gold-fill @ 9% */
+  --live-tint: rgba(209, 131, 22, 0.06); /* --gold-fill @ 6% — the active-round column wash */
 
   color-scheme: light;
 }
@@ -182,6 +183,35 @@
     .recap-pulse {
       animation: none;
     }
+  }
+
+  /* Standings "Round N live" status dot — gold (status), same calm cadence as the recap
+     pulse. Only rendered while a round is in progress. */
+  .live-dot {
+    background: var(--gold-fill);
+    animation: live-pulse 1.9s ease-out infinite;
+  }
+  @keyframes live-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(209, 131, 22, 0.5);
+    }
+    70% {
+      box-shadow: 0 0 0 5px rgba(209, 131, 22, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(209, 131, 22, 0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot {
+      animation: none;
+    }
+  }
+
+  /* Active-round column wash in the round-by-round table — a faint warm tint so the eye
+     lands on the numbers that are currently moving. Restrained; works on any width. */
+  .live-col {
+    background: var(--live-tint);
   }
 
   /* -------------------------------------------------------------- */
