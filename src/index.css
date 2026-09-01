@@ -183,4 +183,48 @@
       animation: none;
     }
   }
+
+  /* -------------------------------------------------------------- */
+  /* Premium recap card — a sense-of-place masthead (topographic wash
+     in the course colour), an engraved course name, and a serif
+     pull-quote dispatch. --course comes from .round[data-course]. The
+     colour-mix lines fall back to a flat token where unsupported. */
+  .recap-card {
+    background: var(--ground-2);
+    border: 1px solid var(--hair-strong);
+    box-shadow: 0 6px 22px rgba(27, 30, 28, 0.08);
+  }
+  .recap-mast {
+    position: relative;
+    overflow: hidden;
+    background: var(--ground-2);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--course) 9%, var(--ground-2)) 0%,
+      var(--ground-2) 100%
+    );
+  }
+  .recap-topo {
+    position: absolute;
+    inset: 0;
+    color: var(--course);
+    opacity: 0.1;
+    pointer-events: none;
+  }
+  .recap-topo svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  /* Fraunces ships normal-only here (no italic face), so the dispatch is an engraved
+     serif pull-quote with a course-coloured rule — not a faux-italic line. */
+  .recap-dispatch {
+    font-family: 'Fraunces', ui-serif, Georgia, serif;
+    font-variation-settings: 'opsz' 36, 'wght' 500;
+    border-left: 2px solid var(--course);
+  }
+  .recap-week-tint {
+    background: var(--ground);
+    background: color-mix(in srgb, var(--course) 4%, var(--ground));
+  }
 }

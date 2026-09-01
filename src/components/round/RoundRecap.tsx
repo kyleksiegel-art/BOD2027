@@ -2,66 +2,83 @@ import { Link } from 'react-router-dom'
 import type { RoundRecapVM, RecapAct } from '@/lib/data/compute'
 import { courseSlug, formatDay, formatMoney } from '@/lib/format'
 
-// Stable non-gold identity palette (gold is reserved for leader/winner status; red is the
-// course rail). Indexed by RecapPlayer.colorIndex so a player keeps one colour all round.
+// Stable non-gold identity palette (gold is reserved for leader/winner status; the course
+// colour is the masthead). Indexed by RecapPlayer.colorIndex so a player keeps one colour.
 const PLAYER_COLORS = ['var(--blue)', 'var(--gold-fill)', 'var(--olive)', 'var(--paper-faint)']
 
 /**
- * The live round story: ONE card driven by round state. It opens as a live leaderboard, becomes
- * the round's story through the turn, tightens into late-round drama, and settles into the final
- * recap — all from buildRoundRecap, re-derived on every score change via the normal useLiveQuery
- * path (so it's live on every phone). The rest of /rounds/:n is untouched.
+ * The live round story, premium treatment: one card driven by round state. A sense-of-place
+ * masthead, a hero figure, an editorial dispatch, the trip-race "Week" strip, the lead ribbon
+ * and the live leaderboard — re-weighted opening → moving → closing → final. Everything comes
+ * from buildRoundRecap and re-derives on every score change via the normal useLiveQuery path.
  */
 export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
   const slug = courseSlug(vm.course.name) ?? undefined
   const colorOf = new Map(vm.players.map((p) => [p.playerId, PLAYER_COLORS[p.colorIndex % PLAYER_COLORS.length]]))
+  const leader = vm.standing[0]
 
   // Ribbon: leader per hole, and where the lead flipped.
-  let prevLeader: string | null = null
+  let prev: string | null = null
   const cells = vm.holeLeaders.map((h) => {
-    const leader = h.inPlay ? h.order[0] : null
-    const flip = h.inPlay && prevLeader !== null && leader !== prevLeader
-    if (h.inPlay) prevLeader = leader
-    return { holeNumber: h.holeNumber, inPlay: h.inPlay, color: leader ? colorOf.get(leader) : undefined, flip }
+    const lead = h.inPlay ? h.order[0] : null
+    const flip = h.inPlay && prev !== null && lead !== prev
+    if (h.inPlay) prev = lead
+    return { holeNumber: h.holeNumber, inPlay: h.inPlay, color: lead ? colorOf.get(lead) : undefined, flip }
   })
   const total = vm.holeLeaders.length
   const ribbonRight = ribbonCaption(vm.act, vm.leadChangeCount, vm.roundThru, total)
 
+  const heroCaption = vm.live
+    ? `pts · ${vm.margin > 0 ? `leads by ${vm.margin}` : 'tied'}${leader?.projection !== null ? ` · proj ${leader.projection}` : ''}`
+    : `pts · ${vm.margin > 0 ? `won by ${vm.margin}` : 'shared'}${vm.holesWonLeader ? ` · ${vm.holesWonLeader.count} holes` : ''}`
+
   return (
-    <section
-      className="round round-rail mt-6 overflow-hidden rounded-lg border border-hair bg-ground-2"
-      data-course={slug}
-    >
-      {/* header */}
-      <div className="flex items-center gap-2 border-b border-hair px-4 py-3">
-        <span className={`h-2 w-2 flex-none rounded-full ${vm.live ? 'recap-pulse' : 'round-swatch'}`} aria-hidden />
-        <span className="eyebrow">{vm.live ? `Live · Round ${vm.round.round_number}` : 'Round Recap'}</span>
-        <span
-          className={`ml-auto rounded-sm border px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.14em] tnum ${
-            vm.official ? 'border-gold text-gold' : 'border-hair-strong text-paper-faint'
-          }`}
-        >
-          {vm.official ? 'Official' : vm.live ? `Thru ${vm.roundThru}` : 'Final'}
-        </span>
+    <section className="round recap-card mt-6 overflow-hidden rounded-lg" data-course={slug}>
+      {/* masthead — sense of place */}
+      <div className="recap-mast px-4 pb-3 pt-3.5">
+        <Topo />
+        <div className="relative flex items-center gap-2">
+          <span className={`h-2 w-2 flex-none rounded-full ${vm.live ? 'recap-pulse' : 'round-swatch'}`} aria-hidden />
+          <span className="text-[0.64rem] font-semibold uppercase tracking-[0.2em] text-gold">
+            {vm.live ? 'Live' : 'Recap'} · Round {vm.round.round_number} of 4
+          </span>
+          <span
+            className={`ml-auto rounded-sm border bg-ground-2 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.14em] tnum ${
+              vm.official ? 'border-gold text-gold' : 'border-hair-strong text-paper-faint'
+            }`}
+          >
+            {vm.official ? 'Official' : vm.live ? `Thru ${vm.roundThru}` : 'Final'}
+          </span>
+        </div>
+        <h2 className="fx-display relative mt-2 font-display text-[2rem] font-semibold leading-none text-paper">
+          {vm.course.name}
+        </h2>
+        <p className="relative mt-1 text-[0.8rem] text-paper-dim">{formatDay(vm.round.date)}</p>
       </div>
 
-      {/* hero: course, headline, narrative */}
-      <div className="px-4 pb-3 pt-3">
-        <p className="fx-serif-sm font-display text-[0.86rem] text-paper-dim">
-          {vm.course.name} · {formatDay(vm.round.date)}
-        </p>
-        <h2 className="fx-head mt-0.5 font-display text-[1.75rem] font-semibold leading-none text-paper">
+      {/* hero — headline, big figure, dispatch */}
+      <div className="px-4 pb-1 pt-3">
+        <h3 className="fx-title font-display text-[1.5rem] font-semibold leading-tight text-paper">
           {vm.headline.map((seg, i) => (
             <span key={i} className={seg.gold ? 'text-gold-bright' : undefined}>
               {seg.text}
             </span>
           ))}
-        </h2>
-        <p className="mt-2 text-[0.92rem] text-paper-dim">{vm.narrative}</p>
+        </h3>
+        <div className="mt-2 flex items-end gap-2.5">
+          <span className="fx-display font-display text-[3.2rem] font-semibold leading-[0.8] tracking-tight text-paper tnum">
+            {leader?.points ?? 0}
+          </span>
+          <span className="pb-1 text-[0.84rem] text-paper-dim">{heroCaption}</span>
+        </div>
+        <p className="recap-dispatch mt-3 pl-3 text-[0.98rem] leading-snug text-paper-dim">{vm.dispatch}</p>
       </div>
 
+      {/* THE WEEK — championship context (round 2+) */}
+      {vm.week && <TheWeek vm={vm} />}
+
       {/* leader ribbon */}
-      <div className="px-4 pb-3">
+      <div className="px-4 pb-3 pt-3">
         <div className="flex items-baseline gap-2">
           <span className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
             How the lead moved
@@ -81,8 +98,6 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
                 )}
               </span>
             ) : (
-              // Holes still to come: a slim track, not a full grey block — so an early ribbon
-              // reads as "more to come", never as a broken/half-loaded bar.
               <span key={c.holeNumber} className="flex h-full flex-1 items-center">
                 <span className="h-[3px] w-full rounded-full bg-hair" />
               </span>
@@ -100,18 +115,21 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
         </div>
       </div>
 
-      {/* leaderboard */}
-      <ol className="border-t border-hair">
+      {/* this round */}
+      <p className="border-t border-hair px-4 pb-0.5 pt-2 text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
+        This round
+      </p>
+      <ol>
         {vm.standing.map((p, i) => {
-          const leader = i === 0
+          const isLead = i === 0
           return (
             <li
               key={p.playerId}
-              className={`grid grid-cols-[1.2rem_1fr_auto] items-center gap-x-3 border-b border-hair px-4 py-2 last:border-b-0 ${
-                leader ? 'leader-row' : ''
+              className={`grid grid-cols-[1.1rem_1fr_auto] items-center gap-x-3 border-b border-hair px-4 py-1.5 last:border-b-0 ${
+                isLead ? 'leader-row' : ''
               }`}
             >
-              <span className={`tnum fx-serif-sm font-display text-[0.95rem] font-semibold ${leader ? 'text-gold' : 'text-paper-faint'}`}>
+              <span className={`tnum fx-serif-sm font-display text-[0.9rem] font-semibold ${isLead ? 'text-gold' : 'text-paper-faint'}`}>
                 {i + 1}
               </span>
               <span className="flex flex-col">
@@ -119,14 +137,14 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
                 {vm.live && (
                   <span className="tnum text-[0.7rem] text-paper-faint">
                     thru {p.thru}
-                    {leader && p.projection !== null ? ` · proj ${p.projection}` : ''}
-                    {!leader && p.gapToLeader > 0 ? ` · −${p.gapToLeader}` : ''}
+                    {isLead && p.projection !== null ? ` · proj ${p.projection}` : ''}
+                    {!isLead && p.gapToLeader > 0 ? ` · −${p.gapToLeader}` : ''}
                   </span>
                 )}
               </span>
-              <span className={`tnum fx-title text-right font-display text-[1.25rem] font-semibold ${leader ? 'text-gold-bright' : 'text-paper'}`}>
+              <span className={`tnum font-display text-[1.15rem] font-semibold ${isLead ? 'text-gold-bright' : 'text-paper'}`}>
                 {p.points}
-                <span className="ml-0.5 text-[0.6rem] font-normal text-paper-faint">pts</span>
+                <span className="ml-0.5 text-[0.58rem] font-normal text-paper-faint">pts</span>
               </span>
             </li>
           )
@@ -153,18 +171,82 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
   )
 }
 
+/** Topographic wash — a few smooth contours in the course colour, evoking Streamsong's land. */
+function Topo() {
+  return (
+    <div className="recap-topo" aria-hidden>
+      <svg viewBox="0 0 400 150" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" strokeWidth="1.2">
+        <path d="M-20 120 C 60 90, 120 140, 200 108 S 340 70, 430 100" />
+        <path d="M-20 100 C 70 74, 130 118, 210 88 S 350 52, 430 82" />
+        <path d="M-20 80 C 80 58, 140 96, 220 70 S 360 38, 430 64" />
+        <path d="M-20 60 C 90 44, 150 76, 230 54 S 360 26, 430 48" />
+        <path d="M-20 40 C 100 30, 160 58, 240 40 S 360 16, 430 34" />
+        <path d="M-20 138 C 60 112, 120 156, 210 126 S 350 92, 430 120" />
+      </svg>
+    </div>
+  )
+}
+
+/** The trip race — overall standings and what this round is doing to them. */
+function TheWeek({ vm }: { vm: RoundRecapVM }) {
+  const week = vm.week!
+  return (
+    <div className="mx-4 mb-1 overflow-hidden rounded-md border border-hair recap-week-tint">
+      <div className="flex items-baseline gap-2 px-3 pb-1 pt-2">
+        <span className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-paper-faint">The Week</span>
+        <span className="ml-auto text-[0.72rem] text-paper-dim">{week.throughLabel}</span>
+      </div>
+      <p className="fx-serif-sm px-3 pb-1.5 font-display text-[0.9rem] font-medium text-paper">
+        <WeekLine line={week.line} leader={week.leaderName} />
+      </p>
+      {week.rows.map((r, i) => (
+        <div
+          key={r.playerId}
+          className={`grid grid-cols-[1rem_1fr_auto_2.6rem] items-center gap-x-2.5 border-t border-hair px-3 py-1 text-[0.9rem] ${
+            i === 0 ? 'bg-[var(--leader-tint)]' : ''
+          }`}
+        >
+          <span className={`tnum fx-serif-sm font-display text-[0.85rem] font-semibold ${i === 0 ? 'text-gold' : 'text-paper-faint'}`}>
+            {r.position}
+          </span>
+          <span className="text-paper">{r.name}</span>
+          <span className={`tnum text-[0.74rem] font-semibold ${r.change > 0 ? 'text-olive' : r.change < 0 ? 'text-red' : 'text-paper-faint'}`}>
+            {r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : '—'}
+          </span>
+          <span className="tnum text-right font-display text-[1rem] font-semibold text-paper">{r.overall}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// The week line names the leader first — render that name in gold to tie it to the leader row.
+function WeekLine({ line, leader }: { line: string; leader: string }) {
+  const first = leader.split(/\s+/)[0]
+  if (line.startsWith(first)) {
+    return (
+      <>
+        <span className="text-gold-bright">{first}</span>
+        {line.slice(first.length)}
+      </>
+    )
+  }
+  return <>{line}</>
+}
+
 function ribbonCaption(act: RecapAct, changes: number, thru: number, total: number): string {
   if (act === 'final') return `${changes} lead change${changes === 1 ? '' : 's'}`
-  // Live: lead with progress, then the movement story once there is one.
   const moved = changes === 0 ? (act === 'opening' ? 'wire to wire' : 'no change') : `${changes} lead change${changes === 1 ? '' : 's'}`
   return `thru ${thru} of ${total} · ${moved}`
 }
 
-/** The facts row, chosen by act — nothing shows until it has signal. */
+/** The facts row, chosen by act. On round 1 (no Week) the early acts keep facts so the card
+ *  isn't sparse; once The Week carries the context, opening/moving drop the extra fact rows. */
 function ActFacts({ vm }: { vm: RoundRecapVM }) {
   const rows: { k: string; v: React.ReactNode }[] = []
+  const early = vm.act === 'opening' || vm.act === 'moving'
 
-  if (vm.act === 'opening' || vm.act === 'moving') {
+  if (early && !vm.week) {
     if (vm.holesWonLeader)
       rows.push({ k: 'Holes won', v: `${vm.holesWonLeader.name} · ${vm.holesWonLeader.count} of ${vm.holesWonLeader.of}` })
     if (vm.shotOfTheDay)
@@ -173,20 +255,6 @@ function ActFacts({ vm }: { vm: RoundRecapVM }) {
         v: (
           <>
             {vm.shotOfTheDay.name} <Small>— {vm.shotOfTheDay.label}, {ordinal(vm.shotOfTheDay.holeNumber)}</Small>
-          </>
-        ),
-      })
-    // Early on there may be no par 3 played and no birdie yet — surface the pace fight instead
-    // of an empty card, so the leaderboard gap has a companion fact.
-    if (rows.length === 0 && vm.runnerUp)
-      rows.push({
-        k: 'On the chase',
-        v: (
-          <>
-            {vm.runnerUp.name.split(/\s+/)[0]}{' '}
-            <Small>
-              {vm.margin > 0 ? `${vm.margin} back` : 'level'}, {vm.remaining} to play
-            </Small>
           </>
         ),
       })
@@ -206,19 +274,7 @@ function ActFacts({ vm }: { vm: RoundRecapVM }) {
         </>
       ),
     })
-    if (vm.biggestMove)
-      rows.push({
-        k: 'Biggest move',
-        v: (
-          <>
-            <span className="text-olive">▲{vm.biggestMove.change}</span> {vm.biggestMove.name}{' '}
-            <Small>
-              {ordinal(vm.biggestMove.from)} → {ordinal(vm.biggestMove.to)} overall
-            </Small>
-          </>
-        ),
-      })
-    else if (vm.holesWonLeader)
+    if (vm.holesWonLeader)
       rows.push({ k: 'Holes won', v: `${vm.holesWonLeader.name} · ${vm.holesWonLeader.count} of ${vm.holesWonLeader.of}` })
     if (vm.parThreeCount > 0) rows.push({ k: 'Closest to pin', v: <CtpChips vm={vm} /> })
   }
@@ -288,8 +344,8 @@ function ordinal(n: number): string {
 }
 
 /**
- * Share the recap as text via the Web Share API where available (needs HTTPS — the deploy
- * preview qualifies). The shareable IMAGE export is a deliberate follow-up.
+ * Share the recap as text via the Web Share API where available. The image export is a
+ * deliberate follow-up.
  */
 function ShareButton({ vm }: { vm: RoundRecapVM }) {
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
@@ -302,7 +358,7 @@ function ShareButton({ vm }: { vm: RoundRecapVM }) {
         vm.winners[0]?.points ?? 0
       } pts${vm.margin > 0 ? `, by ${vm.margin}` : ''}).`,
     ]
-    if (vm.biggestMove) lines.push(`Biggest move: ${vm.biggestMove.name} ▲${vm.biggestMove.change}.`)
+    if (vm.week) lines.push(vm.week.line.replace(/^(\w+)/, '$1'))
     if (vm.holesWonLeader) lines.push(`Holes won: ${vm.holesWonLeader.name} ${vm.holesWonLeader.count}.`)
     const ctp = vm.ctpWinners.filter((c) => c.name).map((c) => c.name!.split(/\s+/)[0])
     if (ctp.length) lines.push(`CTP: ${ctp.join(', ')}.`)

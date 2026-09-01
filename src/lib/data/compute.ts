@@ -1295,6 +1295,23 @@ export interface RoundRecapVM {
   leadChangeCount: number
   holeLeaders: RecapHoleLeaders[]
   players: RecapPlayer[] // playing players, leaderboard order
+  week: RecapWeekVM | null // what this round is doing to the overall championship (null on round 1)
+  dispatch: string // one line of editorial voice, situation-picked
+}
+
+/** One player's line in the overall (championship) standings as of this round. */
+export interface RecapWeekRow {
+  playerId: string
+  name: string
+  overall: number // cumulative points through this round
+  position: number
+  change: number // positions moved this round; > 0 = climbed
+}
+export interface RecapWeekVM {
+  throughLabel: string // "round 3 live" | "after 3 of 4"
+  line: string // voice line about the trip race
+  rows: RecapWeekRow[] // overall order, desc
+  leaderName: string
 }
 
 function firstName(name: string): string {
@@ -1309,6 +1326,41 @@ function ordinalOf(n: number): string {
 
 function courseShortName(name: string): string {
   return name.replace(/^Streamsong\s+/i, '')
+}
+
+/** One line of voice, deterministic — picks the strongest hook the round currently offers. */
+function pickDispatch(x: {
+  act: RecapAct
+  leadLabel: string
+  multi: boolean
+  margin: number
+  remaining: number
+  theShort: string
+  biggestMove: RecapMover | null
+  shotOfTheDay: RecapHighlight | null
+}): string {
+  const { act, leadLabel, multi, margin, remaining, theShort, biggestMove, shotOfTheDay } = x
+  const final = act === 'final'
+  const late = final || act === 'closing'
+  if (final && !multi && biggestMove && firstName(biggestMove.name) === leadLabel)
+    return `${leadLabel} came for the round and left with the week.`
+  if (late && !multi && margin >= 6) return `${leadLabel} turned it into a procession.`
+  if (late && margin <= 1)
+    return final ? 'It went to the very last holes.' : 'Nothing to separate them down the stretch.'
+  if ((act === 'opening' || act === 'moving') && shotOfTheDay)
+    return `${firstName(shotOfTheDay.name)}’s ${shotOfTheDay.label} on the ${ordinalOf(
+      shotOfTheDay.holeNumber,
+    )} set the tone.`
+  switch (act) {
+    case 'opening':
+      return `${leadLabel} away first — a long way to go on ${theShort}.`
+    case 'moving':
+      return multi ? 'Still everything to play for.' : `${leadLabel} edging clear.`
+    case 'closing':
+      return `${remaining} to play${margin > 0 ? `, ${margin} in hand` : ', all square'}.`
+    default:
+      return multi ? `Honours shared on ${theShort}.` : `${leadLabel} closes out ${theShort}.`
+  }
 }
 
 export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM | null {
@@ -1402,25 +1454,49 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     }
   }
 
-  // Biggest move in the overall standings — this round's positions vs. the prior counting round.
+  // The overall championship as of this round, and the biggest mover — both from the SAME
+  // cumulative standings (through this round vs. through the prior one), so they agree. Only
+  // meaningful once a prior round counts; on round 1 the "week" IS this round, so it stays null.
   let biggestMove: RecapMover | null = null
+  let week: RecapWeekVM | null = null
   const countingBefore = dbData.rounds.some(
     (r) => r.round_number < roundNumber && (r.status === 'final' || r.status === 'in_progress'),
   )
   if (countingBefore) {
     const champs = buildChampionships(dbData)
-    const nameById = new Map(dbData.players.map((p) => [p.id, p.name]))
-    const before = new Map(
+    const nmById = new Map(dbData.players.map((p) => [p.id, p.name]))
+    const beforePos = new Map(
       standingsThroughRound(champs, roundNumber - 1).map((r) => [r.playerId, r.position]),
     )
-    const after = standingsThroughRound(champs, roundNumber)
-    for (const row of after) {
-      const from = before.get(row.playerId)
-      if (from === undefined) continue
-      const change = from - row.position
-      if (change > 0 && (!biggestMove || change > biggestMove.change)) {
-        biggestMove = { name: nameById.get(row.playerId) ?? 'Unknown', from, to: row.position, change }
+    const after = standingsThroughRound(champs, roundNumber) // sorted by position
+    const weekRows: RecapWeekRow[] = after.map((r) => ({
+      playerId: r.playerId,
+      name: nmById.get(r.playerId) ?? 'Unknown',
+      overall: r.total,
+      position: r.position,
+      change: (beforePos.get(r.playerId) ?? r.position) - r.position,
+    }))
+    for (const row of weekRows) {
+      if (row.change > 0 && (!biggestMove || row.change > biggestMove.change)) {
+        biggestMove = { name: row.name, from: row.position + row.change, to: row.position, change: row.change }
       }
+    }
+    const wl = weekRows[0]
+    const gap2 = weekRows[1] ? wl.overall - weekRows[1].overall : 0
+    const line =
+      wl.change > 0
+        ? `${firstName(wl.name)} ${live ? 'is flipping the week' : 'seizes the week lead'} — ${ordinalOf(
+            wl.position + wl.change,
+          )} to the overall lead.`
+        : `${firstName(wl.name)} holds the week lead${gap2 > 0 ? ` by ${gap2}` : ''}.`
+    const countingThrough = dbData.rounds.filter(
+      (r) => r.round_number <= roundNumber && (r.status === 'final' || r.status === 'in_progress'),
+    ).length
+    week = {
+      throughLabel: live ? `round ${roundNumber} live` : `after ${countingThrough} of ${dbData.rounds.length}`,
+      line,
+      rows: weekRows,
+      leaderName: wl.name,
     }
   }
 
@@ -1547,7 +1623,21 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     }
   }
 
+  // ── Dispatch: one line of editorial voice, chosen by the strongest hook available ──
+  const dispatch = pickDispatch({
+    act,
+    leadLabel,
+    multi,
+    margin,
+    remaining,
+    theShort,
+    biggestMove,
+    shotOfTheDay,
+  })
+
   return {
+    week,
+    dispatch,
     round,
     course,
     act,
