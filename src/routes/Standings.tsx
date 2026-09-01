@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { Movement } from '@/components/Movement'
@@ -132,18 +133,29 @@ export default function Standings() {
                             isLive ? 'live-col text-gold' : c.counts ? 'text-paper-dim' : ''
                           }`}
                         >
-                          R{c.roundNumber}
-                          {isLive && (
-                            <>
-                              <span className="ml-0.5 text-[0.6rem] text-gold-bright">●</span>
+                          {/* The round header is the drill-down into that round's card. Kept
+                              near-invisible (no underline, inherits the header colour) so the
+                              table stays quiet; a hairline appears only on hover/focus. */}
+                          <Link
+                            to={`/rounds/${c.roundNumber}`}
+                            className="inline-flex flex-col items-end rounded-sm outline-none hover:text-gold focus-visible:ring-2 focus-visible:ring-gold-fill/60"
+                            aria-label={`Round ${c.roundNumber}${isLive ? ', live' : ''}`}
+                          >
+                            <span>
+                              R{c.roundNumber}
+                              {isLive && (
+                                <span className="ml-0.5 text-[0.6rem] text-gold-bright">●</span>
+                              )}
+                              {c.status === 'upcoming' && (
+                                <span className="ml-0.5 align-super text-[0.6rem] text-paper-faint">·</span>
+                              )}
+                            </span>
+                            {isLive && (
                               <span className="block text-[0.55rem] font-semibold tracking-[0.14em] text-gold">
                                 LIVE
                               </span>
-                            </>
-                          )}
-                          {c.status === 'upcoming' && (
-                            <span className="ml-0.5 align-super text-[0.6rem] text-paper-faint">·</span>
-                          )}
+                            )}
+                          </Link>
                         </th>
                       )
                     })}
