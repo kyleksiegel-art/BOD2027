@@ -91,6 +91,25 @@ export function formatGap(gap: number): string {
   return gap === 0 ? '—' : `-${gap}`
 }
 
+/** Golf-language distance behind the leader: 0 → "LEADER", else "6 BACK". */
+export function formatBack(gap: number): string {
+  return gap === 0 ? 'LEADER' : `${gap} BACK`
+}
+
+/** A player's live-round line: "+17 today · thru 12", "E today · thru 10", "+21 today · F", "Not started". */
+export function formatLiveLine(live: {
+  status: 'playing' | 'did_not_play'
+  todayPoints: number
+  thru: number
+  complete: boolean
+}): string {
+  if (live.status === 'did_not_play') return 'Did not play'
+  if (live.thru === 0) return 'Not started'
+  const pts = live.todayPoints === 0 ? 'E' : `+${live.todayPoints}`
+  const where = live.complete ? 'F' : `thru ${live.thru}`
+  return `${pts} today · ${where}`
+}
+
 /**
  * Round identity for the `.round[data-course]` accent system (index.css) — Red / Black /
  * Blue / Bone Valley get a distinct rail color so R1–R4 read at a glance. Matched on the

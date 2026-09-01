@@ -253,10 +253,19 @@ export function buildRoundDetail(roundNumber: number, dbData: Db): RoundDetailVM
 }
 
 // ── Championship standings ───────────────────────────────────────────────────
+/** A player's state in the round currently in progress. Null when no round is live. */
+export interface StandingLive {
+  status: 'playing' | 'did_not_play'
+  todayPoints: number // this round's Stableford points so far (0 for a DNP / not-yet-started)
+  thru: number // holes completed in the live round (0 = not started)
+  complete: boolean // through the round's counted window
+}
+
 export interface StandingVM extends StandingRow {
   name: string
   sortOrder: number
   byRound: RoundPointsEntry[] // per-round points, aligned to StandingsVM.roundColumns
+  live: StandingLive | null // the in-progress round, per player; null when nothing is live
 }
 
 export interface RoundColumn {
@@ -301,12 +310,24 @@ export function buildChampionships(
     })
 }
 
+/** Summary of the round currently in progress — drives the "Round N live" status line. */
+export interface StandingsLiveRound {
+  roundNumber: number
+  courseName: string
+  holesCounted: number
+  thruMin: number // fewest holes completed among players who have started
+  thruMax: number // most holes completed among playing players (the leading edge)
+  started: boolean // at least one playing player has a hole in
+  allComplete: boolean // every playing player is through the counted window
+}
+
 export interface StandingsVM {
   rows: StandingVM[]
   roundColumns: RoundColumn[] // every round, in order, for the breakdown matrix
   countingRoundNumbers: number[] // rounds that feed the total (final + the live round)
   liveRoundNumbers: number[] // in_progress rounds included provisionally
   hasCountingRound: boolean
+  liveRound: StandingsLiveRound | null // the in-progress round, for the status line; null when none
 }
 
 export function buildStandings(dbData: Db): StandingsVM {
@@ -386,13 +407,46 @@ export function buildStandings(dbData: Db): StandingsVM {
     previousPositions = new Map(prev.map((r) => [r.playerId, r.position]))
   }
 
+  // ── Live round context: per-player "today" points + thru, and the round summary ──
+  // The lowest-numbered in-progress round is "the round in play". Its per-player figures
+  // come straight from the detail already built above — no re-scoring — so the standings
+  // row and the round screen never disagree.
+  const liveRoundNumber = liveRoundNumbers.length > 0 ? liveRoundNumbers[0] : null
+  const liveDetail = liveRoundNumber !== null ? detailByRound.get(liveRoundNumber) ?? null : null
+  const liveByPlayer = new Map<string, PlayerRoundVM>()
+  let liveRound: StandingsLiveRound | null = null
+  if (liveDetail) {
+    for (const pr of liveDetail.players) liveByPlayer.set(pr.playerId, pr)
+    const playing = liveDetail.players.filter((p) => p.status === 'playing')
+    const started = playing.filter((p) => p.thru > 0)
+    liveRound = {
+      roundNumber: liveDetail.round.round_number,
+      courseName: liveDetail.course.name,
+      holesCounted: liveDetail.holesCounted,
+      thruMin: started.length > 0 ? Math.min(...started.map((p) => p.thru)) : 0,
+      thruMax: playing.length > 0 ? Math.max(...playing.map((p) => p.thru)) : 0,
+      started: started.length > 0,
+      allComplete: playing.length > 0 && playing.every((p) => p.thru >= liveDetail.holesCounted),
+    }
+  }
+
   const rows = computeStandings(champs, previousPositions, breakTie).map((r) => {
     const p = nameById.get(r.playerId)
+    const pr = liveDetail ? liveByPlayer.get(r.playerId) : undefined
+    const live: StandingLive | null = pr
+      ? {
+          status: pr.status,
+          todayPoints: pr.totalPoints,
+          thru: pr.thru,
+          complete: pr.status === 'playing' && pr.thru >= liveDetail!.holesCounted,
+        }
+      : null
     return {
       ...r,
       name: p?.name ?? 'Unknown',
       sortOrder: p?.sort_order ?? 999,
       byRound: byRoundByPlayer.get(r.playerId) ?? [],
+      live,
     }
   })
 
@@ -402,6 +456,7 @@ export function buildStandings(dbData: Db): StandingsVM {
     countingRoundNumbers,
     liveRoundNumbers,
     hasCountingRound: countingRoundNumbers.length > 0,
+    liveRound,
   }
 }
 
