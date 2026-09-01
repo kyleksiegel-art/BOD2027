@@ -30,7 +30,7 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
 
   const heroCaption = vm.live
     ? `pts · ${vm.margin > 0 ? `leads by ${vm.margin}` : 'tied'}${leader?.projection !== null ? ` · proj ${leader.projection}` : ''}`
-    : `pts · ${vm.margin > 0 ? `won by ${vm.margin}` : 'shared'}${vm.holesWonLeader ? ` · ${vm.holesWonLeader.count} holes` : ''}`
+    : `pts · ${vm.margin > 0 ? `won by ${vm.margin}` : 'shared'}`
 
   return (
     <section className="round recap-card mt-6 overflow-hidden rounded-lg" data-course={slug}>
@@ -240,25 +240,18 @@ function ribbonCaption(act: RecapAct, changes: number, thru: number, total: numb
   return `thru ${thru} of ${total} · ${moved}`
 }
 
-/** The facts row, chosen by act. On round 1 (no Week) the early acts keep facts so the card
- *  isn't sparse; once The Week carries the context, opening/moving drop the extra fact rows. */
+/**
+ * The facts row. A ranked highlight picker fills the "interesting stat" slot(s) — whichever
+ * point-native superlative has the most signal wins, so nothing shows a dead value. The
+ * structural facts (winner · pays, to-play, CTP) are added per act around it.
+ */
 function ActFacts({ vm }: { vm: RoundRecapVM }) {
   const rows: { k: string; v: React.ReactNode }[] = []
-  const early = vm.act === 'opening' || vm.act === 'moving'
+  const hi = vm.highlights
+  const highlightRow = (h: (typeof hi)[number]) => ({ k: h.label, v: <FactValue value={h.value} /> })
 
-  if (early && !vm.week) {
-    if (vm.holesWonLeader)
-      rows.push({ k: 'Holes won', v: `${vm.holesWonLeader.name} · ${vm.holesWonLeader.count} of ${vm.holesWonLeader.of}` })
-    if (vm.shotOfTheDay)
-      rows.push({
-        k: 'Shot of the day',
-        v: (
-          <>
-            {vm.shotOfTheDay.name} <Small>— {vm.shotOfTheDay.label}, {ordinal(vm.shotOfTheDay.holeNumber)}</Small>
-          </>
-        ),
-      })
-  } else if (vm.act === 'closing') {
+  if (vm.act === 'closing') {
+    if (hi[0]) rows.push(highlightRow(hi[0]))
     rows.push({ k: 'To play', v: <ToPlay vm={vm} /> })
     if (vm.parThreeCount > 0) rows.push({ k: 'Closest to pin', v: <CtpChips vm={vm} /> })
   } else if (vm.act === 'final') {
@@ -274,9 +267,11 @@ function ActFacts({ vm }: { vm: RoundRecapVM }) {
         </>
       ),
     })
-    if (vm.holesWonLeader)
-      rows.push({ k: 'Holes won', v: `${vm.holesWonLeader.name} · ${vm.holesWonLeader.count} of ${vm.holesWonLeader.of}` })
+    hi.slice(0, 2).forEach((h) => rows.push(highlightRow(h)))
     if (vm.parThreeCount > 0) rows.push({ k: 'Closest to pin', v: <CtpChips vm={vm} /> })
+  } else {
+    // opening / moving — the highlights carry the card
+    hi.slice(0, 2).forEach((h) => rows.push(highlightRow(h)))
   }
 
   if (rows.length === 0) return null
@@ -337,10 +332,15 @@ function Small({ children }: { children: React.ReactNode }) {
   return <span className="font-sans text-[0.78rem] font-normal text-paper-dim">{children}</span>
 }
 
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
+/** A highlight value like "Kyle · 4" or "Kyle · net eagle, 7th": lead in serif, detail muted. */
+function FactValue({ value }: { value: string }) {
+  const i = value.indexOf(' · ')
+  if (i === -1) return <>{value}</>
+  return (
+    <>
+      {value.slice(0, i)} <Small>{value.slice(i + 3)}</Small>
+    </>
+  )
 }
 
 /**
@@ -358,8 +358,8 @@ function ShareButton({ vm }: { vm: RoundRecapVM }) {
         vm.winners[0]?.points ?? 0
       } pts${vm.margin > 0 ? `, by ${vm.margin}` : ''}).`,
     ]
-    if (vm.week) lines.push(vm.week.line.replace(/^(\w+)/, '$1'))
-    if (vm.holesWonLeader) lines.push(`Holes won: ${vm.holesWonLeader.name} ${vm.holesWonLeader.count}.`)
+    if (vm.week) lines.push(vm.week.line)
+    for (const h of vm.highlights.slice(0, 2)) lines.push(`${h.label}: ${h.value}.`)
     const ctp = vm.ctpWinners.filter((c) => c.name).map((c) => c.name!.split(/\s+/)[0])
     if (ctp.length) lines.push(`CTP: ${ctp.join(', ')}.`)
     void navigator.share({ title: `${vm.course.name} recap`, text: lines.join('\n') }).catch(() => {})

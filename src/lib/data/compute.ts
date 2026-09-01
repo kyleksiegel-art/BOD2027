@@ -1286,8 +1286,7 @@ export interface RoundRecapVM {
   runnerUp: RecapWinner | null
   standing: RecapStanding[] // this round's order (playing only), desc
   roundWinnerCents: number
-  holesWonLeader: { name: string; count: number; of: number } | null
-  shotOfTheDay: RecapHighlight | null
+  highlights: RecapFact[] // point-native superlatives, ranked by notability (most interesting first)
   biggestMove: RecapMover | null
   ctpWinners: RecapCtpWinner[]
   nextPar3: number | null // next unplayed par 3 (live drama)
@@ -1314,6 +1313,14 @@ export interface RecapWeekVM {
   leaderName: string
 }
 
+/** One picked highlight fact — a label + a display value, ranked by how interesting it is. */
+export interface RecapFact {
+  key: string
+  label: string
+  value: string
+  notability: number // higher = more interesting; candidates with 0 are dropped
+}
+
 function firstName(name: string): string {
   return name.split(/\s+/)[0] || name
 }
@@ -1337,9 +1344,8 @@ function pickDispatch(x: {
   remaining: number
   theShort: string
   biggestMove: RecapMover | null
-  shotOfTheDay: RecapHighlight | null
 }): string {
-  const { act, leadLabel, multi, margin, remaining, theShort, biggestMove, shotOfTheDay } = x
+  const { act, leadLabel, multi, margin, remaining, theShort, biggestMove } = x
   const final = act === 'final'
   const late = final || act === 'closing'
   if (final && !multi && biggestMove && firstName(biggestMove.name) === leadLabel)
@@ -1347,10 +1353,6 @@ function pickDispatch(x: {
   if (late && !multi && margin >= 6) return `${leadLabel} turned it into a procession.`
   if (late && margin <= 1)
     return final ? 'It went to the very last holes.' : 'Nothing to separate them down the stretch.'
-  if ((act === 'opening' || act === 'moving') && shotOfTheDay)
-    return `${firstName(shotOfTheDay.name)}’s ${shotOfTheDay.label} on the ${ordinalOf(
-      shotOfTheDay.holeNumber,
-    )} set the tone.`
   switch (act) {
     case 'opening':
       return `${leadLabel} away first — a long way to go on ${theShort}.`
@@ -1361,6 +1363,179 @@ function pickDispatch(x: {
     default:
       return multi ? `Honours shared on ${theShort}.` : `${leadLabel} closes out ${theShort}.`
   }
+}
+
+/**
+ * The highlight picker: computes every point-native superlative the round can offer, scores each
+ * by how interesting it is, drops the ones with no signal, and returns them ranked. The card shows
+ * the top one or two — so a net eagle beats a quiet "+2", a meltdown can win the slot, and nothing
+ * ever renders a dead value. Everything is derived from the per-hole Stableford points.
+ */
+function buildHighlights(a: {
+  playing: PlayerRoundVM[]
+  holesCounted: number
+  holeLeaders: RecapHoleLeaders[]
+  act: RecapAct
+  winPoints: number
+  priorBestRound: number | null
+}): RecapFact[] {
+  const { playing, holesCounted, holeLeaders, act, winPoints, priorBestRound } = a
+  const fn = firstName
+  const done = (p: PlayerRoundVM) => p.holeResults.filter((h) => h.completed)
+  const ptsMap = (p: PlayerRoundVM) =>
+    new Map(done(p).map((h) => [h.holeNumber, h.points ?? 0] as [number, number]))
+  const cands: RecapFact[] = []
+
+  // Against the number — points vs net-Stableford par pace (2/hole). The golfer's measure.
+  {
+    let best: { p: PlayerRoundVM; v: number } | null = null
+    for (const p of playing) {
+      const v = p.totalPoints - 2 * p.thru
+      if (p.thru >= 3 && (best === null || v > best.v)) best = { p, v }
+    }
+    if (best && best.v > 0)
+      cands.push({ key: 'vsnum', label: 'Against the number', value: `${fn(best.p.name)} · +${best.v}`, notability: best.v * 8 })
+  }
+
+  // Net birdies (3+), with a bump for eagles (4+).
+  {
+    let best: { p: PlayerRoundVM; b: number; e: number } | null = null
+    for (const p of playing) {
+      let b = 0
+      let e = 0
+      for (const h of done(p)) {
+        const pts = h.points ?? 0
+        if (pts >= 3) b++
+        if (pts >= 4) e++
+      }
+      if (b > 0 && (best === null || b > best.b)) best = { p, b, e }
+    }
+    if (best)
+      cands.push({ key: 'birdies', label: 'Net birdies', value: `${fn(best.p.name)} · ${best.b}`, notability: best.b * 15 + best.e * 15 })
+  }
+
+  // Shot of the day — single best hole (net birdie or better).
+  {
+    let best: { p: PlayerRoundVM; pts: number; hole: number } | null = null
+    for (const p of playing)
+      for (const h of done(p)) {
+        const pts = h.points ?? 0
+        if (pts >= 3 && (best === null || pts > best.pts)) best = { p, pts, hole: h.holeNumber }
+      }
+    if (best)
+      cands.push({
+        key: 'shot',
+        label: 'Shot of the day',
+        value: `${fn(best.p.name)} · ${best.pts >= 4 ? 'net eagle' : 'net birdie'}, ${ordinalOf(best.hole)}`,
+        notability: best.pts >= 4 ? 80 : 45,
+      })
+  }
+
+  // Best nine — a full front or full back nine's points.
+  {
+    let best: { p: PlayerRoundVM; pts: number; side: string } | null = null
+    for (const p of playing) {
+      const m = ptsMap(p)
+      if (holesCounted >= 9) {
+        let ok = true
+        let sum = 0
+        for (let h = 1; h <= 9; h++) {
+          if (!m.has(h)) { ok = false; break }
+          sum += m.get(h)!
+        }
+        if (ok && (best === null || sum > best.pts)) best = { p, pts: sum, side: 'front' }
+      }
+      if (holesCounted >= 18) {
+        let ok = true
+        let sum = 0
+        for (let h = 10; h <= 18; h++) {
+          if (!m.has(h)) { ok = false; break }
+          sum += m.get(h)!
+        }
+        if (ok && (best === null || sum > best.pts)) best = { p, pts: sum, side: 'back' }
+      }
+    }
+    if (best && best.pts > 18)
+      cands.push({ key: 'nine', label: 'Best nine', value: `${fn(best.p.name)} · ${best.pts} ${best.side}`, notability: (best.pts - 18) * 5 })
+  }
+
+  // Hot streak — best three consecutive played holes.
+  {
+    let best: { p: PlayerRoundVM; sum: number; s: number } | null = null
+    for (const p of playing) {
+      const m = ptsMap(p)
+      for (let s = 1; s + 2 <= holesCounted; s++) {
+        if (m.has(s) && m.has(s + 1) && m.has(s + 2)) {
+          const sum = m.get(s)! + m.get(s + 1)! + m.get(s + 2)!
+          if (best === null || sum > best.sum) best = { p, sum, s }
+        }
+      }
+    }
+    if (best && best.sum >= 7)
+      cands.push({ key: 'streak', label: 'Hot streak', value: `${fn(best.p.name)} · ${best.sum} on ${best.s}–${best.s + 2}`, notability: (best.sum - 6) * 10 })
+  }
+
+  // Scoring streak — longest run of holes without a blank.
+  {
+    let best: { p: PlayerRoundVM; run: number } | null = null
+    for (const p of playing) {
+      const m = ptsMap(p)
+      let run = 0
+      let top = 0
+      for (let h = 1; h <= holesCounted; h++) {
+        if (m.has(h) && m.get(h)! >= 1) { run++; top = Math.max(top, run) } else if (m.has(h)) run = 0
+      }
+      if (best === null || top > best.run) best = { p, run: top }
+    }
+    if (best && best.run >= 6)
+      cands.push({ key: 'sstreak', label: 'Scoring streak', value: `${fn(best.p.name)} · ${best.run} straight`, notability: (best.run - 4) * 8 })
+  }
+
+  // Scoring holes — the cleanest card (fewest blanks), notable only when near-perfect.
+  {
+    let best: { p: PlayerRoundVM; scored: number; total: number; blanks: number } | null = null
+    for (const p of playing) {
+      const d = done(p)
+      const scored = d.filter((h) => (h.points ?? 0) >= 1).length
+      const blanks = d.length - scored
+      if (d.length >= 6 && (best === null || blanks < best.blanks)) best = { p, scored, total: d.length, blanks }
+    }
+    if (best) {
+      const n = best.blanks === 0 ? 40 : best.blanks === 1 ? 12 : 0
+      if (n > 0)
+        cands.push({ key: 'scoring', label: 'Scoring holes', value: `${fn(best.p.name)} · ${best.scored} of ${best.total}`, notability: n })
+    }
+  }
+
+  // Blow-ups — the most blank holes (the roast).
+  {
+    let best: { p: PlayerRoundVM; blanks: number } | null = null
+    for (const p of playing) {
+      const blanks = done(p).filter((h) => (h.points ?? 0) === 0).length
+      if (best === null || blanks > best.blanks) best = { p, blanks }
+    }
+    if (best && best.blanks >= 3)
+      cands.push({ key: 'blanks', label: 'Blow-ups', value: `${fn(best.p.name)} · ${best.blanks} blanks`, notability: best.blanks * 14 })
+  }
+
+  // Time in front — holes spent leading (from the ribbon).
+  {
+    const led = new Map<string, number>()
+    for (const h of holeLeaders) if (h.inPlay) led.set(h.order[0], (led.get(h.order[0]) ?? 0) + 1)
+    let best: { p: PlayerRoundVM; n: number } | null = null
+    for (const p of playing) {
+      const n = led.get(p.playerId) ?? 0
+      if (best === null || n > best.n) best = { p, n }
+    }
+    if (best && best.n >= 3)
+      cands.push({ key: 'front', label: 'In front', value: `${fn(best.p.name)} · led ${best.n}`, notability: Math.min(best.n * 3, 28) })
+  }
+
+  // Low round of the trip — is this the best single round posted so far? (Only once it's done.)
+  if (act === 'final' && priorBestRound !== null && winPoints > 0 && winPoints >= priorBestRound)
+    cands.push({ key: 'lowround', label: 'Trip', value: `${winPoints} · low round so far`, notability: 70 })
+
+  return cands.filter((c) => c.notability > 0).sort((x, y) => y.notability - x.notability)
 }
 
 export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM | null {
@@ -1409,61 +1584,26 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     {},
   ).round_winner_cents ?? 0
 
-  // Holes won — outright net winner per played hole (reuses the tiebreak tally). Replaces the
-  // old "best back nine", which was undefined mid-round. Available from the first hole.
-  const playedHoleCells: HoleNetCell[][] = []
-  for (let holeNo = 1; holeNo <= holesCounted; holeNo++) {
-    const cells = playing.map((p) => {
-      const hr = p.holeResults.find((h) => h.holeNumber === holeNo)
-      return { playerId: p.playerId, net: hr?.net ?? null, completed: hr?.completed ?? false }
-    })
-    if (cells.some((c) => c.completed)) playedHoleCells.push(cells)
-  }
-  const holesWonTally = tallyHolesWon(playedHoleCells)
-  let holesWonLeader: { name: string; count: number; of: number } | null = null
-  {
-    let bestId: string | null = null
-    let bestCount = 0
-    const orderById = new Map(playing.map((p, i) => [p.playerId, i]))
-    for (const [pid, count] of holesWonTally) {
-      if (count > bestCount || (count === bestCount && (orderById.get(pid) ?? 99) < (orderById.get(bestId ?? '') ?? 99))) {
-        bestId = pid
-        bestCount = count
-      }
-    }
-    if (bestId && bestCount > 0) {
-      const name = playing.find((p) => p.playerId === bestId)?.name ?? 'Unknown'
-      holesWonLeader = { name, count: bestCount, of: playedHoleCells.length }
-    }
-  }
-
-  // Shot of the day — best single-hole Stableford (net birdie or better) so far.
-  let shotOfTheDay: RecapHighlight | null = null
-  for (const p of playing) {
-    for (const hr of p.holeResults) {
-      if (!hr.completed) continue
-      const pts = hr.points ?? 0
-      if (pts >= 3 && (!shotOfTheDay || pts > shotOfTheDay.points)) {
-        shotOfTheDay = {
-          name: p.name,
-          holeNumber: hr.holeNumber,
-          points: pts,
-          label: pts >= 4 ? 'net eagle' : 'net birdie',
-        }
-      }
-    }
-  }
-
-  // The overall championship as of this round, and the biggest mover — both from the SAME
-  // cumulative standings (through this round vs. through the prior one), so they agree. Only
-  // meaningful once a prior round counts; on round 1 the "week" IS this round, so it stays null.
+  // The overall championship as of this round, the biggest mover, and the best single round
+  // posted before this one (for the "low round of the trip" highlight) — all from the SAME
+  // cumulative standings. Only meaningful once a prior round counts; the week stays null on r1.
   let biggestMove: RecapMover | null = null
   let week: RecapWeekVM | null = null
+  let priorBestRound: number | null = null
   const countingBefore = dbData.rounds.some(
     (r) => r.round_number < roundNumber && (r.status === 'final' || r.status === 'in_progress'),
   )
   if (countingBefore) {
     const champs = buildChampionships(dbData)
+    let mx = 0
+    let anyPrior = false
+    for (const c of champs)
+      for (const r of c.byRound)
+        if (r.counts && r.roundNumber < roundNumber) {
+          anyPrior = true
+          if (r.points > mx) mx = r.points
+        }
+    priorBestRound = anyPrior ? mx : null
     const nmById = new Map(dbData.players.map((p) => [p.id, p.name]))
     const beforePos = new Map(
       standingsThroughRound(champs, roundNumber - 1).map((r) => [r.playerId, r.position]),
@@ -1623,17 +1763,12 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     }
   }
 
+  // ── Highlights: point-native superlatives, ranked so the most interesting one wins the slot
+  //    (and nothing shows a dead value early). ──
+  const highlights = buildHighlights({ playing, holesCounted, holeLeaders, act, winPoints, priorBestRound })
+
   // ── Dispatch: one line of editorial voice, chosen by the strongest hook available ──
-  const dispatch = pickDispatch({
-    act,
-    leadLabel,
-    multi,
-    margin,
-    remaining,
-    theShort,
-    biggestMove,
-    shotOfTheDay,
-  })
+  const dispatch = pickDispatch({ act, leadLabel, multi, margin, remaining, theShort, biggestMove })
 
   return {
     week,
@@ -1653,8 +1788,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     runnerUp,
     standing,
     roundWinnerCents,
-    holesWonLeader,
-    shotOfTheDay,
+    highlights,
     biggestMove,
     ctpWinners,
     nextPar3,
