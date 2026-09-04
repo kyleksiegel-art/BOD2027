@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>CTP, Reworked · BOD·27 mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&display=swap"
+/>
+
+<style>
+  :root {
+    /* Fairway Linen — lifted verbatim from src/index.css */
+    --ground: #e9e1d0;
+    --ground-2: #f2ecdd;
+    --paper: #1b1e1c;
+    --paper-dim: #4b453c;
+    --paper-faint: #4f4a41;
+    --gold: #8f5410;
+    --gold-bright: #935608;
+    --gold-fill: #d18316;
+    --blue: #345f7c;
+    --olive: #6f7511;
+    --red: #9a3412;
+    --hair: rgba(27, 30, 28, 0.14);
+    --hair-strong: rgba(27, 30, 28, 0.24);
+    --leader-tint: rgba(209, 131, 22, 0.09);
+    --ctp-fill: rgba(209, 131, 22, 0.1);
+
+    --sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --serif: "Fraunces", ui-serif, Georgia, serif;
+    color-scheme: light;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--paper);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    line-height: 1.5;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 2.5rem) 4rem;
+  }
+
+  /* ---- masthead ---- */
+  .masthead {
+    border-bottom: 1px solid var(--hair-strong);
+    padding-bottom: 1.4rem;
+    margin-bottom: 2.4rem;
+  }
+  .kicker {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 0 0 0.5rem;
+  }
+  .masthead h1 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 132, "SOFT" 0, "wght" 600;
+    letter-spacing: -0.02em;
+    font-size: clamp(2.1rem, 6vw, 3.4rem);
+    line-height: 1;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+  }
+  .masthead p {
+    margin: 0;
+    max-width: 60ch;
+    color: var(--paper-dim);
+    font-size: 0.98rem;
+  }
+  .rulecheck {
+    margin-top: 1.2rem;
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    background: var(--ground-2);
+    border: 1px solid var(--hair);
+    border-left: 3px solid var(--gold-fill);
+    border-radius: 3px;
+    padding: 0.8rem 1rem;
+    max-width: 62ch;
+    font-size: 0.86rem;
+    color: var(--paper-dim);
+  }
+  .rulecheck strong {
+    color: var(--paper);
+    font-weight: 600;
+  }
+  .rulecheck .q {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 40, "wght" 600;
+    color: var(--gold-bright);
+    font-size: 1.1rem;
+    line-height: 1.2;
+  }
+
+  /* ---- section headings ---- */
+  .change {
+    margin: 3rem 0 1.3rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 0.6rem;
+  }
+  .change .tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--paper);
+    background: var(--gold-fill);
+    border-radius: 2px;
+    padding: 0.18rem 0.5rem;
+  }
+  .change h2 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 60, "wght" 600;
+    font-size: 1.5rem;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .change .sub {
+    color: var(--paper-faint);
+    font-size: 0.85rem;
+    margin-left: auto;
+  }
+
+  /* ---- phone gallery ---- */
+  .gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.8rem 1.6rem;
+    align-items: flex-start;
+  }
+  figure {
+    margin: 0;
+    width: 340px;
+    max-width: 100%;
+    flex: 0 1 340px;
+  }
+  figcaption {
+    font-size: 0.82rem;
+    color: var(--paper-dim);
+    margin-top: 0.7rem;
+    padding-left: 0.2rem;
+  }
+  figcaption b {
+    color: var(--paper);
+    font-weight: 600;
+  }
+
+  .phone {
+    background: var(--ground);
+    border: 1px solid var(--hair-strong);
+    border-radius: 26px;
+    padding: 0.5rem;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 18px 40px -24px rgba(27, 30, 28, 0.5);
+  }
+  .screen {
+    background: var(--ground);
+    border-radius: 20px;
+    overflow: hidden;
+    height: 620px;
+    display: flex;
+    flex-direction: column;
+  }
+  .statusbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.55rem 1.1rem 0.35rem;
+    font-size: 0.72rem;
+    color: var(--paper-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .statusbar .dots {
+    letter-spacing: 0.15em;
+  }
+  .screen-body {
+    padding: 0.4rem 1.05rem 1.05rem;
+    overflow: hidden;
+    flex: 1;
+  }
+
+  /* ---- Enter flow: hole header ---- */
+  .hole-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--paper-faint);
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    padding: 0.2rem 0 0.6rem;
+  }
+  .hole-nav .arrow {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--hair);
+    border-radius: 999px;
+    color: var(--paper-dim);
+    font-size: 0.9rem;
+  }
+  .hole-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.4rem;
+  }
+  .hole-head[data-course="red"] {
+    box-shadow: inset 3px 0 0 var(--red);
+    padding-left: 0.7rem;
+    margin-left: -0.3rem;
+  }
+  .hole-num {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .hole-num .lbl {
+    font-size: 0.66rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--paper-faint);
+  }
+  .hole-num .n {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 90, "SOFT" 0, "wght" 600;
+    font-size: 2.3rem;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+  }
+  .hole-meta {
+    text-align: right;
+    font-size: 0.74rem;
+    color: var(--paper-faint);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.45;
+  }
+  .hole-meta .par {
+    color: var(--paper);
+    font-weight: 600;
+  }
+
+  /* ---- score rows ---- */
+  .scores {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.35rem;
+  }
+  .srow {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .srow .who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+  .srow .name {
+    font-size: 0.94rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .srow .topar {
+    font-size: 0.72rem;
+    color: var(--paper-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .srow .topar.good {
+    color: var(--olive);
+    font-weight: 600;
+  }
+  .srow.gets {
+    border-left: 2px solid var(--gold);
+    background: rgba(209, 131, 22, 0.07);
+    padding-left: 0.55rem;
+    margin-left: -0.55rem;
+  }
+  .srow .topar.stroke {
+    color: var(--gold-bright);
+    font-weight: 600;
+  }
+  .val-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  .pips {
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    display: flex;
+    gap: 2px;
+  }
+  .pips i {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--gold-bright);
+    display: block;
+  }
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .stepper button {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid var(--hair-strong);
+    background: var(--ground-2);
+    color: var(--paper-dim);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+    font-family: var(--sans);
+  }
+  .stepper .val {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 40, "wght" 600;
+    font-size: 1.35rem;
+    min-width: 1.3ch;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .stepper .val.empty {
+    color: var(--paper-faint);
+    font-variation-settings: "opsz" 40, "wght" 400;
+  }
+
+  /* ---- the CTP control (Change A) ---- */
+  .ctp {
+    margin-top: 0.9rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--hair);
+  }
+  .ctp-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+  .ctp-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .ctp-hint {
+    font-size: 0.72rem;
+    color: var(--paper-faint);
+  }
+  .ctp-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .ctp-pick,
+  .ctp-none {
+    font: inherit;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.8rem;
+    min-height: 40px;
+    border: 1px solid var(--hair-strong);
+    border-radius: 3px;
+    background: var(--ground-2);
+    color: var(--paper);
+    cursor: pointer;
+  }
+  .ctp-pick[aria-checked="true"],
+  .ctp-none[aria-checked="true"] {
+    border-color: var(--gold);
+    background: var(--ctp-fill);
+    color: var(--gold-bright);
+    font-weight: 600;
+  }
+  .ctp-none {
+    color: var(--paper-dim);
+  }
+  .ctp-pick.is-out {
+    opacity: 0.36;
+    cursor: not-allowed;
+  }
+  .ctp-pick:focus-visible,
+  .ctp-none:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+  }
+  .ctp.is-locked {
+    opacity: 0.55;
+  }
+  .ctp-saved {
+    font-size: 0.72rem;
+    color: var(--olive);
+    font-weight: 600;
+    margin-top: 0.55rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .ctp-note {
+    margin-top: 0.6rem;
+    font-size: 0.78rem;
+    color: var(--gold-bright);
+    background: var(--ctp-fill);
+    border-radius: 3px;
+    padding: 0.5rem 0.65rem;
+    display: flex;
+    gap: 0.45rem;
+    align-items: flex-start;
+  }
+
+  /* ---- Round summary (Change B) ---- */
+  .page-head {
+    padding: 0.3rem 0 0.6rem;
+  }
+  .page-head .eye {
+    font-size: 0.66rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .page-head h3 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 72, "SOFT" 0, "wght" 600;
+    font-size: 1.7rem;
+    margin: 0.25rem 0 0;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  .swatch {
+    width: 0.62rem;
+    height: 0.62rem;
+    border-radius: 999px;
+    background: var(--red);
+    display: inline-block;
+  }
+  .page-head .day {
+    font-size: 0.76rem;
+    color: var(--paper-faint);
+    margin-top: 0.15rem;
+    letter-spacing: 0.02em;
+  }
+  .ctp-summary {
+    margin-top: 1.3rem;
+  }
+  .ctp-summary-h {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 0 0 0.2rem;
+  }
+  .ctp-list {
+    list-style: none;
+    margin: 0.4rem 0 0;
+    padding: 0;
+  }
+  .ctp-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.72rem 0.2rem;
+    border-bottom: 1px solid var(--hair);
+    cursor: pointer;
+  }
+  .ctp-list li:hover {
+    background: var(--ground-2);
+  }
+  .ctp-hole {
+    font-variant-numeric: tabular-nums;
+    color: var(--paper-faint);
+    width: 2.3rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+  .ctp-win {
+    font-weight: 500;
+    font-size: 0.98rem;
+    flex: 1;
+  }
+  .ctp-win.none {
+    color: var(--paper-dim);
+    font-weight: 400;
+  }
+  .ctp-win.pending {
+    color: var(--paper-faint);
+  }
+  .ctp-list .go {
+    color: var(--paper-faint);
+    font-size: 0.95rem;
+  }
+  .ctp-foot {
+    font-size: 0.76rem;
+    color: var(--paper-faint);
+    margin-top: 0.9rem;
+    line-height: 1.5;
+  }
+
+  /* small edge-state phones a touch shorter */
+  figure.edge .screen {
+    height: 540px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.3rem;
+    margin: 1.1rem 0 0;
+    font-size: 0.8rem;
+    color: var(--paper-dim);
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .chip {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 2px;
+    border: 1px solid var(--hair-strong);
+  }
+  .chip.sel {
+    background: var(--ctp-fill);
+    border-color: var(--gold);
+  }
+  .chip.out {
+    background: var(--ground-2);
+    opacity: 0.4;
+  }
+  .chip.ok {
+    background: var(--ground-2);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    figure {
+      animation: rise 0.5s ease both;
+    }
+    figure:nth-child(2) {
+      animation-delay: 0.06s;
+    }
+    figure:nth-child(3) {
+      animation-delay: 0.12s;
+    }
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="kicker">BOD·27 — Interaction Mockup</p>
+    <h1>Closest&nbsp;to&nbsp;the&nbsp;Pin, reworked</h1>
+    <p>
+      CTP entry moves out of its own block on the round page and into the
+      hole-by-hole score flow, where it actually happens. Eligibility is derived
+      from the scores you've already tapped — “par or better” is enforced by the
+      app, not by memory — and the round page becomes a read-only summary.
+    </p>
+    <div class="rulecheck">
+      <span class="q">?</span>
+      <div>
+        <strong>One rule to confirm before I build:</strong> eligibility keys off
+        “par or better.” This mockup defaults to <strong>gross</strong> par (the
+        conventional CTP skill — get on, two-putt). If the boys mean
+        <strong>net</strong> par, it's a one-line change. Which is it?
+      </div>
+    </div>
+  </header>
+
+  <!-- CHANGE A -->
+  <div class="change">
+    <span class="tag">A</span>
+    <h2>Inline control, in the Enter flow</h2>
+    <span class="sub">renders only when the hole is a par 3</span>
+  </div>
+
+  <div class="gallery">
+    <!-- A1: the normal case -->
+    <figure>
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>9:41</span><span class="dots">●●● offline · queued</span>
+          </div>
+          <div class="screen-body">
+            <div class="hole-nav">
+              <span class="arrow">‹</span>
+              <span>Hole 6 of 18 · Streamsong Red</span>
+              <span class="arrow">›</span>
+            </div>
+            <div class="hole-head" data-course="red">
+              <div class="hole-num">
+                <span class="lbl">Hole</span><span class="n">6</span>
+              </div>
+              <div class="hole-meta">
+                <div><span class="par">Par 3</span></div>
+                <div>SI 15 · 168 yds</div>
+              </div>
+            </div>
+
+            <div class="scores">
+              <div class="srow gets">
+                <div class="who">
+                  <span class="name">Kyle Siegel</span>
+                  <span class="topar stroke">1 stroke here · thru 6 · 8 pts</span>
+                </div>
+                <div class="stepper">
+                  <button aria-label="minus">−</button>
+                  <span class="val-wrap"><span class="pips"><i></i></span><span class="val">3</span></span>
+                  <button aria-label="plus">+</button>
+                </div>
+              </div>
+              <div class="srow">
+                <div class="who">
+                  <span class="name">Chris Denove</span>
+                  <span class="topar">no stroke · thru 6 · 9 pts</span>
+                </div>
+                <div class="stepper">
+                  <button aria-label="minus">−</button>
+                  <span class="val-wrap"><span class="val">2</span></span>
+                  <button aria-label="plus">+</button>
+                </div>
+              </div>
+              <div class="srow">
+                <div class="who">
+                  <span class="name">Jon Aronson</span>
+                  <span class="topar">no stroke · thru 6 · 5 pts</span>
+                </div>
+                <div class="stepper">
+                  <button aria-label="minus">−</button>
+                  <span class="val-wrap"><span class="val">4</span></span>
+                  <button aria-label="plus">+</button>
+                </div>
+              </div>
+              <div class="srow gets">
+                <div class="who">
+                  <span class="name">Adam Hersh</span>
+                  <span class="topar stroke">1 stroke here · thru 6 · 6 pts</span>
+                </div>
+                <div class="stepper">
+                  <button aria-label="minus">−</button>
+                  <span class="val-wrap"><span class="pips"><i></i></span><span class="val">4</span></span>
+                  <button aria-label="plus">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="ctp">
+              <div class="ctp-head">
+                <span class="ctp-label">Closest to the pin</span>
+                <span class="ctp-hint">par or better to claim</span>
+              </div>
+              <div class="ctp-choices" role="radiogroup" aria-label="Closest to pin, hole 6">
+                <button class="ctp-pick" role="radio" aria-checked="true">Kyle</button>
+                <button class="ctp-pick" role="radio" aria-checked="false">Chris</button>
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Jon</button>
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Adam</button>
+                <button class="ctp-none" role="radio" aria-checked="false">No winner</button>
+              </div>
+              <div class="ctp-saved">✓ Saved — Kyle</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <b>The pick, in context.</b> The per-hole stroke treatment is untouched —
+        gold rail, “1 stroke here,” and pips all stay. CTP just slots in below.
+        Note Adam: he <em>gets a stroke</em> (net) but made bogey gross, so he's
+        dimmed for CTP — the gross-vs-net line made visible.
+      </figcaption>
+    </figure>
+
+    <!-- A2: no scores yet -->
+    <figure class="edge">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>9:41</span><span class="dots">●●● online</span>
+          </div>
+          <div class="screen-body">
+            <div class="hole-head" data-course="red" style="margin-top:0.3rem">
+              <div class="hole-num">
+                <span class="lbl">Hole</span><span class="n">8</span>
+              </div>
+              <div class="hole-meta">
+                <div><span class="par">Par 3</span></div>
+                <div>SI 9 · 201 yds</div>
+              </div>
+            </div>
+            <div class="scores">
+              <div class="srow">
+                <div class="who"><span class="name">Kyle Siegel</span><span class="topar">not entered</span></div>
+                <div class="stepper"><button>−</button><span class="val empty">–</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Chris Denove</span><span class="topar">not entered</span></div>
+                <div class="stepper"><button>−</button><span class="val empty">–</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Jon Aronson</span><span class="topar">not entered</span></div>
+                <div class="stepper"><button>−</button><span class="val empty">–</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Adam Hersh</span><span class="topar">not entered</span></div>
+                <div class="stepper"><button>−</button><span class="val empty">–</span><button>+</button></div>
+              </div>
+            </div>
+            <div class="ctp is-locked">
+              <div class="ctp-head">
+                <span class="ctp-label">Closest to the pin</span>
+                <span class="ctp-hint">enter scores first</span>
+              </div>
+              <div class="ctp-choices" role="radiogroup" aria-label="Closest to pin, hole 8">
+                <button class="ctp-pick" role="radio" aria-checked="false" disabled>Kyle</button>
+                <button class="ctp-pick" role="radio" aria-checked="false" disabled>Chris</button>
+                <button class="ctp-pick" role="radio" aria-checked="false" disabled>Jon</button>
+                <button class="ctp-pick" role="radio" aria-checked="false" disabled>Adam</button>
+                <button class="ctp-none" role="radio" aria-checked="false" disabled>No winner</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <b>Edge · nothing scored yet.</b> The whole control is disabled — you
+        can't set a winner (or “No winner”) before scores exist.
+      </figcaption>
+    </figure>
+
+    <!-- A3: everyone bogey+ -->
+    <figure class="edge">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>9:41</span><span class="dots">●●● online</span>
+          </div>
+          <div class="screen-body">
+            <div class="hole-head" data-course="red" style="margin-top:0.3rem">
+              <div class="hole-num">
+                <span class="lbl">Hole</span><span class="n">14</span>
+              </div>
+              <div class="hole-meta">
+                <div><span class="par">Par 3</span></div>
+                <div>SI 5 · 224 yds</div>
+              </div>
+            </div>
+            <div class="scores">
+              <div class="srow">
+                <div class="who"><span class="name">Kyle Siegel</span><span class="topar">+1 · 1 pt</span></div>
+                <div class="stepper"><button>−</button><span class="val">4</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Chris Denove</span><span class="topar">+2 · 0 pts</span></div>
+                <div class="stepper"><button>−</button><span class="val">5</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Jon Aronson</span><span class="topar">picked up</span></div>
+                <div class="stepper"><button>−</button><span class="val empty">✕</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Adam Hersh</span><span class="topar">+1 · 1 pt</span></div>
+                <div class="stepper"><button>−</button><span class="val">4</span><button>+</button></div>
+              </div>
+            </div>
+            <div class="ctp">
+              <div class="ctp-head">
+                <span class="ctp-label">Closest to the pin</span>
+                <span class="ctp-hint">par or better to claim</span>
+              </div>
+              <div class="ctp-choices" role="radiogroup" aria-label="Closest to pin, hole 14">
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Kyle</button>
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Chris</button>
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Jon</button>
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Adam</button>
+                <button class="ctp-none" role="radio" aria-checked="true">No winner</button>
+              </div>
+              <div class="ctp-saved">✓ Saved — no winner</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <b>Edge · nobody qualified.</b> Everyone made bogey or worse (or picked
+        up), so only “No winner” is selectable. The rule explains itself.
+      </figcaption>
+    </figure>
+
+    <!-- A4: winner invalidated -->
+    <figure class="edge">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>9:41</span><span class="dots">●●● offline · queued</span>
+          </div>
+          <div class="screen-body">
+            <div class="hole-head" data-course="red" style="margin-top:0.3rem">
+              <div class="hole-num">
+                <span class="lbl">Hole</span><span class="n">16</span>
+              </div>
+              <div class="hole-meta">
+                <div><span class="par">Par 3</span></div>
+                <div>SI 17 · 145 yds</div>
+              </div>
+            </div>
+            <div class="scores">
+              <div class="srow">
+                <div class="who">
+                  <span class="name">Kyle Siegel</span>
+                  <span class="topar">+1 · 1 pt <span style="color:var(--red)">(was 3)</span></span>
+                </div>
+                <div class="stepper"><button>−</button><span class="val">4</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Chris Denove</span><span class="topar good">par · 3 pts</span></div>
+                <div class="stepper"><button>−</button><span class="val">3</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Jon Aronson</span><span class="topar">+2 · 0 pts</span></div>
+                <div class="stepper"><button>−</button><span class="val">5</span><button>+</button></div>
+              </div>
+              <div class="srow">
+                <div class="who"><span class="name">Adam Hersh</span><span class="topar">+1 · 1 pt</span></div>
+                <div class="stepper"><button>−</button><span class="val">4</span><button>+</button></div>
+              </div>
+            </div>
+            <div class="ctp">
+              <div class="ctp-head">
+                <span class="ctp-label">Closest to the pin</span>
+                <span class="ctp-hint">par or better to claim</span>
+              </div>
+              <div class="ctp-choices" role="radiogroup" aria-label="Closest to pin, hole 16">
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Kyle</button>
+                <button class="ctp-pick" role="radio" aria-checked="false">Chris</button>
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Jon</button>
+                <button class="ctp-pick is-out" role="radio" aria-checked="false" disabled>Adam</button>
+                <button class="ctp-none" role="radio" aria-checked="false">No winner</button>
+              </div>
+              <div class="ctp-note">
+                <span>⚠</span>
+                <span>CTP cleared — Kyle no longer made par. Re-pick a winner.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <b>Edge · a fixed score invalidates the winner.</b> You logged Kyle,
+        then corrected his 3 to a 4. On save the app clears the stale winner and
+        says why — never keeps an invalid one.
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="legend">
+    <span><span class="chip sel"></span> selected winner</span>
+    <span><span class="chip ok"></span> eligible — made par or better</span>
+    <span><span class="chip out"></span> ineligible — bogey+ or no score</span>
+  </div>
+
+  <!-- CHANGE B -->
+  <div class="change">
+    <span class="tag">B</span>
+    <h2>Round page becomes a read-only summary</h2>
+    <span class="sub">≈20 buttons off the review screen</span>
+  </div>
+
+  <div class="gallery">
+    <figure>
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar">
+            <span>9:41</span><span class="dots">●●● online</span>
+          </div>
+          <div class="screen-body">
+            <div class="page-head">
+              <span class="eye">Round 1 · Thu, Feb 4</span>
+              <h3><span class="swatch"></span>Streamsong Red</h3>
+              <div class="day">Coore &amp; Crenshaw · Par 72</div>
+            </div>
+
+            <div class="ctp-summary">
+              <h4 class="ctp-summary-h">Closest to the pin</h4>
+              <ul class="ctp-list">
+                <li>
+                  <span class="ctp-hole">H6</span>
+                  <span class="ctp-win">Kyle Siegel</span>
+                  <span class="go">›</span>
+                </li>
+                <li>
+                  <span class="ctp-hole">H8</span>
+                  <span class="ctp-win none">No winner</span>
+                  <span class="go">›</span>
+                </li>
+                <li>
+                  <span class="ctp-hole">H14</span>
+                  <span class="ctp-win pending">—</span>
+                  <span class="go">›</span>
+                </li>
+                <li>
+                  <span class="ctp-hole">H16</span>
+                  <span class="ctp-win pending">—</span>
+                  <span class="go">›</span>
+                </li>
+              </ul>
+              <p class="ctp-foot">
+                Bragging rights only — pays nothing. Tap a hole to edit it on the
+                score-entry screen.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <b>Glanceable, no controls.</b> Four par 3s, one line each: winner, “No
+        winner,” or pending (—). Each row deep-links back to that hole in Enter,
+        so there's an obvious edit path without buttons on the review page.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div style="padding:0.2rem 0.4rem">
+        <h3 style="font-family:var(--serif);font-variation-settings:'opsz' 48,'wght' 600;font-size:1.2rem;margin:0 0 0.8rem;">
+          What changes in code
+        </h3>
+        <ul style="margin:0;padding-left:1.1rem;font-size:0.9rem;color:var(--paper-dim);line-height:1.7;">
+          <li><b style="color:var(--paper)">No schema change.</b> Same
+            <code>ctp[round][hole]</code> store: a winner, an explicit null, or undecided.</li>
+          <li><b style="color:var(--paper)">One derive function</b> —
+            <code>isCtpEligible</code>: a score exists and gross ≤ par. Pick-ups fail it for free.</li>
+          <li><b style="color:var(--paper)">Move, don't rebuild.</b> The entry
+            control relocates into the Enter hole view (par 3 only); the round page loses its
+            four blocks and gains this list.</li>
+          <li><b style="color:var(--paper)">Recompute on save.</b> If a score edit
+            makes the stored winner ineligible, clear it and flag the hole.</li>
+        </ul>
+        <p style="font-size:0.82rem;color:var(--paper-faint);margin-top:1.1rem;line-height:1.55;">
+          Net effect: one data-entry pass instead of two, the “must make par” rule
+          enforced from the data, and a review screen that's finally just a review.
+        </p>
+      </div>
+      <figcaption>&nbsp;</figcaption>
+    </figure>
+  </div>
+</div>
+
+</body>
+</html>
