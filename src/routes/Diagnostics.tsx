@@ -9,6 +9,7 @@ import { clientId } from '@/lib/clientId'
 import { useSession } from '@/lib/auth/session'
 import { lastSyncAt, retryDeadLetter } from '@/lib/sync/outbox'
 import { useSyncSnapshot } from '@/lib/sync/engine'
+import { readLastCrash, clearLastCrash } from '@/lib/crash'
 import { getReachability, subscribeReachability } from '@/lib/sync/reachability'
 import { formatDay } from '@/lib/format'
 import type { DeadLetterEntry, OutboxEntry } from '@/lib/data/types'
@@ -31,6 +32,7 @@ export default function Diagnostics() {
   const lastSync = useLiveQuery(() => lastSyncAt(), [], null)
   const outbox = useLiveQuery(() => db.outbox.orderBy('seq').toArray(), [], [])
   const dead = useLiveQuery(() => db.dead_letter.orderBy('failed_at').toArray(), [], [])
+  const lastCrash = useLiveQuery(() => readLastCrash(), [], null)
   const [copied, setCopied] = useState(false)
 
   if (session === undefined) {
@@ -70,6 +72,7 @@ export default function Diagnostics() {
         dead_letter: snapshot.deadLetter,
         outbox,
         dead_letter_items: dead,
+        last_crash: lastCrash,
         captured_at: new Date().toISOString(),
       },
       null,
@@ -123,6 +126,29 @@ export default function Diagnostics() {
               <DeadItem key={item.id} item={item} />
             ))}
           </ul>
+        )}
+      </Section>
+
+      <Section title={lastCrash ? 'Last crash' : 'Last crash — none'}>
+        {lastCrash ? (
+          <>
+            <Row label="When" value={new Date(lastCrash.at).toLocaleString()} />
+            <Row label="Where" value={lastCrash.route || '—'} mono />
+            <Row label="Scope" value={lastCrash.scope === 'shell' ? 'Whole app' : 'One screen'} />
+            <Row label="Error" value={lastCrash.message} mono />
+            {lastCrash.stack ? (
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded border border-hair bg-ground p-2 font-mono text-[0.68rem] leading-snug text-paper-dim">
+                {lastCrash.stack}
+              </pre>
+            ) : null}
+            <div className="mt-3">
+              <Button onClick={() => void clearLastCrash()}>Clear</Button>
+            </div>
+          </>
+        ) : (
+          <p className="text-[0.85rem] text-paper-dim">
+            No screen has crashed on this phone. If one does, it is recorded here and included in the JSON below.
+          </p>
         )}
       </Section>
 
