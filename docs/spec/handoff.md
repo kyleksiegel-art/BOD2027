@@ -1,17 +1,18 @@
-# Handoff — 2026-09-05 (branch `recap-share-image`)
+# Handoff — 2026-09-05 (branch `error-boundary`)
 
-Recap "Share ↗" now shares a PNG of the recap card instead of a text summary (Kyle: "just the
-image"). `src/lib/share/recapImage.ts` (modern-screenshot, 2×, footer excluded via
-`data-share-exclude`); `ShareButton` in `RoundRecap.tsx` pre-renders after fonts settle so the
-tap → share sheet stays inside the iOS user gesture. Text is only the fallback where the share
-sheet can't take files.
+Error boundary, the next item from today's reliability ranking.
 
-Verified in the desktop preview at 375px: 670×1549 PNG, ~219 KB, ~170 ms, fonts and course
-accent intact, footer gone. `navigator.share` is undefined in the preview, so the sheet itself
-is untested — **check on an iPhone: /rounds/1 → Share → Messages.**
+- `src/components/ErrorBoundary.tsx`: `CrashPanel` (Reload / Home / "What happened" details,
+  copy says saved scores and drafts are not lost). Two router `errorElement`s: a pathless route
+  under Layout keeps the tab bar up when a page throws; the root route replaces react-router's
+  default "Unexpected Application Error!" for a Layout crash. `AppErrorBoundary` wraps the router.
+- `src/lib/crash.ts`: last crash → `sync_meta['last_crash']`; Diagnostics shows it + Clear, and
+  includes it in "Copy state as JSON".
+- Dev-only `?crash=route` / `?crash=shell` triggers; stripped from the prod bundle (checked).
 
-Tests 162, `npm run build` clean. Earlier today (merged, PR #11): Enter drafts persist in Dexie,
-Enter opens on the current hole, Save advances.
+Verified in the preview: both panels render, both record, tab bar survives the route case,
+navigating away recovers. Tests 167, `npm run build` clean.
 
-Still open from the 2026-09-05 ranking: error boundary, score history, Realtime channel-status
-handling, wake lock, DB backup, the four-phone dry run and pre-trip chores.
+Earlier today (merged): PR #11 Enter drafts/current hole/advance; PR #12 recap Share as image
+(verified on Kyle's iPhone). Still open: score history, Realtime channel-status handling,
+wake lock, DB backup, four-phone dry run + pre-trip chores.
