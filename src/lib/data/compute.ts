@@ -532,6 +532,13 @@ export interface EnterVM {
   standing: { name: string; points: number; thru: number }[]
   /** Holes with at least one entered or picked-up cell, for the hole picker. */
   holesWithEntries: number[]
+  /**
+   * Where the group is: the first hole on which some playing player has no stored score
+   * (a gross or a pick-up). 18 once every hole is complete. Computed from stored rows
+   * only, not drafts — the Enter screen uses it to pick its opening hole, so that a phone
+   * reopened on the 13th tee lands on 13, not 1.
+   */
+  firstOpenHole: number
 }
 
 /**
@@ -701,6 +708,23 @@ export function buildEnterHole(
     if (s.gross_strokes !== null || s.picked_up) entered.add(s.hole_number)
   }
 
+  // Stored rows only (rawDb): a hole is complete when every playing player has a cell on
+  // it. DNP players are not waited for, matching the Save gate in Enter.
+  const playingIds = rps.filter((rp) => rp.status === 'playing').map((rp) => rp.player_id)
+  const storedCells = new Set<string>()
+  for (const s of rawDb.scores) {
+    if (s.round_id !== round.id) continue
+    if (s.gross_strokes !== null || s.picked_up) storedCells.add(`${s.player_id}|${s.hole_number}`)
+  }
+  // No playing players means nothing to wait for on any hole; start at the 1st.
+  let firstOpenHole = playingIds.length === 0 ? 1 : 18
+  for (let h = 1; h <= 18; h++) {
+    if (playingIds.some((id) => !storedCells.has(`${id}|${h}`))) {
+      firstOpenHole = h
+      break
+    }
+  }
+
   return {
     round,
     course,
@@ -714,6 +738,7 @@ export function buildEnterHole(
       thru: p.thru,
     })),
     holesWithEntries: [...entered].sort((a, b) => a - b),
+    firstOpenHole,
   }
 }
 

@@ -6,6 +6,7 @@ import { PlayerEntryRow } from '@/components/enter/PlayerEntryRow'
 import { useEnterHole, usePendingHoles, useRoundChoices } from '@/lib/data/selectors'
 import type { EnterDraft } from '@/lib/data/compute'
 import { saveCells, saveCtp, subscribeWriteState, getWriteState } from '@/lib/data/mutations'
+import { loadEnterDrafts, putEnterDraft } from '@/lib/data/drafts'
 
 function useWriteState() {
   return useSyncExternalStore(subscribeWriteState, getWriteState, getWriteState)
@@ -21,7 +22,9 @@ export default function Enter() {
   const write = useWriteState()
 
   const [roundNumber, setRoundNumber] = useState<number | null>(null)
-  const [hole, setHole] = useState(1)
+  // null until the round's data is in: the screen then opens on the first hole the group
+  // hasn't finished, not on the 1st. Reset to null whenever the round changes.
+  const [hole, setHole] = useState<number | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   // Which hole was most recently saved, so an untouched hole doesn't claim "Saved".
   const [justSaved, setJustSaved] = useState<number | null>(null)
@@ -32,10 +35,14 @@ export default function Enter() {
   // Closest-to-pin winner per hole, unsaved until Save. undefined key = untouched; a value
   // of null is the explicit "no winner". Cleared for a hole once its save succeeds.
   const [ctpDrafts, setCtpDrafts] = useState<Record<number, string | null>>({})
-  // The same map in a ref. React state does not settle within a single frame, so two taps
+  // The same maps in refs. React state does not settle within a single frame, so two taps
   // landing in one frame would both read the pre-tap value and one increment would vanish.
   // The ref is the value the next tap computes from; the state is what renders.
   const draftsRef = useRef<DraftsByHole>({})
+  const ctpRef = useRef<Record<number, string | null>>({})
+  // Which round the refs currently hold drafts for. Drafts are persisted in Dexie per
+  // round and reloaded when this changes, so a force-quit between holes loses nothing.
+  const draftsRoundRef = useRef<string | null>(null)
 
   // Default to the round actually being played; failing that, the first one not yet final.
   useEffect(() => {
@@ -45,18 +52,91 @@ export default function Enter() {
     setRoundNumber((live ?? next ?? rounds[0]).roundNumber)
   }, [rounds, roundNumber])
 
-  const { vm, loading } = useEnterHole(roundNumber ?? 1, hole, drafts[hole] ?? EMPTY)
+  const holeShown = hole ?? 1
+  const { vm, loading } = useEnterHole(roundNumber ?? 1, holeShown, drafts[holeShown] ?? EMPTY)
+  // Until the round default resolves, `vm` is built for round 1 as a placeholder. Nothing
+  // below may act on it: a finished round 1 would otherwise hand a live round its 18th hole.
+  const vmIsForRound = vm !== null && roundNumber !== null && vm.round.round_number === roundNumber
+  const roundId = vmIsForRound ? vm.round.id : null
+  const firstOpenHole = vmIsForRound ? vm.firstOpenHole : null
+
+  // Round changed (or first load): pull this round's unsaved holes back out of Dexie, then
+  // land on the group's current hole. The round-id check discards a stale load if the
+  // picker was tapped again before the first one resolved.
+  useEffect(() => {
+    if (!roundId) return
+    let cancelled = false
+    void loadEnterDrafts(roundId).then((rows) => {
+      if (cancelled) return
+      const nextDrafts: DraftsByHole = {}
+      const nextCtp: Record<number, string | null> = {}
+      for (const r of rows) {
+        if (Object.keys(r.players).length > 0) nextDrafts[r.hole_number] = r.players
+        if (r.ctp_touched) nextCtp[r.hole_number] = r.ctp_winner
+      }
+      draftsRef.current = nextDrafts
+      ctpRef.current = nextCtp
+      draftsRoundRef.current = roundId
+      setDrafts(nextDrafts)
+      setCtpDrafts(nextCtp)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [roundId])
+
+  useEffect(() => {
+    if (hole === null && firstOpenHole !== null) setHole(firstOpenHole)
+  }, [hole, firstOpenHole])
   // Holes recorded on this phone but not yet acknowledged by the server. Distinct from a
   // draft: a draft is not recorded anywhere, a pending hole is recorded and merely owed.
   const pendingHoles = usePendingHoles(vm?.round.id ?? null)
 
-  function setDraft(playerId: string, draft: EnterDraft) {
-    const forHole = { ...(draftsRef.current[hole] ?? {}), [playerId]: draft }
-    draftsRef.current = { ...draftsRef.current, [hole]: forHole }
-    setDrafts(draftsRef.current)
+  /** Write one hole's unsaved state through to Dexie — or drop its row when nothing is left. */
+  function persistHole(h: number) {
+    const rid = draftsRoundRef.current
+    if (!rid) return
+    const touched = Object.prototype.hasOwnProperty.call(ctpRef.current, h)
+    void putEnterDraft({
+      round_id: rid,
+      hole_number: h,
+      players: draftsRef.current[h] ?? {},
+      ctp_touched: touched,
+      ctp_winner: touched ? (ctpRef.current[h] ?? null) : null,
+    })
   }
 
-  if (loading || !rounds || roundNumber === null) {
+  function setDraft(playerId: string, draft: EnterDraft) {
+    const h = holeShown
+    const forHole = { ...(draftsRef.current[h] ?? {}), [playerId]: draft }
+    draftsRef.current = { ...draftsRef.current, [h]: forHole }
+    setDrafts(draftsRef.current)
+    persistHole(h)
+  }
+
+  function setCtpDraft(winner: string | null) {
+    const h = holeShown
+    ctpRef.current = { ...ctpRef.current, [h]: winner }
+    setCtpDrafts(ctpRef.current)
+    persistHole(h)
+  }
+
+  function clearHoleDrafts(h: number, part: 'players' | 'ctp') {
+    if (part === 'players') {
+      const rest = { ...draftsRef.current }
+      delete rest[h]
+      draftsRef.current = rest
+      setDrafts(rest)
+    } else {
+      const rest = { ...ctpRef.current }
+      delete rest[h]
+      ctpRef.current = rest
+      setCtpDrafts(rest)
+    }
+    persistHole(h)
+  }
+
+  if (loading || !rounds || roundNumber === null || hole === null) {
     return (
       <Page>
         <PageHeader eyebrow="Hole by Hole" title="Enter Scores" />
@@ -101,7 +181,7 @@ export default function Enter() {
 
   /** A stepper tap. `stored` is the value on screen; an unsaved edit outranks it. */
   function step(playerId: string, delta: number, stored: number) {
-    const current = draftsRef.current[hole]?.[playerId]?.grossStrokes ?? stored
+    const current = draftsRef.current[holeShown]?.[playerId]?.grossStrokes ?? stored
     setDraft(playerId, {
       grossStrokes: Math.min(25, Math.max(1, current + delta)),
       pickedUp: false,
@@ -115,6 +195,8 @@ export default function Enter() {
 
   async function saveHole() {
     if (!vm || !dirty) return
+    // `hole` is non-null once this renders; the hoisted declaration cannot see that narrowing.
+    const h = holeShown
     // Scores and CTP are one Save. saveCells/saveCtp each resolve true once the entry is
     // durably queued — offline included — and false only if this device could not record it
     // at all, and then the edits stay put.
@@ -123,31 +205,29 @@ export default function Enter() {
         Object.entries(holeDrafts).map(([playerId, d]) => ({
           roundId: vm.round.id,
           playerId,
-          holeNumber: hole,
+          holeNumber: h,
           grossStrokes: d.grossStrokes,
           pickedUp: d.pickedUp,
         })),
       )
       if (!ok) return
-      const rest = { ...draftsRef.current }
-      delete rest[hole]
-      draftsRef.current = rest
-      setDrafts(rest)
+      clearHoleDrafts(h, 'players')
     }
     if (ctpIsDirty) {
       const ok = await saveCtp({
         round_id: vm.round.id,
-        hole_number: hole,
-        player_id: ctpDrafts[hole], // string winner, or null for "no winner"
+        hole_number: h,
+        player_id: ctpDrafts[h] ?? null, // string winner, or null for "no winner"
         distance_feet: null, // distance is not tracked
       })
       if (!ok) return
-      setCtpDrafts((prev) => {
-        const { [hole]: _drop, ...rest } = prev
-        return rest
-      })
+      clearHoleDrafts(h, 'ctp')
     }
-    setJustSaved(hole)
+    setJustSaved(h)
+    // Save is gated on every playing player being in, so a saved hole is a finished hole:
+    // move on to the next one. The "Saved" state stays on the hole left behind, so paging
+    // back confirms it. The 18th stays put — there is nowhere to go.
+    if (h < 18) setHole(h + 1)
   }
 
   return (
@@ -161,9 +241,15 @@ export default function Enter() {
             key={r.roundNumber}
             type="button"
             onClick={() => {
+              if (r.roundNumber === roundNumber) return
               setRoundNumber(r.roundNumber)
-              setHole(1)
+              // Opens on that round's current hole once its data is in. Its drafts are
+              // reloaded from Dexie by the round effect; blank the refs meanwhile so one
+              // round's edits never overlay another's.
+              setHole(null)
               draftsRef.current = {}
+              ctpRef.current = {}
+              draftsRoundRef.current = null
               setDrafts({})
               setCtpDrafts({})
             }}
@@ -235,7 +321,7 @@ export default function Enter() {
               type="button"
               aria-label="Previous hole"
               disabled={hole === 1}
-              onClick={() => setHole((h) => Math.max(1, h - 1))}
+              onClick={() => setHole((h) => Math.max(1, (h ?? 1) - 1))}
               className="tap rounded-md border border-hair-strong px-4 text-xl text-paper disabled:opacity-30"
             >
               ‹
@@ -259,7 +345,7 @@ export default function Enter() {
               type="button"
               aria-label="Next hole"
               disabled={hole === 18}
-              onClick={() => setHole((h) => Math.min(18, h + 1))}
+              onClick={() => setHole((h) => Math.min(18, (h ?? 1) + 1))}
               className="tap rounded-md border border-hair-strong px-4 text-xl text-paper disabled:opacity-30"
             >
               ›
@@ -323,7 +409,7 @@ export default function Enter() {
                       key={p.playerId}
                       type="button"
                       aria-pressed={sel}
-                      onClick={() => setCtpDrafts((d) => ({ ...d, [hole]: p.playerId }))}
+                      onClick={() => setCtpDraft(p.playerId)}
                       className={`tap rounded-md border px-3 text-[0.85rem] ${
                         sel
                           ? 'border-gold bg-gold-fill text-paper font-semibold'
@@ -337,7 +423,7 @@ export default function Enter() {
                 <button
                   type="button"
                   aria-pressed={ctpCurrent === null}
-                  onClick={() => setCtpDrafts((d) => ({ ...d, [hole]: null }))}
+                  onClick={() => setCtpDraft(null)}
                   className={`tap rounded-md border px-3 text-[0.85rem] ${
                     ctpCurrent === null
                       ? 'border-gold bg-gold-fill text-paper font-semibold'

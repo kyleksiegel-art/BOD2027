@@ -128,6 +128,23 @@ Things that will bite if forgotten:
 - **Nothing auto-saves.** Edits live in per-hole drafts (`DraftsByHole` in `Enter.tsx`) that
   survive paging between holes, and reach the server only on Save. On a failed save the
   drafts stay put, so a bad connection costs a second tap, never a hole.
+- **Drafts are persisted in Dexie (v7 `enter_drafts`, keyed `[round_id+hole_number]`)**
+  (2026-09-05). iOS evicts backgrounded PWAs freely and Save is gated on the whole group, so
+  React-state-only drafts were the likeliest thing on the phone to vanish. `Enter.tsx` still
+  owns the value in refs (two taps in one frame) and writes through via
+  `src/lib/data/drafts.ts` after every tap; a row is deleted when the hole has nothing unsaved
+  left, which is what Save does. Drafts are per round and reload when the round changes —
+  the picker no longer wipes them. Scores and the CTP pick share one row (`ctp_touched`
+  distinguishes an explicit "no winner" from untouched).
+- **Enter opens on the group's current hole**, not hole 1: `EnterVM.firstOpenHole` is the
+  first hole on which some *playing* player has no stored cell (18 once complete, 1 with no
+  round_players). Computed from stored rows only, never drafts. `hole` state is `null` until
+  resolved, and the resolving effect is gated on the VM belonging to the selected round —
+  before the round default settles, `useEnterHole` builds round 1 as a placeholder, and a
+  finished round 1 would otherwise hand the live round its 18th hole. **A successful Save
+  advances to the next hole** (Kyle, 2026-09-05); `justSaved` stays on the hole left so paging
+  back reads "Saved". Hole 18 stays put. Tests: `enter.test.ts`,
+  `drafts.test.ts`. Full `vitest run` → **161**.
 - **A hole can't be saved until every *playing* player has a score on it** (Kyle,
   2026-08-21 feedback). Save is gated on `allEntered` in `Enter.tsx` — computed from
   `vm.players` (drafts already overlaid), a gross or a pick-up counts, DNP players are

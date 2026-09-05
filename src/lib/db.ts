@@ -24,6 +24,7 @@ import type {
   OutboxEntry,
   DeadLetterEntry,
   SyncMetaRow,
+  EnterDraftRow,
 } from './data/types'
 
 export class BodDatabase extends Dexie {
@@ -52,6 +53,11 @@ export class BodDatabase extends Dexie {
   dead_letter!: Table<DeadLetterEntry, string>
   // Local scratch: the monotonic clock's high-water mark, last successful sync.
   sync_meta!: Table<SyncMetaRow, string>
+  // Unsaved Enter-screen holes. Not the outbox: an outbox entry is recorded and owed to the
+  // server; a draft is not recorded anywhere yet. iOS evicts backgrounded PWAs freely, and
+  // Save is gated on the whole group being entered, so a half-entered hole held only in
+  // React state was the likeliest thing on the phone to vanish.
+  enter_drafts!: Table<EnterDraftRow, [string, number]>
 
   constructor() {
     super('bod2027')
@@ -101,6 +107,11 @@ export class BodDatabase extends Dexie {
       itinerary_items: 'id, day, sort_order',
       lodging: 'id, check_in',
       lodging_assignments: 'id, lodging_id, player_id',
+    })
+    // v7 — Enter drafts survive a force-quit. Keyed by the hole; indexed by round so the
+    // screen loads one round's drafts in a single query.
+    this.version(7).stores({
+      enter_drafts: '[round_id+hole_number], round_id',
     })
   }
 }

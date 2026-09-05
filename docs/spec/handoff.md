@@ -1,24 +1,18 @@
-# Handoff
+# Handoff — 2026-09-05 (branch `enter-drafts-persist`, uncommitted)
 
-**Not a numbered phase.** Design-refinement pass from Kyle's external brief (typography axes,
-leader/winner color hierarchy, course identity colors, contrast). Branch `design-refinements` off
-`main` (Phases 0–8 + the tiebreaker chain are merged to `main`; not yet pushed).
+Two cart-reliability fixes on the Enter screen, no phase work.
 
-**Built:** Fraunces swapped to Fontsource's `full` build (was `wght`-only) to unlock `opsz`/`SOFT`
-— font payload ~169 KB, over the ≤80 KB checklist target, accepted (`decisions.md`). New
-`.fx-display/.fx-head/.fx-title/.fx-serif-sm` axis utilities; `.leader-row` gold spine/tint reused
-on Standings, round Leaderboard, Money's 1st place, Enter's round-so-far; `courseSlug()` +
-`.round[data-course]` accent rails/swatches on Rounds/Home/RoundDetail (rail uses `box-shadow`,
-not `border-left` — see CLAUDE.md for why); `--paper-dim`/`--paper-faint` darkened ~12%. Also:
-`HeroPhoto` now recovers from a failed hero-image fetch (drops `<source>`s on `onError`, falls
-through to the JPG) — found live during this session's own browser verification, not a bad deploy.
+1. Enter drafts persist in Dexie (v7 `enter_drafts`) so an iOS eviction mid-hole loses nothing.
+   Helper: `src/lib/data/drafts.ts`. Write-through on every tap; row deleted on Save.
+2. Enter opens on the group's current hole (`EnterVM.firstOpenHole`), per round, from stored
+   cells only. Round picker resets the hole and reloads that round's drafts.
 
-**Verified:** `vitest run` → 148 (unchanged, no logic touched). `tsc -b` + `npm run build` clean.
-Browser-checked Home, Standings, Money, Rounds, RoundDetail on the local dev server — leader
-spine/tint, course rails, and sharper display type all confirmed live (some via computed-style
-JS checks, not just screenshots).
+Verified in the browser against local Supabase (R3 in progress, 3 playing): opened on 13,
+drafts on 13+14 survived a reload, Save cleared 13 and left 14. Test writes reverted in the DB.
+Tests 161 (was 148 + 13 new), `npm run build` clean. CLAUDE.md §Phase 5A updated.
 
-Committed and pushed to `design-refinements`; Kyle to review the Netlify deploy preview and merge.
+3. A successful Save advances to the next hole (18 stays put); "Saved" remains on the hole left.
 
-**Next:** Phase 9 — Polish (Lighthouse pass, README) is still the next numbered phase; this
-session didn't touch it.
+Not done: error boundary, score history,
+Realtime channel-status handling, wake lock, DB backup — see the 2026-09-05 chat ranking.
+Next: review + PR to `main`; then the four-phone dry run and the pre-trip chores.
