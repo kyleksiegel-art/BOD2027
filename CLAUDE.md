@@ -320,6 +320,16 @@ money** (CTP is still entered on the round screen for bragging rights, it just p
   `holesCounted`) and `ctpWinnerId`. Still records through the outbox; still $0. The
   standalone `CtpEntry.tsx` component and the `useRoundCtp` selector are **deleted** —
   `/rounds/:n` only *reports* CTP now, via the RoundRecap's "Closest to Pin" fact.
+- **Recap Share sends an image, not text** (Kyle 2026-09-05). `src/lib/share/recapImage.ts`
+  rasterises the `.recap-card` section with `modern-screenshot` (DOM → SVG foreignObject →
+  canvas; self-hosted fonts get embedded) at 2× and shares it as a PNG `File` via
+  `navigator.share({ files })`. The footer carries `data-share-exclude` so the buttons stay
+  out of the picture. **The PNG is pre-rendered in an effect** after `document.fonts.ready`:
+  iOS only honours `navigator.share` inside a user gesture, and rasterising on the tap could
+  outlast it. A card with `offsetWidth < 200` is refused (a hidden tab rasterises to a 2px
+  ribbon). Text summary is only the fallback where `canShare({ files })` is false. The share
+  sheet itself can't be exercised in the desktop preview (`navigator.share` undefined) —
+  **verify on a phone.**
 - **Money page: `src/routes/Money.tsx`** — total purse + 1st/2nd/round-winner breakdown, buy-in
   reconciliation, per-round winner cards (no CTP section), per-player ledger, settlement.
 - **Settings: `SettingsEditor.tsx` "Money" card** — four dollar fields (buy-in, round winner,

@@ -1,18 +1,17 @@
-# Handoff — 2026-09-05 (branch `enter-drafts-persist`, uncommitted)
+# Handoff — 2026-09-05 (branch `recap-share-image`)
 
-Two cart-reliability fixes on the Enter screen, no phase work.
+Recap "Share ↗" now shares a PNG of the recap card instead of a text summary (Kyle: "just the
+image"). `src/lib/share/recapImage.ts` (modern-screenshot, 2×, footer excluded via
+`data-share-exclude`); `ShareButton` in `RoundRecap.tsx` pre-renders after fonts settle so the
+tap → share sheet stays inside the iOS user gesture. Text is only the fallback where the share
+sheet can't take files.
 
-1. Enter drafts persist in Dexie (v7 `enter_drafts`) so an iOS eviction mid-hole loses nothing.
-   Helper: `src/lib/data/drafts.ts`. Write-through on every tap; row deleted on Save.
-2. Enter opens on the group's current hole (`EnterVM.firstOpenHole`), per round, from stored
-   cells only. Round picker resets the hole and reloads that round's drafts.
+Verified in the desktop preview at 375px: 670×1549 PNG, ~219 KB, ~170 ms, fonts and course
+accent intact, footer gone. `navigator.share` is undefined in the preview, so the sheet itself
+is untested — **check on an iPhone: /rounds/1 → Share → Messages.**
 
-Verified in the browser against local Supabase (R3 in progress, 3 playing): opened on 13,
-drafts on 13+14 survived a reload, Save cleared 13 and left 14. Test writes reverted in the DB.
-Tests 161 (was 148 + 13 new), `npm run build` clean. CLAUDE.md §Phase 5A updated.
+Tests 162, `npm run build` clean. Earlier today (merged, PR #11): Enter drafts persist in Dexie,
+Enter opens on the current hole, Save advances.
 
-3. A successful Save advances to the next hole (18 stays put); "Saved" remains on the hole left.
-
-Not done: error boundary, score history,
-Realtime channel-status handling, wake lock, DB backup — see the 2026-09-05 chat ranking.
-Next: review + PR to `main`; then the four-phone dry run and the pre-trip chores.
+Still open from the 2026-09-05 ranking: error boundary, score history, Realtime channel-status
+handling, wake lock, DB backup, the four-phone dry run and pre-trip chores.

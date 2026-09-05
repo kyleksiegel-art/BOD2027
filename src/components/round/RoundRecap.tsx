@@ -1,6 +1,9 @@
+import { useEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import type { RoundRecapVM, RecapAct } from '@/lib/data/compute'
 import { courseSlug, formatDay, formatMoney } from '@/lib/format'
+import { canShareFiles, recapImageFilename, renderRecapImage, SHARE_EXCLUDE_ATTR } from '@/lib/share/recapImage'
 
 // Stable non-gold identity palette (gold is reserved for leader/winner status; the course
 // colour is the masthead). Indexed by RecapPlayer.colorIndex so a player keeps one colour.
@@ -14,6 +17,8 @@ const PLAYER_COLORS = ['var(--blue)', 'var(--gold-fill)', 'var(--olive)', 'var(-
  */
 export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
   const slug = courseSlug(vm.course.name) ?? undefined
+  // The card element itself is what Share rasterises.
+  const cardRef = useRef<HTMLElement>(null)
   const colorOf = new Map(vm.players.map((p) => [p.playerId, PLAYER_COLORS[p.colorIndex % PLAYER_COLORS.length]]))
   const leader = vm.standing[0]
 
@@ -33,7 +38,7 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
     : `pts · ${vm.margin > 0 ? `won by ${vm.margin}` : 'shared'}`
 
   return (
-    <section className="round recap-card mt-6 overflow-hidden rounded-lg" data-course={slug}>
+    <section ref={cardRef} className="round recap-card mt-6 overflow-hidden rounded-lg" data-course={slug}>
       {/* masthead — sense of place */}
       <div className="recap-mast px-4 pb-3 pt-3.5">
         <Topo />
@@ -154,8 +159,8 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
       {/* act-specific facts */}
       <ActFacts vm={vm} />
 
-      {/* footer */}
-      <div className="flex items-center gap-2.5 border-t border-hair bg-ground px-4 py-2.5">
+      {/* footer — actions, not content: left out of the shared image */}
+      <div className="flex items-center gap-2.5 border-t border-hair bg-ground px-4 py-2.5" {...{ [SHARE_EXCLUDE_ATTR]: '' }}>
         <span className="tnum text-[0.72rem] text-paper-faint">
           {vm.live ? `Live · thru ${vm.roundThru} · updating` : 'Final · derived on-device'}
         </span>
@@ -165,7 +170,7 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
         >
           Standings
         </Link>
-        {!vm.live && <ShareButton vm={vm} />}
+        {!vm.live && <ShareButton vm={vm} cardRef={cardRef} />}
       </div>
     </section>
   )
@@ -344,14 +349,43 @@ function FactValue({ value }: { value: string }) {
 }
 
 /**
- * Share the recap as text via the Web Share API where available. The image export is a
- * deliberate follow-up.
+ * Share the finished recap as an image through the share sheet (Kyle, 2026-09-05: "just the
+ * image"). The card is rasterised ahead of the tap: iOS only honours navigator.share within a
+ * user gesture, and a rasterisation that takes longer than the gesture's grace period would
+ * throw NotAllowedError. Pre-rendering keeps the tap-to-sheet path synchronous. Falls back to
+ * a text summary only where the share sheet cannot take files.
  */
-function ShareButton({ vm }: { vm: RoundRecapVM }) {
+function ShareButton({ vm, cardRef }: { vm: RoundRecapVM; cardRef: RefObject<HTMLElement> }) {
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  const [image, setImage] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  // Render (and re-render when the card's data changes) so the file is ready at the tap.
+  useEffect(() => {
+    if (!canShare) return
+    let cancelled = false
+    setImage(null)
+    const el = cardRef.current
+    if (!el) return
+    // Let the fonts settle first; a card painted mid-swap would embed the fallback face.
+    const ready = typeof document !== 'undefined' && document.fonts ? document.fonts.ready : Promise.resolve()
+    void ready
+      .then(() => renderRecapImage(el))
+      .then((blob) => {
+        if (cancelled) return
+        setImage(new File([blob], recapImageFilename(vm.course.name, vm.round.round_number), { type: 'image/png' }))
+      })
+      .catch(() => {
+        /* the tap falls back to rendering on demand, then to text */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [canShare, cardRef, vm])
+
   if (!canShare) return null
 
-  const onShare = () => {
+  const shareText = () => {
     const winnerNames = vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')
     const lines = [
       `${vm.course.name} — ${winnerNames} ${vm.winners.length > 1 ? 'share it' : 'takes it'} (${
@@ -360,18 +394,42 @@ function ShareButton({ vm }: { vm: RoundRecapVM }) {
     ]
     if (vm.week) lines.push(vm.week.line)
     for (const h of vm.highlights.slice(0, 2)) lines.push(`${h.label}: ${h.value}.`)
-    const ctp = vm.ctpWinners.filter((c) => c.name).map((c) => c.name!.split(/\s+/)[0])
-    if (ctp.length) lines.push(`CTP: ${ctp.join(', ')}.`)
-    void navigator.share({ title: `${vm.course.name} recap`, text: lines.join('\n') }).catch(() => {})
+    return navigator.share({ title: `${vm.course.name} recap`, text: lines.join('\n') })
+  }
+
+  const shareFile = (file: File) =>
+    canShareFiles(file) ? navigator.share({ files: [file], title: `${vm.course.name} recap` }) : shareText()
+
+  const onShare = async () => {
+    if (image) {
+      void shareFile(image).catch(() => {})
+      return
+    }
+    // Not pre-rendered (or it failed): render now, then share. May lose the gesture on iOS —
+    // in which case the sheet simply does not open and a second tap, now pre-rendered, will.
+    const el = cardRef.current
+    if (!el) return void shareText().catch(() => {})
+    setBusy(true)
+    try {
+      const blob = await renderRecapImage(el)
+      const file = new File([blob], recapImageFilename(vm.course.name, vm.round.round_number), { type: 'image/png' })
+      setImage(file)
+      await shareFile(file)
+    } catch {
+      /* dismissed, or unsupported — nothing to report */
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
     <button
       type="button"
-      onClick={onShare}
-      className="tap inline-flex items-center gap-1 rounded border border-gold-bright bg-gold-fill px-3 text-[0.82rem] font-semibold text-paper"
+      onClick={() => void onShare()}
+      disabled={busy}
+      className="tap inline-flex items-center gap-1 rounded border border-gold-bright bg-gold-fill px-3 text-[0.82rem] font-semibold text-paper disabled:opacity-60"
     >
-      Share ↗
+      {busy ? 'Preparing…' : 'Share ↗'}
     </button>
   )
 }
