@@ -222,3 +222,19 @@ export interface SyncMetaRow {
   key: string
   value: unknown
 }
+
+/**
+ * An unsaved Enter-screen hole, persisted so a force-quit or an iOS eviction does not throw
+ * away three of four scores on the 13th. One row per (round, hole); deleted once that hole
+ * is saved or every edit on it is cleared. Local-only — never a server mirror.
+ */
+export interface EnterDraftRow {
+  round_id: string
+  hole_number: number
+  /** Per-player unsaved edits. Empty when only the CTP pick is touched. */
+  players: Record<string, { grossStrokes: number | null; pickedUp: boolean }>
+  /** Whether the closest-to-pin pick was touched; `ctp_winner` is meaningless otherwise. */
+  ctp_touched: boolean
+  /** The unsaved CTP pick: a player id, or null for the explicit "no winner". */
+  ctp_winner: string | null
+}
