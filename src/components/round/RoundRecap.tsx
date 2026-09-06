@@ -170,7 +170,7 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
         >
           Standings
         </Link>
-        {!vm.live && <ShareButton vm={vm} cardRef={cardRef} />}
+        <ShareButton vm={vm} cardRef={cardRef} />
       </div>
     </section>
   )
@@ -349,56 +349,78 @@ function FactValue({ value }: { value: string }) {
 }
 
 /**
- * Share the finished recap as an image through the share sheet (Kyle, 2026-09-05: "just the
- * image"). The card is rasterised ahead of the tap: iOS only honours navigator.share within a
- * user gesture, and a rasterisation that takes longer than the gesture's grace period would
- * throw NotAllowedError. Pre-rendering keeps the tap-to-sheet path synchronous. Falls back to
- * a text summary only where the share sheet cannot take files.
+ * Share the recap as an image through the share sheet (Kyle, 2026-09-05: "just the image";
+ * 2026-09-06: during the round too, not only at the end). The card is rasterised ahead of the
+ * tap: iOS only honours navigator.share within a user gesture, and a rasterisation that takes
+ * longer than the gesture's grace period would throw NotAllowedError. Pre-rendering keeps the
+ * tap-to-sheet path synchronous. A live card re-derives on every score, so the pre-render is
+ * debounced — the last one before the tap is the one that ships. Falls back to a text summary
+ * only where the share sheet cannot take files.
  */
 function ShareButton({ vm, cardRef }: { vm: RoundRecapVM; cardRef: RefObject<HTMLElement> }) {
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const [image, setImage] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const filename = recapImageFilename(vm.course.name, vm.round.round_number, vm.live ? vm.roundThru : null)
+
   // Render (and re-render when the card's data changes) so the file is ready at the tap.
+  // Live rounds change on every saved hole, so wait for the card to settle before painting.
   useEffect(() => {
     if (!canShare) return
     let cancelled = false
     setImage(null)
     const el = cardRef.current
     if (!el) return
-    // Let the fonts settle first; a card painted mid-swap would embed the fallback face.
-    const ready = typeof document !== 'undefined' && document.fonts ? document.fonts.ready : Promise.resolve()
-    void ready
-      .then(() => renderRecapImage(el))
-      .then((blob) => {
-        if (cancelled) return
-        setImage(new File([blob], recapImageFilename(vm.course.name, vm.round.round_number), { type: 'image/png' }))
-      })
-      .catch(() => {
-        /* the tap falls back to rendering on demand, then to text */
-      })
+    const delay = vm.live ? 1200 : 0
+    const timer = window.setTimeout(() => {
+      // Let the fonts settle first; a card painted mid-swap would embed the fallback face.
+      const ready = typeof document !== 'undefined' && document.fonts ? document.fonts.ready : Promise.resolve()
+      void ready
+        .then(() => renderRecapImage(el))
+        .then((blob) => {
+          if (cancelled) return
+          setImage(new File([blob], filename, { type: 'image/png' }))
+        })
+        .catch(() => {
+          /* the tap falls back to rendering on demand, then to text */
+        })
+    }, delay)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
-  }, [canShare, cardRef, vm])
+  }, [canShare, cardRef, vm, filename])
 
   if (!canShare) return null
 
+  const title = vm.live ? `${vm.course.name} — thru ${vm.roundThru}` : `${vm.course.name} recap`
+
   const shareText = () => {
-    const winnerNames = vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')
-    const lines = [
-      `${vm.course.name} — ${winnerNames} ${vm.winners.length > 1 ? 'share it' : 'takes it'} (${
-        vm.winners[0]?.points ?? 0
-      } pts${vm.margin > 0 ? `, by ${vm.margin}` : ''}).`,
-    ]
+    const lines: string[] = []
+    if (vm.live) {
+      const lead = vm.standing[0]
+      lines.push(
+        lead
+          ? `${vm.course.name}, thru ${vm.roundThru} — ${lead.name.split(/\s+/)[0]} ${
+              vm.margin > 0 ? `leads by ${vm.margin}` : 'tied for the lead'
+            } (${lead.points} pts).`
+          : `${vm.course.name}, thru ${vm.roundThru}.`,
+      )
+    } else {
+      const winnerNames = vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')
+      lines.push(
+        `${vm.course.name} — ${winnerNames} ${vm.winners.length > 1 ? 'share it' : 'takes it'} (${
+          vm.winners[0]?.points ?? 0
+        } pts${vm.margin > 0 ? `, by ${vm.margin}` : ''}).`,
+      )
+    }
     if (vm.week) lines.push(vm.week.line)
     for (const h of vm.highlights.slice(0, 2)) lines.push(`${h.label}: ${h.value}.`)
-    return navigator.share({ title: `${vm.course.name} recap`, text: lines.join('\n') })
+    return navigator.share({ title, text: lines.join('\n') })
   }
 
-  const shareFile = (file: File) =>
-    canShareFiles(file) ? navigator.share({ files: [file], title: `${vm.course.name} recap` }) : shareText()
+  const shareFile = (file: File) => (canShareFiles(file) ? navigator.share({ files: [file], title }) : shareText())
 
   const onShare = async () => {
     if (image) {
@@ -412,7 +434,7 @@ function ShareButton({ vm, cardRef }: { vm: RoundRecapVM; cardRef: RefObject<HTM
     setBusy(true)
     try {
       const blob = await renderRecapImage(el)
-      const file = new File([blob], recapImageFilename(vm.course.name, vm.round.round_number), { type: 'image/png' })
+      const file = new File([blob], filename, { type: 'image/png' })
       setImage(file)
       await shareFile(file)
     } catch {

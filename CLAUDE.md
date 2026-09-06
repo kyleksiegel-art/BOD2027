@@ -320,16 +320,21 @@ money** (CTP is still entered on the round screen for bragging rights, it just p
   `holesCounted`) and `ctpWinnerId`. Still records through the outbox; still $0. The
   standalone `CtpEntry.tsx` component and the `useRoundCtp` selector are **deleted** —
   `/rounds/:n` only *reports* CTP now, via the RoundRecap's "Closest to Pin" fact.
-- **Recap Share sends an image, not text** (Kyle 2026-09-05). `src/lib/share/recapImage.ts`
+- **Recap Share sends an image, not text** (Kyle 2026-09-05), **during the round as well as
+  after it** (Kyle 2026-09-06 — the button is no longer gated on `!vm.live`). `src/lib/share/recapImage.ts`
   rasterises the `.recap-card` section with `modern-screenshot` (DOM → SVG foreignObject →
   canvas; self-hosted fonts get embedded) at 2× and shares it as a PNG `File` via
   `navigator.share({ files })`. The footer carries `data-share-exclude` so the buttons stay
   out of the picture. **The PNG is pre-rendered in an effect** after `document.fonts.ready`:
   iOS only honours `navigator.share` inside a user gesture, and rasterising on the tap could
-  outlast it. A card with `offsetWidth < 200` is refused (a hidden tab rasterises to a 2px
-  ribbon). Text summary is only the fallback where `canShare({ files })` is false. The share
-  sheet itself can't be exercised in the desktop preview (`navigator.share` undefined);
-  verified on Kyle's iPhone 2026-09-05 (Messages, first tap).
+  outlast it. **On a live card the pre-render is debounced 1.2 s** — the VM re-derives on every
+  saved hole. Live files are named `…-thru{N}.png` and titled "Course — thru N" so mid-round
+  shares don't collide in Photos. A card with `offsetWidth < 200` is refused (a hidden tab
+  rasterises to a 2px ribbon) — in the desktop preview that guard fires whenever the pane is
+  hidden/narrow and the tap silently does nothing; use the mobile preset when testing. Text
+  summary is only the fallback where `canShare({ files })` is false. The share sheet itself
+  can't be exercised in the desktop preview (`navigator.share` undefined); verified on Kyle's
+  iPhone 2026-09-05 (Messages, first tap).
 - **Money page: `src/routes/Money.tsx`** — total purse + 1st/2nd/round-winner breakdown, buy-in
   reconciliation, per-round winner cards (no CTP section), per-player ledger, settlement.
 - **Settings: `SettingsEditor.tsx` "Money" card** — four dollar fields (buy-in, round winner,

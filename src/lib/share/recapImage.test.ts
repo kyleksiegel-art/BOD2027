@@ -6,4 +6,8 @@ describe('recapImageFilename', () => {
     expect(recapImageFilename('Streamsong Red', 1)).toBe('bod2027-r1-streamsong-red.png')
     expect(recapImageFilename('Bone Valley (Chain)', 4)).toBe('bod2027-r4-bone-valley-chain.png')
   })
+
+  it('marks a live share with the holes played', () => {
+    expect(recapImageFilename('Streamsong Blue', 3, 13)).toBe('bod2027-r3-streamsong-blue-thru13.png')
+  })
 })
