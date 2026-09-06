@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
+import { RouteErrorPanel, RouteFrame } from '@/components/ErrorBoundary'
 import Home from '@/routes/Home'
 import Standings from '@/routes/Standings'
 import Rounds from '@/routes/Rounds'
@@ -20,7 +21,15 @@ import SideGames from '@/routes/info/SideGames'
 export const router = createBrowserRouter([
   {
     element: <Layout />,
+    // Layout itself threw: no shell survives, our panel replaces react-router's default page.
+    errorElement: <RouteErrorPanel scope="shell" />,
     children: [
+      {
+        // Pathless: a page that throws renders RouteErrorPanel HERE, inside Layout's
+        // Outlet, so the tab bar stays up. On the Layout route itself the shell would go too.
+        element: <RouteFrame />,
+        errorElement: <RouteErrorPanel />,
+        children: [
       { path: '/', element: <Home /> },
       { path: '/standings', element: <Standings /> },
       { path: '/rounds', element: <Rounds /> },
@@ -43,6 +52,8 @@ export const router = createBrowserRouter([
       { path: '/admin', element: <Admin /> },
       { path: '/diagnostics', element: <Diagnostics /> },
       { path: '*', element: <NotFound /> },
+        ],
+      },
     ],
   },
 ])

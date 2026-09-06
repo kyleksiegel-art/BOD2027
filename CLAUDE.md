@@ -328,8 +328,8 @@ money** (CTP is still entered on the round screen for bragging rights, it just p
   iOS only honours `navigator.share` inside a user gesture, and rasterising on the tap could
   outlast it. A card with `offsetWidth < 200` is refused (a hidden tab rasterises to a 2px
   ribbon). Text summary is only the fallback where `canShare({ files })` is false. The share
-  sheet itself can't be exercised in the desktop preview (`navigator.share` undefined) —
-  **verify on a phone.**
+  sheet itself can't be exercised in the desktop preview (`navigator.share` undefined);
+  verified on Kyle's iPhone 2026-09-05 (Messages, first tap).
 - **Money page: `src/routes/Money.tsx`** — total purse + 1st/2nd/round-winner breakdown, buy-in
   reconciliation, per-round winner cards (no CTP section), per-player ledger, settlement.
 - **Settings: `SettingsEditor.tsx` "Money" card** — four dollar fields (buy-in, round winner,
@@ -385,6 +385,28 @@ Things that will bite if forgotten:
 - Course handicap on the Players page is the player's **own** handicap (post cap/override), NOT
   the play-off-the-low relative figure the scorecard uses.
 - Tests: `info.test.ts` (10). Full `vitest run` → **140**. `tsc -b` + `npm run build` clean.
+
+## Error boundary (2026-09-05) — the shape to reuse
+
+A render crash used to be a white screen with no way back but a reload nobody in another cart
+could suggest. Now: `src/components/ErrorBoundary.tsx` + `src/lib/crash.ts`.
+
+- **Two react-router `errorElement`s, one `CrashPanel`.** A pathless route under `Layout`
+  (`RouteFrame` + `RouteErrorPanel scope="route"`) catches a page that throws and renders the
+  panel **inside Layout's Outlet — the tab bar survives**, so the scorer taps another tab. The
+  root `Layout` route carries `RouteErrorPanel scope="shell"` for a crash in the shell itself.
+- **`AppErrorBoundary`** (class, wraps `RouterProvider` in `main.tsx`) is belt-and-braces for
+  anything outside the router. It does **not** see a Layout crash: react-router's built-in
+  boundary sits inside it and paints "Unexpected Application Error!" first — which is exactly
+  why the root route needs its own `errorElement`. Found in browser verification.
+- **The crash is recorded** to `sync_meta['last_crash']` (`recordCrash`, never throws:
+  message, stack ≤4000 chars, component stack, route, scope, UA). Diagnostics shows a "Last
+  crash" section with Clear, and "Copy state as JSON" carries it.
+- The panel's copy says what was **not** lost (saved scores, the outbox, drafts) — that is the
+  only question in the cart.
+- **Dev-only trigger:** `?crash=route` / `?crash=shell` (`DevCrash`, gated on
+  `import.meta.env.DEV`; confirmed absent from the production bundle). Use it to see the panels.
+- Tests: `crash.test.ts` (5). Full `vitest run` → **167**.
 
 ## Design refinement pass (2026-08-28) — the shape to reuse
 

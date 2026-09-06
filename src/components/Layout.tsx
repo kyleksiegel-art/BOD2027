@@ -4,6 +4,7 @@ import { TopBar } from './TopBar'
 import { BottomTabBar } from './BottomTabBar'
 import { HydrationGate } from './HydrationGate'
 import { PwaUpdatePrompt } from './PwaUpdatePrompt'
+import { DevCrash } from './ErrorBoundary'
 import { useSyncEngine } from '@/lib/sync/engine'
 import { ensurePersistedIfUnlocked } from '@/lib/auth/session'
 
@@ -27,6 +28,7 @@ export function Layout() {
   return (
     <div className="flex min-h-[100dvh] flex-col">
       <TopBar />
+      <DevCrash where="shell" />
       <PwaUpdatePrompt />
       <main className="flex-1 overflow-x-hidden">
         <HydrationGate>
