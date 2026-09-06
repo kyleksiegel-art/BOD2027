@@ -10,7 +10,7 @@ the tap shares one PNG file, no text. Note: with the preview pane hidden the car
 width, the `offsetWidth < 200` guard fires, and the tap does nothing — that is the harness, not
 the phone.
 
-Tests 163 on this branch (162 + 1 new; the five crash tests are in PR #13), `npm run build` clean. Branches don't overlap: PR #13 (error boundary) touches
+Tests 168 after the rebase on main (PR #13 merged), `npm run build` clean. Branches don't overlap: PR #13 (error boundary) touches
 ErrorBoundary/router/main/Layout/Diagnostics/crash; this one touches RoundRecap + recapImage.
 
 Still open: score history, Realtime channel-status handling, wake lock, DB backup, dry run.
