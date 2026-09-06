@@ -24,12 +24,13 @@ export async function renderRecapImage(el: HTMLElement): Promise<Blob> {
   })
 }
 
-export function recapImageFilename(courseName: string, roundNumber: number): string {
+/** `thru` is set for a live round, so mid-round shares don't overwrite each other in Photos. */
+export function recapImageFilename(courseName: string, roundNumber: number, thru: number | null = null): string {
   const slug = courseName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
-  return `bod2027-r${roundNumber}-${slug}.png`
+  return `bod2027-r${roundNumber}-${slug}${thru !== null ? `-thru${thru}` : ''}.png`
 }
 
 /** True where the share sheet accepts an image file (iOS 15+, Android Chrome). */
