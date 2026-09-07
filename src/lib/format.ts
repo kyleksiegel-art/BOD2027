@@ -139,3 +139,10 @@ export function formatMoneySigned(cents: number): string {
   const s = usd.format(Math.abs(cents) / 100)
   return cents > 0 ? `+${s}` : `−${s}`
 }
+
+const clockFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ })
+
+/** A timestamptz → "10:42" in ET (no suffix — for dense lists like the Field Report wire). */
+export function formatClock(iso: string): string {
+  return clockFmt.format(new Date(iso)).replace(/\s?[AP]M$/i, '')
+}

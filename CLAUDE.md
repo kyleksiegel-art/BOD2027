@@ -488,3 +488,33 @@ seal and the serif carry the annual-report idea. The canvas also holds two unbui
   strokes derivation is still tested in `relative-strokes.test.ts` / `handicap.test.ts`.
 - Tests: `report.test.ts` (4, three-player two-round fixture asserted by hand, incl. a DNP). Full
   `vitest run` → **172**. `tsc -b` + `npm run build` clean. Verified live on `/rounds/1` and `/rounds/2`.
+
+## Field Report (2026-09-07, branch `field-report`) — the shape to reuse
+
+The wire: plain-English events generated from saved scores, newest hole first. A one-line strip
+on Standings under the live status line; tap → `/standings/wire`. Nothing is typed. Mocked first
+on the `BOD27 Wild Ideas` canvas.
+
+- **`src/lib/data/wire.ts` `buildFieldReport(db) → WireVM | null`** — pure. Follows the
+  in-progress round, else the latest final round (so the wire has content between rounds); null
+  before any hole is saved. Walks holes 1..thru replaying cumulative round points; per hole, per
+  completed player: a score verb ("birdies the 12th"), then one consequence, then one note.
+  - **Consequence** (hole > 1 only): takes the lead / ties for the lead (6) · breaks the tie (6) ·
+    caught, tied (5) · drops from a sole lead (5) · moves/slips with rank change (4) · lead
+    grows/cut/holds (sole → sole). **The opening all-square is nobody's lead**
+    (`noLeaderBefore`): the first to separate "takes" it, the rest "slip".
+  - **Note**: streak announced at 5 and every 4 holes after; a zero after a run ≥5 says "Ends a
+    run of N"; otherwise "Nth zero of the round".
+  - **Field collapse**: everyone in, same points, nobody moved → one line ("Field pars the 11th.
+    No movement."). Never on hole 1.
+  - **CTP** on a par 3 with a recorded winner → its own line (notability 3).
+  - Clock per hole = latest `client_updated_at_effective` on that hole, via `formatClock` (ET, no
+    suffix). The Phase 4 seed's stamps are Jan 2026 so they all read the same — real saves won't.
+- `useFieldReport()` returns `undefined` while loading, `null` when there's nothing to show.
+- **`FieldReportStrip.tsx`** (Standings): **rotates through the newest hole's events** every 4.5 s
+  (`.wire-swap` fade-in on a keyed span; static top event under reduced motion), sub-line
+  "2 of 3 · 3:56 · live". Only the current hole rotates — older holes never resurface. Two lines
+  with `line-clamp-2` — the news is in the second clause, never ellipse it to one line.
+- **`routes/FieldReport.tsx`**: hole groups (Par · SI · clock), event rows with the player's
+  ribbon colour (same `PLAYER_COLORS` slots as the recap), `leader-row` on lead/position changes.
+- Tests: `wire.test.ts` (5). Full `vitest run` → **177**.
