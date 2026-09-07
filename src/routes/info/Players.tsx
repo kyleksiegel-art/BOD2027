@@ -3,6 +3,7 @@ import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { PlayerForm } from '@/components/PlayerForm'
 import { usePlayers } from '@/lib/data/selectors'
+import { courseShortName } from '@/lib/format'
 import type { PlayerCardVM } from '@/lib/data/selectors'
 
 const initials = (name: string) =>
@@ -40,82 +41,88 @@ export default function Players() {
 }
 
 /**
- * One player. The header row expands to Form (Kyle 2026-09-07) — same collapsible pattern as the
- * round report. Course handicaps stay visible either way; they're the thing looked up on the tee.
+ * One player. The whole collapsed row is the tap target (Kyle 2026-09-07 — "feels weird": the
+ * row was 161px tall with only the top 44px tappable, so most of the card was dead), and the
+ * course handicaps are one compact line rather than a three-line ragged wrap. The Form panel
+ * sits outside the button, so no panel is nested inside a control.
  */
 function PlayerRow({ card }: { card: PlayerCardVM }) {
   const { player, courseHandicaps, form } = card
   const [open, setOpen] = useState(false)
 
-  const header = (
-    <div className="flex items-center gap-4">
-      <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full border border-gold/30 bg-gold/10 font-display text-[0.9rem] font-semibold text-gold">
-        {player.photo_url ? (
-          <img src={player.photo_url} alt={player.name} className="h-full w-full rounded-full object-cover" />
-        ) : (
-          initials(player.name)
-        )}
-      </span>
-      <span className="flex flex-1 flex-col text-left">
-        <span className="text-[1.05rem] text-paper">{player.name}</span>
-        {player.title && <span className="text-[0.76rem] text-paper-faint">{player.title}</span>}
-      </span>
-      <span className="flex flex-col items-end">
-        <span className="tnum font-display text-[1.15rem] font-semibold text-paper">
-          {player.handicap_index.toFixed(1)}
+  const collapsed = (
+    <>
+      <div className="flex items-center gap-4">
+        <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full border border-gold/30 bg-gold/10 font-display text-[0.9rem] font-semibold text-gold">
+          {player.photo_url ? (
+            <img src={player.photo_url} alt={player.name} className="h-full w-full rounded-full object-cover" />
+          ) : (
+            initials(player.name)
+          )}
         </span>
-        <span className="text-[0.62rem] uppercase tracking-[0.12em] text-paper-faint">Index</span>
-      </span>
-      {form && (
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`ml-1 flex-none text-paper-faint transition-transform ${open ? '-rotate-180' : ''}`}
-          aria-hidden
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        <span className="flex flex-1 flex-col text-left">
+          <span className="text-[1.05rem] text-paper">{player.name}</span>
+          {player.title && <span className="text-[0.76rem] text-paper-faint">{player.title}</span>}
+        </span>
+        <span className="flex flex-col items-end">
+          <span className="tnum font-display text-[1.15rem] font-semibold text-paper">
+            {player.handicap_index.toFixed(1)}
+          </span>
+          <span className="text-[0.62rem] uppercase tracking-[0.12em] text-paper-faint">Index</span>
+        </span>
+        {form && (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`ml-1 flex-none text-paper-faint transition-transform ${open ? '-rotate-180' : ''}`}
+            aria-hidden
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+      </div>
+
+      {/* One line, full width: short course names, the number carrying the weight. */}
+      {courseHandicaps.length > 0 && (
+        <dl className="mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-left">
+          {courseHandicaps.map((ch, i) => (
+            <span key={ch.roundNumber} className="inline-flex items-baseline gap-1">
+              {i > 0 && <span className="mr-0.5 text-[0.7rem] text-paper-faint" aria-hidden>·</span>}
+              <dt className="text-[0.72rem] text-paper-faint">{courseShortName(ch.courseName)}</dt>
+              <dd className="tnum text-[0.82rem] font-semibold text-paper-dim">
+                {ch.didNotPlay ? 'DNP' : ch.playingHandicap !== null ? ch.playingHandicap : '—'}
+              </dd>
+            </span>
+          ))}
+        </dl>
       )}
-    </div>
+    </>
   )
 
   return (
-    <li className={`border-b border-hair py-4 first:border-t first:border-t-hair-strong ${open ? 'bg-ground-2' : ''}`}>
+    <li className={`border-b border-hair first:border-t first:border-t-hair-strong ${open ? 'bg-ground-2' : ''}`}>
       {form ? (
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-controls={`form-${player.id}`}
-          className="tap block w-full text-left"
+          className="block w-full py-4 text-left"
         >
-          {header}
+          {collapsed}
         </button>
       ) : (
-        header
-      )}
-
-      {courseHandicaps.length > 0 && (
-        <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 pl-[3.75rem]">
-          {courseHandicaps.map((ch) => (
-            <div key={ch.roundNumber} className="flex items-baseline gap-1.5">
-              <dt className="text-[0.7rem] text-paper-faint">{ch.courseName}</dt>
-              <dd className="tnum text-[0.82rem] font-semibold text-paper-dim">
-                {ch.didNotPlay ? 'DNP' : ch.playingHandicap !== null ? ch.playingHandicap : '—'}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <div className="py-4">{collapsed}</div>
       )}
 
       {form && open && (
-        <div id={`form-${player.id}`}>
+        <div id={`form-${player.id}`} className="pb-4">
           <PlayerForm vm={form} />
         </div>
       )}

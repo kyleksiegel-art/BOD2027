@@ -117,6 +117,11 @@ export function formatLiveLine(live: {
  * or the short trip-config form ("Bone Valley"). Falls back to null (no accent) for any
  * future/placeholder course name that doesn't match.
  */
+/** "Streamsong Red" → "Red". Bone Valley has no prefix and is returned unchanged. */
+export function courseShortName(name: string): string {
+  return name.replace(/^Streamsong\s+/i, '')
+}
+
 export function courseSlug(courseName: string): 'red' | 'black' | 'blue' | 'bone' | null {
   const n = courseName.toLowerCase()
   if (n.includes('red')) return 'red'

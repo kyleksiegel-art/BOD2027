@@ -551,7 +551,14 @@ Expanded from a row on the Players page, same collapsible pattern as the round r
   uninformative. Ramp is red (0) · grey (1) · faint olive (2, par) · olive (3+) · gold ring
   (net eagle); unplayed is an outline. Tile labels reserve two lines (`min-h-[2.5em]`) so
   "Front · Back" wrapping doesn't drop its figure below the other two.
-- **Players page**: the header row is the toggle (chevron, rotates), course handicaps stay
-  visible either way — they're what gets looked up on the tee. `PlayerCardVM.form` is the
-  carrier; screens still import only from `selectors.ts`.
+- **Players page**: **the whole collapsed row is the toggle** — header *and* the handicap strip,
+  with `py-4` on the button itself, not the `<li>` (Kyle 2026-09-07, "the players card feels
+  weird": the row was 161px tall with only the top 44px tappable, so 73% of the card was dead;
+  the `<li>`'s own padding was another 32px of it). Course handicaps stay visible either way —
+  they're what gets looked up on the tee — but as **one compact line** (`courseShortName`, `·`
+  separated) rather than a three-line ragged wrap; the row is now ~106px and all four players
+  fit. The Form panel renders **outside** the button so no panel is nested in a control.
+  `PlayerCardVM.form` is the carrier; screens still import only from `selectors.ts`.
+- `courseShortName` ("Streamsong Red" → "Red") now lives in `src/lib/format.ts`. It had been
+  copy-pasted privately into `compute.ts` and `report.ts`; both now import the shared one.
 - Tests: `form.test.ts` (6). Full `vitest run` → **183**.
