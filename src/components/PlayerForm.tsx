@@ -61,34 +61,39 @@ export function PlayerForm({ vm }: { vm: PlayerFormVM }) {
         </p>
       )}
 
-      {vm.strip && (
-        <>
-          <div className="mt-3.5 flex items-baseline gap-2">
+      {/* One strip per round played, newest first, so two rounds of form read side by side
+          without tapping. The legend is shared — it renders once, under the last strip. */}
+      {vm.strips.map((st, i) => (
+        <div key={st.roundNumber} className={i === 0 ? 'mt-3.5' : 'mt-3'}>
+          <div className="flex items-baseline gap-2">
             <span className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
-              Round {vm.strip.roundNumber} · {vm.strip.courseName}
+              Round {st.roundNumber} · {st.courseName}
             </span>
             <span className="tnum ml-auto text-[0.72rem] text-paper-dim">
-              {vm.strip.points} pts thru {vm.strip.thru}
+              {st.points} pts{st.complete ? '' : ` thru ${st.thru}`}
             </span>
           </div>
           <div
             className="mt-1.5 grid h-[22px] gap-[2px]"
-            style={{ gridTemplateColumns: `repeat(${vm.strip.cells.length}, minmax(0, 1fr))` }}
+            style={{ gridTemplateColumns: `repeat(${st.cells.length}, minmax(0, 1fr))` }}
             role="img"
-            aria-label={stripLabel(vm.strip.cells)}
+            aria-label={`Round ${st.roundNumber} at ${st.courseName} — ${stripLabel(st.cells)}`}
           >
-            {vm.strip.cells.map((c) => (
+            {st.cells.map((c) => (
               <Cell key={c.holeNumber} cell={c} />
             ))}
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.66rem] text-paper-dim">
-            <Key swatch={BANDS.zero} label="zero" />
-            <Key swatch={BANDS.one} label="1 pt" />
-            <Key swatch={BANDS.par} label="2 (par)" />
-            <Key swatch={BANDS.good} label="3+" />
-            <Key ring label="net eagle" />
-          </div>
-        </>
+        </div>
+      ))}
+
+      {vm.strips.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.66rem] text-paper-dim">
+          <Key swatch={BANDS.zero} label="zero" />
+          <Key swatch={BANDS.one} label="1 pt" />
+          <Key swatch={BANDS.par} label="2 (par)" />
+          <Key swatch={BANDS.good} label="3+" />
+          <Key ring label="net eagle" />
+        </div>
       )}
     </div>
   )
@@ -145,8 +150,19 @@ function bandFor(points: number): string {
   return BANDS.good
 }
 
-/** One hole. Colour is the points band; a net eagle keeps the band and adds a gold ring. */
+/**
+ * One hole, in three states: past a shortened round's cutoff (a hairline, no box — the hole is
+ * not part of this round), counted but not yet in (an outline), or played (its points band, plus
+ * a gold ring on a net eagle).
+ */
 function Cell({ cell }: { cell: FormCell }) {
+  if (!cell.counted) {
+    return (
+      <span className="flex items-center">
+        <span className="h-[3px] w-full rounded-full bg-hair" />
+      </span>
+    )
+  }
   if (!cell.played) {
     return <span className="rounded-[2px] border border-hair-strong" />
   }
@@ -174,7 +190,7 @@ function Key({ swatch, ring, label }: { swatch?: string; ring?: boolean; label: 
   )
 }
 
-/** The strip is decoration for sighted users; screen readers get the numbers. */
+/** The strips are decoration for sighted users; screen readers get the numbers. */
 function stripLabel(cells: FormCell[]): string {
   const played = cells.filter((c) => c.played)
   const parts = played.map((c) => `hole ${c.holeNumber}: ${c.pickedUp ? 'picked up' : `${c.points} points`}`)

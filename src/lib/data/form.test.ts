@@ -58,7 +58,7 @@ function scoresFor(playerId: string, roundId: string, thru: number, deltas: Reco
   })
 }
 
-function makeDb(opts: { r3?: boolean; p2SitsOutR2?: boolean } = {}): Db {
+function makeDb(opts: { r3?: boolean; p2SitsOutR2?: boolean; r1Shortened?: boolean } = {}): Db {
   const players: PlayerRow[] = [
     { id: P1, name: 'Jon Aronson', title: null, handicap_index: 0, index_is_assigned: false, index_updated_at: null, photo_url: null, sort_order: 0 } as unknown as PlayerRow,
     { id: P2, name: 'Chris Denove', title: null, handicap_index: 0, index_is_assigned: false, index_updated_at: null, photo_url: null, sort_order: 1 } as unknown as PlayerRow,
@@ -66,7 +66,7 @@ function makeDb(opts: { r3?: boolean; p2SitsOutR2?: boolean } = {}): Db {
   const courses: CourseRow[] = [{ id: COURSE, name: 'Streamsong Red', data_is_placeholder: false } as unknown as CourseRow]
   const tees: TeeRow[] = [{ id: TEE, course_id: COURSE, name: 'Green', rating: 72, slope: 113, par: 72, total_yardage: 6500 } as unknown as TeeRow]
   const rounds: RoundRow[] = [
-    { id: R1, round_number: 1, date: '2027-02-04', course_id: COURSE, tee_time: null, status: 'final', holes_counted: null },
+    { id: R1, round_number: 1, date: '2027-02-04', course_id: COURSE, tee_time: null, status: 'final', holes_counted: opts.r1Shortened ? 15 : null },
     { id: R2, round_number: 2, date: '2027-02-05', course_id: COURSE, tee_time: null, status: 'in_progress', holes_counted: null },
     // Round 3 is upcoming unless asked for — it must never count.
     { id: R3, round_number: 3, date: '2027-02-06', course_id: COURSE, tee_time: null, status: opts.r3 ? 'final' : 'upcoming', holes_counted: null },
@@ -166,20 +166,39 @@ describe('buildPlayerForm', () => {
     expect(p2.splitLean).toBeNull()
   })
 
-  it('strips the latest round the player actually played, flagging eagles and pick-ups', () => {
+  it('gives one strip per round played, newest first, flagging eagles and pick-ups', () => {
     const form = buildPlayerForm(makeDb({ r3: true })).get(P1)!
-    expect(form.strip!.roundNumber).toBe(3)
-    expect(form.strip!.cells).toHaveLength(18)
-    expect(form.strip!.cells[0]).toEqual({ holeNumber: 1, points: 4, played: true, pickedUp: false, eagle: true })
-    expect(form.strip!.cells[2]).toEqual({ holeNumber: 3, points: null, played: false, pickedUp: false, eagle: false })
+    // R1 (18 in), R2 (5 in), R3 (2 in) → newest first.
+    expect(form.strips.map((st) => st.roundNumber)).toEqual([3, 2, 1])
+    expect(form.strips.map((st) => st.complete)).toEqual([false, false, true])
+    // R1: 18 pars (36) − two doubles (−4) + the birdie on 18 (+1) = 33.
+    expect(form.strips[2].points).toBe(33)
 
-    // A DNP round is skipped — P2's strip stays on round 1.
+    const r3 = form.strips[0]
+    expect(r3.cells).toHaveLength(18)
+    expect(r3.cells[0]).toMatchObject({ points: 4, eagle: true, counted: true })
+    expect(r3.cells[2]).toMatchObject({ holeNumber: 3, points: null, played: false, counted: true })
+
+    // A DNP round is absent entirely — P2 played round 1 only.
     const sat = buildPlayerForm(makeDb({ p2SitsOutR2: true })).get(P2)!
-    expect(sat.strip!.roundNumber).toBe(1)
+    expect(sat.strips.map((st) => st.roundNumber)).toEqual([1])
     expect(sat.holesPlayed).toBe(18)
 
     // The pick-up on R2's 5th shows as played, zero points.
     const p2 = buildPlayerForm(makeDb()).get(P2)!
-    expect(p2.strip!.cells[4]).toEqual({ holeNumber: 5, points: 0, played: true, pickedUp: true, eagle: false })
+    expect(p2.strips[0].roundNumber).toBe(2)
+    expect(p2.strips[0].cells[4]).toMatchObject({ holeNumber: 5, points: 0, played: true, pickedUp: true })
+  })
+
+  it('keeps every strip 18 wide so a shortened round still lines up hole-for-hole', () => {
+    const form = buildPlayerForm(makeDb({ r1Shortened: true })).get(P1)!
+    const r1 = form.strips.find((st) => st.roundNumber === 1)!
+    expect(r1.holesCounted).toBe(15)
+    expect(r1.cells).toHaveLength(18)
+    // Holes 16–18 are past the cutoff: not counted, and not treated as merely unplayed.
+    expect(r1.cells.slice(15).every((c) => !c.counted && !c.played)).toBe(true)
+    expect(r1.cells.slice(0, 15).every((c) => c.counted)).toBe(true)
+    // Every strip is the same width, whatever each round's cutoff.
+    expect(new Set(form.strips.map((st) => st.cells.length))).toEqual(new Set([18]))
   })
 })

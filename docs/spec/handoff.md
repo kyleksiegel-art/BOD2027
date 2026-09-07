@@ -6,6 +6,8 @@
 - `npx vitest run` → 183. `tsc -b` + `npm run build` clean. Verified in the browser preview on the
   local seed (rounds 1–2 final, round 3 live thru 13): tiles align, strip bands distinct, chevron
   rotates, no horizontal overflow.
+- Form now shows **one strip per round played**, newest first, all 18 cells wide so rounds line up
+  (chosen off a two-option canvas: stacked vs round tabs). `vitest run` → 184.
 - Players row reworked after Kyle's "feels weird": whole collapsed row is the tap target (was 73%
   dead), handicaps on one line, row 161px → 106px. `courseShortName` promoted to `format.ts`.
 - Corrected the stale `purse_amounts` note in CLAUDE.md (PR #18) — the hosted DB was already fine.
