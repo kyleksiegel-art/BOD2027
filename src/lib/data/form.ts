@@ -18,6 +18,7 @@ export interface FormCell {
   played: boolean
   pickedUp: boolean
   eagle: boolean // net eagle or better — gets the ring
+  counted: boolean // false past a shortened round's cutoff — the hole isn't part of this round
 }
 
 export interface FormRun {
@@ -47,6 +48,7 @@ export interface FormStrip {
   points: number
   thru: number
   holesCounted: number
+  complete: boolean // through the counted window — the header drops the "thru N"
   cells: FormCell[]
 }
 
@@ -62,7 +64,9 @@ export interface PlayerFormVM {
   // in it), so the sentence quotes points PER HOLE and the tile shows the hole counts.
   splitNote: string | null // "1.4 points a hole on the front, 1.2 on the back" — null when too early
   splitLean: 'front' | 'back' | 'even' | null
-  strip: FormStrip | null // the latest counting round the player actually played
+  // One strip per round the player actually PLAYED (a DNP round is absent), newest first, so
+  // two rounds of form are comparable without tapping (Kyle 2026-09-07, option A).
+  strips: FormStrip[]
 }
 
 /** A nine needs this many holes before the split is worth a sentence. */
@@ -96,7 +100,7 @@ function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | nul
   const back: FormNine = { points: 0, holes: 0 }
   let bestRun: FormRun | null = null
   let worstStretch: FormStretch | null = null
-  let strip: FormStrip | null = null
+  const strips: FormStrip[] = []
   let lastRoundNumber = 0
   let lastThru = 0
 
@@ -168,18 +172,23 @@ function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | nul
       }
     }
 
-    // The strip follows the latest round this player actually played.
+    // One strip per round played, in round order; reversed to newest-first below.
     lastRoundNumber = d.round.round_number
     lastThru = p.thru
-    strip = {
+    strips.push({
       roundNumber: d.round.round_number,
       courseName: d.course.name,
       points: p.totalPoints,
       thru: p.thru,
       holesCounted: d.holesCounted,
-      cells: Array.from({ length: d.holesCounted }, (_, i) => {
+      complete: p.thru >= d.holesCounted,
+      // Always 18 columns: a 15-hole round rendered 15-across would be wider per cell and
+      // hole 8 would not sit above hole 8 of the next strip, which is the whole point of
+      // stacking them. Holes past the cutoff are marked instead of dropped.
+      cells: Array.from({ length: 18 }, (_, i) => {
         const hole = i + 1
-        const hr = p.holeResults.find((h) => h.holeNumber === hole)
+        const counted = hole <= d.holesCounted
+        const hr = counted ? p.holeResults.find((h) => h.holeNumber === hole) : undefined
         const pts = hr?.completed ? hr.points ?? 0 : null
         return {
           holeNumber: hole,
@@ -187,9 +196,10 @@ function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | nul
           played: !!hr?.completed,
           pickedUp: !!hr?.pickedUp,
           eagle: pts !== null && pts >= 4,
+          counted,
         }
       }),
-    }
+    })
   }
 
   if (holesPlayed === 0) return null
@@ -204,7 +214,7 @@ function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | nul
     back,
     splitNote: splitNoteFor(front, back),
     splitLean: splitLeanFor(front, back),
-    strip,
+    strips: strips.reverse(),
   }
 }
 

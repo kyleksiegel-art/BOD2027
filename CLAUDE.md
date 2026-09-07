@@ -544,9 +544,15 @@ Expanded from a row on the Players page, same collapsible pattern as the round r
     totals** (mid-round the front has more holes in it): `splitLean` is front/back/even, and
     `splitNote` quotes both rates. Both nines need ≥5 holes (`MIN_NINE_HOLES`) or both are null.
     A tile showing "38 · 22" beside "even either way" is why — always show the hole counts.
-  - `strip` — the latest round the player actually **played** (a DNP round is skipped), one
-    `FormCell` per counted hole, `eagle` on 4+ points.
-- **`src/components/PlayerForm.tsx`** — three tiles + the hole strip. **Five points bands, not
+  - `strips` — **one per round the player actually played, newest first** (a DNP round is absent
+    entirely), so two rounds of form compare without tapping (Kyle 2026-09-07, chosen off a
+    two-option mockup against round tabs). `complete` drops the "thru N" from the header.
+    **Every strip is 18 cells wide whatever the round's cutoff**: a 15-hole round rendered
+    15-across has wider cells and its hole 8 does not sit above the next strip's hole 8, which
+    is the entire point of stacking them. `FormCell.counted` is false past the cutoff and renders
+    as a hairline, distinct from a counted-but-unplayed hole's outline.
+- **`src/components/PlayerForm.tsx`** — three tiles + one hole strip per round, with the legend
+  rendered **once** under the last strip. **Five points bands, not
   three**: net Stableford lives on 1–2 points, so one shared grey made every strip flat and
   uninformative. Ramp is red (0) · grey (1) · faint olive (2, par) · olive (3+) · gold ring
   (net eagle); unplayed is an outline. Tile labels reserve two lines (`min-h-[2.5em]`) so
@@ -561,4 +567,4 @@ Expanded from a row on the Players page, same collapsible pattern as the round r
   `PlayerCardVM.form` is the carrier; screens still import only from `selectors.ts`.
 - `courseShortName` ("Streamsong Red" → "Red") now lives in `src/lib/format.ts`. It had been
   copy-pasted privately into `compute.ts` and `report.ts`; both now import the shared one.
-- Tests: `form.test.ts` (6). Full `vitest run` → **183**.
+- Tests: `form.test.ts` (7). Full `vitest run` → **184**.
