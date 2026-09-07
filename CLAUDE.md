@@ -568,3 +568,29 @@ Expanded from a row on the Players page, same collapsible pattern as the round r
 - `courseShortName` ("Streamsong Red" → "Red") now lives in `src/lib/format.ts`. It had been
   copy-pasted privately into `compute.ts` and `report.ts`; both now import the shared one.
 - Tests: `form.test.ts` (7). Full `vitest run` → **184**.
+
+## The shell is the only scroller (2026-09-07) — don't regress this
+
+`Layout`'s `<main>` carries **`overflow-x: clip`, never `hidden`.** Kyle, on his phone: "the
+field report scroll isn't working."
+
+Per CSS Overflow 3, `visible` on one axis computes to **`auto`** when the other axis is neither
+`visible` nor `clip`. So `overflow-x-hidden` on `<main>` silently made `overflow-y: auto`,
+turning it into a nested scroll container with **no definite height** (`flex-1` under
+`min-h-[100dvh]`) — the shape iOS Safari swallows touch scrolling on. `clip` keeps the
+horizontal clipping and leaves `overflow-y: visible`, so the document stays the sole scroller.
+
+- It went unnoticed for months because **every page fit in one or two flicks**: Standings 1.3
+  screens, Players 1.2, Money 2.0, round detail 2.1. The **Field Report is 4.3 screens** and
+  needs sustained momentum, so it surfaced there first — and will grow to ~6 screens by the end
+  of an 18-hole round.
+- `overflow: clip` is Safari 16+. On anything older the declaration is dropped and the axis
+  falls back to `visible` — a wide child could then scroll the page sideways, which is a
+  degradation, not a break.
+- **Could not be reproduced on-device here** (the iOS Simulator needs a full Xcode install; this
+  Mac has command-line tools only). Verified structurally instead: `<main>` computes
+  `clip / visible`, no scroll container remains in the ancestor chain, the document scrolls its
+  full 2693px range, and no page 
+  from Home to Rules has horizontal overflow at 375px.
+- Anything that needs its own horizontal scroll (the scorecard table, the round-by-round table)
+  keeps its **own** `overflow-x-auto` wrapper. That is the right place for it — never the shell.
