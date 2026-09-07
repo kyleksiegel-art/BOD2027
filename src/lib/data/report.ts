@@ -1,7 +1,7 @@
 import { buildChampionships, buildRoundDetail, buildRoundRecap } from './compute'
 import type { Db } from './compute'
 import { standingsThroughRound } from '@/lib/scoring'
-import { formatDay, formatDayLong } from '@/lib/format'
+import { courseShortName, formatDay, formatDayLong } from '@/lib/format'
 
 /**
  * The round report — the round's story in four short, plain paragraphs, once the round is
@@ -44,9 +44,6 @@ function ordinalOf(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
   const v = n % 100
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
-}
-function courseShortName(name: string): string {
-  return name.replace(/^Streamsong\s+/i, '')
 }
 function theShortOf(name: string): string {
   const short = courseShortName(name)
