@@ -3,9 +3,9 @@ import { Page } from '@/components/Page'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Leaderboard } from '@/components/round/Leaderboard'
 import { Scorecard } from '@/components/round/Scorecard'
-import { HandicapWorksheet } from '@/components/round/HandicapWorksheet'
 import { RoundRecap } from '@/components/round/RoundRecap'
-import { useRoundDetail, useRoundRecap } from '@/lib/data/selectors'
+import { RoundReport } from '@/components/round/RoundReport'
+import { useRoundDetail, useRoundRecap, useRoundReport } from '@/lib/data/selectors'
 import { courseSlug, formatDay, formatTeeTime } from '@/lib/format'
 
 export default function RoundDetail() {
@@ -13,6 +13,7 @@ export default function RoundDetail() {
   const n = Number(roundNumber)
   const { vm, loading } = useRoundDetail(n)
   const recap = useRoundRecap(n)
+  const report = useRoundReport(n)
 
   if (loading) {
     return (
@@ -78,8 +79,9 @@ export default function RoundDetail() {
           {/* The recap card carries its own "This round" leaderboard; only fall back to the
               standalone one when there's no recap yet (e.g. started but no scores in). */}
           {recap ? <RoundRecap vm={recap} /> : <Leaderboard vm={vm} />}
+          {/* The report is an addition under the recap, only once the round is final. */}
+          {report && <RoundReport vm={report} />}
           <Scorecard vm={vm} />
-          <HandicapWorksheet vm={vm} />
         </>
       )}
     </Page>
