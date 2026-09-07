@@ -1,4 +1,9 @@
-# Handoff — 2026-09-07 (branch `player-form`, not yet pushed)
+# Handoff — 2026-09-07
+
+- **iOS scroll fix**: `Layout`'s `<main>` was `overflow-x-hidden`, which computes `overflow-y:auto`
+  and made it a nested scroll container with no definite height — iOS swallowed touch scrolling on
+  the 4.3-screen Field Report. Now `overflow-x-clip`. See CLAUDE.md §"The shell is the only
+  scroller". NOT reproduced on-device (no full Xcode) — needs Kyle's phone to confirm. (branch `player-form`, not yet pushed)
 
 - Built **player form**: `src/lib/data/form.ts` (+ `form.test.ts`), `components/PlayerForm.tsx`,
   expandable rows on the Players page, `form` on `PlayerCardVM`. See CLAUDE.md §"Player form".
