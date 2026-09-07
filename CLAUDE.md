@@ -450,3 +450,41 @@ design brief, on branch `design-refinements` off `main`. No new tables, no logic
   through to the guaranteed JPG. Found via a real (client-side, not deploy) failure during this
   pass's own browser verification.
 - Tests: unchanged, **148** (no logic touched). `tsc -b` + `npm run build` clean.
+
+## Round report (2026-09-06, branch `shareholder-letter`) — the shape to reuse
+
+An **addition** under the recap card on `/rounds/:n` once the round is final (Kyle: "I love how
+the board looks now, I want it as an addition" — the recap is untouched). Mocked first as a
+"Shareholder Letter" on the `BOD27 Wild Ideas` design canvas, then **de-jargoned on Kyle's
+call** ("drop the business jargon") — the copy is plain, per the conventions above; only the
+seal and the serif carry the annual-report idea. The canvas also holds two unbuilt ideas
+(Field Report wire, player Form stats).
+
+- **`src/lib/data/report.ts` `buildRoundReport(n, db) → ReportVM | null`** — pure, same rule as
+  every builder. Null unless `buildRoundRecap(...).act === 'final'` (official *or* all scores
+  in). Four short paragraphs as `ReportSeg[][]` (`strong` marks a derived fact): who won and by
+  how much (+ "was behind at the turn" off `holeLeaders[8]`); the hole it turned on (the last
+  lead-change hole, both players' points there; "led from the 1st and was never caught"
+  otherwise) + the biggest jump on the previous counting round; the worst three-hole stretch on
+  the books; the week ("leads the week at N, k clear of X. Two rounds to go." / "wins the week"
+  on the last round). Headline pairs the round with the week: leads / keeps / takes the week
+  lead / takes the week.
+- **Every player is named, once** (Kyle 2026-09-06). After the three story paragraphs, anyone
+  whose last name has not appeared gets a line in a "rest of the field" paragraph (place with
+  competition ties, points, gap, plus a hook: the best hole at net birdie or better, else the
+  blank count at 2+); DNP players get "sat out." The check is a substring match on the last name
+  across the paragraphs already built, so a new template that names someone needs no bookkeeping.
+- **Copy avoids pronouns** — names only — so no template ever guesses one.
+- **`src/components/round/RoundReport.tsx`** — a written account, not a second scoreboard: no
+  masthead, no results table (the recap has both). Body is Fraunces at `opsz 36 / wght 450`.
+  Shares as a PNG through `renderRecapImage` like the recap; footer carries
+  `data-share-exclude`; button hidden where `navigator.share` is undefined (desktop preview).
+- **Collapsible**: the header (eyebrow, headline, day) is the tap target; body + Share fold. Open
+  by default only when `ReportVM.latest` (no later round final/in progress). The Share button
+  mounts only while open, so its pre-render never captures a header-only card.
+- Selector `useRoundReport(n)`; wired in `RoundDetail.tsx` directly under `<RoundRecap>`.
+- **The Handicap Worksheet is gone from `/rounds/:n`** (Kyle 2026-09-06 — the report took its
+  slot; `HandicapWorksheet.tsx` deleted). The `Worksheet` data on `PlayerRoundVM` stays — the
+  strokes derivation is still tested in `relative-strokes.test.ts` / `handicap.test.ts`.
+- Tests: `report.test.ts` (4, three-player two-round fixture asserted by hand, incl. a DNP). Full
+  `vitest run` → **172**. `tsc -b` + `npm run build` clean. Verified live on `/rounds/1` and `/rounds/2`.

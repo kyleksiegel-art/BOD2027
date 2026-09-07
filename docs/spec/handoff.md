@@ -1,16 +1,16 @@
-# Handoff — 2026-09-06 (branch `share-live`, rebased on main after PR #13 merged)
+# Handoff — 2026-09-06 (branch `shareholder-letter`, not yet pushed/merged)
 
-Recap "Share ↗" now shows during a live round too (Kyle: "not just at the end"). Same image
-path as the final share; the live pre-render is debounced 1.2 s because the card re-derives on
-every saved hole; live files are `…-thru{N}.png`, title "Course — thru N"; the text fallback has
-a live variant ("Adam leads by 1").
-
-Verified in the preview (mobile preset, stubbed navigator.share): live card renders the button,
-the tap shares one PNG file, no text. Note: with the preview pane hidden the card has no layout
-width, the `offsetWidth < 200` guard fires, and the tap does nothing — that is the harness, not
-the phone.
-
-Tests 168 after the rebase on main (PR #13 merged), `npm run build` clean. Branches don't overlap: PR #13 (error boundary) touches
-ErrorBoundary/router/main/Layout/Diagnostics/crash; this one touches RoundRecap + recapImage.
-
-Still open: score history, Realtime channel-status handling, wake lock, DB backup, dry run.
+- Built the **round report** (was "Letter to Shareholders"; Kyle: drop the business jargon) as an
+  addition under the recap card on `/rounds/:n` (final rounds only). See CLAUDE.md §"Round report".
+- New: `src/lib/data/report.ts` (+ `report.test.ts`), `src/components/round/RoundReport.tsx`,
+  `useRoundReport` in `selectors.ts`; `RoundDetail.tsx` renders it under `<RoundRecap>`.
+- Report is collapsible (open only for the latest counting round). Handicap Worksheet removed
+  from the round page (component deleted; the data + tests remain).
+- Report names every player (a "rest of the field" paragraph + "sat out" for DNP).
+- `npx vitest run` → 172 passed. `npx tsc -b` and `npm run build` clean.
+- Verified in the browser preview on rounds 1 and 2 with the local Supabase seed; Share button
+  only appears where `navigator.share` exists — check on an iPhone before trusting the PNG share.
+- Design canvas "BOD27 Wild Ideas" (Artifact) holds mockups for two unbuilt ideas: the Field
+  Report wire on Standings and Form stats on the player card. Kyle liked the report; the other
+  two are undecided.
+- Nothing committed yet — Kyle to review the live demo, then commit/PR from this branch.

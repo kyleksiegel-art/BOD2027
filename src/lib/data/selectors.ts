@@ -1,6 +1,8 @@
 // Read-only hooks the screens use. Each subscribes to Dexie via useLiveQuery and runs the
 // pure assembly in compute.ts. Screens import ONLY from here — never Dexie or scoring
 // directly — so the data-layering rule stays enforceable by grep.
+import { buildRoundReport } from './report'
+import type { ReportVM } from './report'
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
@@ -92,6 +94,12 @@ export function useRoundDetail(roundNumber: number): { vm: RoundDetailVM | null;
 export function useRoundRecap(roundNumber: number): RoundRecapVM | null {
   const data = useDbData()
   return useMemo(() => (data ? buildRoundRecap(roundNumber, data) : null), [data, roundNumber])
+}
+
+/** The round report for one round — null until the round is final. */
+export function useRoundReport(roundNumber: number): ReportVM | null {
+  const data = useDbData()
+  return useMemo(() => (data ? buildRoundReport(roundNumber, data) : null), [data, roundNumber])
 }
 
 export interface PlayerCardVM {
