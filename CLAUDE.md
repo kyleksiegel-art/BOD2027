@@ -519,10 +519,17 @@ on the `BOD27 Wild Ideas` canvas.
   - Clock per hole = latest `client_updated_at_effective` on that hole, via `formatClock` (ET, no
     suffix). The Phase 4 seed's stamps are Jan 2026 so they all read the same — real saves won't.
 - `useFieldReport()` returns `undefined` while loading, `null` when there's nothing to show.
-- **`FieldReportStrip.tsx`** (Standings): **rotates through the newest hole's events** every 4.5 s
-  (`.wire-swap` fade-in on a keyed span; static top event under reduced motion), sub-line
-  "2 of 3 · 3:56 · live". Only the current hole rotates — older holes never resurface. Two lines
-  with `line-clamp-2` — the news is in the second clause, never ellipse it to one line.
+- **`FieldReportStrip.tsx`** (Standings): a **rolling ticker of the most recent events ACROSS
+  holes** (newest first, capped `FEED_MAX` = 8), one every 4.5 s. **This replaced a version that
+  rotated only the newest hole's events** (Kyle 2026-09-07, "it's not rotating"): a quiet current
+  hole collapses to a single "No movement" line, so `events.length < 2` left it dead — the exact
+  case real data hits most of the time, and the one my desktop test masked by injecting a second
+  score. The feed flattens `vm.holes[].events`, so it is ≥2 from hole 1 on (hole 1 never
+  collapses). **Reduced motion suppresses the FADE, not the advance** — the changing line is
+  information, so it keeps moving; only the `.wire-swap` keyframes are gated on the media query
+  (the old version froze the whole rotation, a second reason it looked broken). Keyed on the
+  event so the hole marker and line swap together; two lines with `line-clamp-2`, news in the
+  second clause.
 - **`routes/FieldReport.tsx`**: hole groups (Par · SI · clock), event rows with the player's
   ribbon colour (same `PLAYER_COLORS` slots as the recap), `leader-row` on lead/position changes.
 - Tests: `wire.test.ts` (5). Full `vitest run` → **177**.
