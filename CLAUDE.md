@@ -518,3 +518,32 @@ on the `BOD27 Wild Ideas` canvas.
 - **`routes/FieldReport.tsx`**: hole groups (Par · SI · clock), event rows with the player's
   ribbon colour (same `PLAYER_COLORS` slots as the recap), `leader-row` on lead/position changes.
 - Tests: `wire.test.ts` (5). Full `vitest run` → **177**.
+
+## Player form (2026-09-07, branch `player-form`) — the shape to reuse
+
+The third canvas mockup: what the stored scores say about how a player has actually played.
+Expanded from a row on the Players page, same collapsible pattern as the round report.
+
+- **`src/lib/data/form.ts` `buildPlayerForm(db) → Map<playerId, PlayerFormVM>`** — pure, built
+  for the whole field at once (one `buildRoundDetail` per round, reused across players — the
+  same shape as `buildPlayerCourseHandicaps`). Counts **final + in_progress rounds only**; a
+  player with no completed hole is absent from the map (the row then has no expand affordance).
+  - `bestRun` — longest run of consecutive holes with points, **within one round** (runs don't
+    cross rounds). Ties → more points, then the later round.
+  - `worstStretch` — lowest three consecutive *completed* holes across rounds. Ties → earliest
+    (round, hole), so the figure doesn't jump as later rounds match it.
+  - `front`/`back` — `{points, holes}` per nine. **The verdict compares points PER HOLE, not raw
+    totals** (mid-round the front has more holes in it): `splitLean` is front/back/even, and
+    `splitNote` quotes both rates. Both nines need ≥5 holes (`MIN_NINE_HOLES`) or both are null.
+    A tile showing "38 · 22" beside "even either way" is why — always show the hole counts.
+  - `strip` — the latest round the player actually **played** (a DNP round is skipped), one
+    `FormCell` per counted hole, `eagle` on 4+ points.
+- **`src/components/PlayerForm.tsx`** — three tiles + the hole strip. **Five points bands, not
+  three**: net Stableford lives on 1–2 points, so one shared grey made every strip flat and
+  uninformative. Ramp is red (0) · grey (1) · faint olive (2, par) · olive (3+) · gold ring
+  (net eagle); unplayed is an outline. Tile labels reserve two lines (`min-h-[2.5em]`) so
+  "Front · Back" wrapping doesn't drop its figure below the other two.
+- **Players page**: the header row is the toggle (chevron, rotates), course handicaps stay
+  visible either way — they're what gets looked up on the tee. `PlayerCardVM.form` is the
+  carrier; screens still import only from `selectors.ts`.
+- Tests: `form.test.ts` (6). Full `vitest run` → **183**.
