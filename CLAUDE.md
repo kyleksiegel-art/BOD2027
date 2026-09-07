@@ -344,10 +344,18 @@ money** (CTP is still entered on the round screen for bragging rights, it just p
 Things that will bite if forgotten:
 - **Standings ties share a position** (competition ranking), which is exactly what the
   pooled-position payout relies on — three tied for 1st still share only the two paid places.
-- **On the hosted DB, `purse_amounts` may still hold the old shape** (`buy_in_per_player_cents` +
-  `fixed_cents`) until the migration is pushed *or* someone hits Save on the Money settings card.
-  `buildMoney` reads the new fields (fallback 0), so until then the Money page will reconcile
-  against a stale buy-in — set it in Settings.
+- **`purse_amounts` needs no manual fixing** (verified on the hosted DB 2026-09-07). The seed in
+  `20260812100400_seed_core.sql` already carries the new shape, and
+  `20260823120000_money_model_revision.sql` ends with an `update ... where value ? 'fixed_cents'`
+  that rewrites an old-shape row in place — a no-op on a row that is already new-shape, which is
+  why the hosted row keeps its original `updated_at`. An **earlier version of this note claimed
+  the hosted DB might still hold `fixed_cents` and that someone had to hit Save in Settings; that
+  was wrong** — don't reintroduce it. `buildMoney` still falls back to 0 per field, and a config
+  that doesn't add up is caught by `reconciliation.balanced` and flagged on the Money page rather
+  than settled.
+- The `fixed_cents` reads left in `20260819090000_admin_rpcs.sql` (~line 872) are **dead**: that
+  migration's `rpc_finalize_round` is superseded by the money-model revision, which reads
+  `round_winner_cents`. Don't take them as evidence the old shape is still live.
 - Tests: `money.test.ts` (6) covers payouts+reconciliation, tie pooling, pending, abandoned, the
   reconciliation tripwire, and empty config. Full `vitest run` → **130**. `supabase test db` →
   **232** (finalize freeze + admin_path asserts updated; `plan(106)` unchanged).
