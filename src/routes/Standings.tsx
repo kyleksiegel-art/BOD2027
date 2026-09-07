@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { Movement } from '@/components/Movement'
-import { useStandings } from '@/lib/data/selectors'
+import { FieldReportStrip } from '@/components/FieldReportStrip'
+import { useStandings, useFieldReport } from '@/lib/data/selectors'
 import type { StandingsLiveRound } from '@/lib/data/compute'
 import { formatBack, formatLiveLine } from '@/lib/format'
 
@@ -40,6 +41,7 @@ function LiveStatus({ live }: { live: StandingsLiveRound }) {
 
 export default function Standings() {
   const standings = useStandings()
+  const wire = useFieldReport()
 
   if (!standings) return <LoadingStandings />
 
@@ -56,6 +58,9 @@ export default function Standings() {
       />
 
       {live && <LiveStatus live={liveRound} />}
+
+      {/* The Field Report strip follows the live round; between rounds it follows the last one. */}
+      {wire && <FieldReportStrip vm={wire} />}
 
       {!hasCountingRound ? (
         <p className="mt-8 text-paper-dim">

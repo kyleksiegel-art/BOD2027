@@ -3,6 +3,8 @@
 // directly — so the data-layering rule stays enforceable by grep.
 import { buildRoundReport } from './report'
 import type { ReportVM } from './report'
+import { buildFieldReport } from './wire'
+import type { WireVM } from './wire'
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
@@ -100,6 +102,12 @@ export function useRoundRecap(roundNumber: number): RoundRecapVM | null {
 export function useRoundReport(roundNumber: number): ReportVM | null {
   const data = useDbData()
   return useMemo(() => (data ? buildRoundReport(roundNumber, data) : null), [data, roundNumber])
+}
+
+/** The Field Report wire — the live round's events, else the latest counting round's. */
+export function useFieldReport(): WireVM | null | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildFieldReport(data) : undefined), [data])
 }
 
 export interface PlayerCardVM {

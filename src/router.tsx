@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout'
 import { RouteErrorPanel, RouteFrame } from '@/components/ErrorBoundary'
 import Home from '@/routes/Home'
 import Standings from '@/routes/Standings'
+import FieldReport from '@/routes/FieldReport'
 import Rounds from '@/routes/Rounds'
 import RoundDetail from '@/routes/RoundDetail'
 import Enter from '@/routes/Enter'
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
         children: [
       { path: '/', element: <Home /> },
       { path: '/standings', element: <Standings /> },
+      { path: '/standings/wire', element: <FieldReport /> },
       { path: '/rounds', element: <Rounds /> },
       { path: '/rounds/:roundNumber', element: <RoundDetail /> },
       { path: '/enter', element: <Enter /> },
