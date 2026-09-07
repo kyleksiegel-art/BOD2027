@@ -1,5 +1,11 @@
 # Handoff — 2026-09-07
 
+- **Field Report strip is a rolling cross-hole ticker now** (Kyle: "it's not rotating"). The old
+  one cycled only the newest hole's events, so a quiet "No movement" hole (1 event) sat dead, and
+  reduced motion froze it entirely. Both fixed. See CLAUDE.md §"Field Report".
+- Note: PR #21 (overflow-x clip) was a misread of "scroll" — it fixed a real latent iOS scroll trap
+  but was NOT this complaint. Harmless; left merged.
+
 - **iOS scroll fix**: `Layout`'s `<main>` was `overflow-x-hidden`, which computes `overflow-y:auto`
   and made it a nested scroll container with no definite height — iOS swallowed touch scrolling on
   the 4.3-screen Field Report. Now `overflow-x-clip`. See CLAUDE.md §"The shell is the only
