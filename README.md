@@ -14,12 +14,24 @@ npm run dev        # Vite dev server at http://localhost:5173
 npm run build      # tsc -b + vite build → dist/
 npm run preview    # serve the production build locally
 npm run typecheck  # tsc project-references, no emit
-npm test           # vitest (no tests until Phase 3)
+npm test           # vitest run — full suite (184 tests)
+npm run test:scoring   # just the pure scoring engine
+npm run test:sync      # just the offline sync engine
 ```
 
-The app itself has no environment variables yet; the two it will ever need
-(`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) are wired in a later phase. Everything
-else mutable lives in Supabase, not in config (see `decisions.md`).
+**Environment variables.** The app needs exactly two, both read at build/runtime by
+`src/lib/supabase.ts`:
+
+| Variable | What it is |
+|---|---|
+| `VITE_SUPABASE_URL` | The Supabase project's REST/Realtime origin (local: `http://localhost:54321`) |
+| `VITE_SUPABASE_ANON_KEY` | The anonymous key — authenticates *reads only*; safe to ship (see "Why the anon key being public is fine") |
+
+Copy `.env.example` → `.env.local` for local dev (the anon key comes from `supabase status`).
+On Netlify they are set in the site's build environment. Everything else mutable lives in
+Supabase, not in config (see `decisions.md`). The `pin-verify` Edge Function has its own
+secrets (`APP_PIN_ARGON2_HASH`, `APP_PIN_BCRYPT_HASH`, `APP_SESSION_EXPIRES_AT`) — see
+Edge Functions below — which are never bundled into the client.
 
 ## Supabase (local database)
 
@@ -221,7 +233,54 @@ and *then* installing leaves you locked out with no signal. **Add the app to the
 screen first, then unlock inside the installed app** — on hotel wifi, before you need it.
 This applies to `/admin`; score entry needs no unlock at all.
 
-## The rest of this file will fill in as the build progresses
+## Offline behaviour
 
-- Offline behaviour, the outbox, and diagnostics (Phase 6)
-- Deployment notes and custom-domain instructions (Phase 9)
+The app is a `vite-plugin-pwa` PWA (`registerType: 'prompt'` — a new version waits behind
+an explicit tap and never reloads mid-flush). Once installed it works fully offline for the
+things done in a cart: **score entry, picked-up flags, CTP results, and day-of tee/handicap
+changes**. Those go through an **outbox** (Dexie) and sync when the connection returns;
+everything in `/admin` is online-only and says so plainly when offline.
+
+- **Conflict resolution** is row-level last-write-wins on the tuple
+  `(client_updated_at_effective, client_id)`, written once in `src/lib/sync/comparator.ts`
+  and applied identically in four places (the SQL guard, the Realtime handler, hydration,
+  and the pending-write shield). A stale offline write never clobbers newer data; the losing
+  device rolls back to the winner. `npm run test:sync` is the proof.
+- **Diagnostics** live at `/diagnostics` (PIN-gated, reachable offline): client id, session,
+  reachability, last sync, the outbox and the dead-letter queue with per-item Retry /
+  Export-JSON, plus "Copy state as JSON" (token redacted) and the last render crash.
+- **Export.** `/admin` → Export copies every score as JSON or CSV to the clipboard.
+
+See `CLAUDE.md` §"Offline path" for the full sync engine shape.
+
+## Deployment (Netlify)
+
+`main` serves the SPA at `bod2027.netlify.app`. The build is `npm run build` → `dist`, with
+a SPA fallback and cache headers in `netlify.toml` (Node 22 pinned). Every branch gets its
+own deploy preview; a phase merges to `main` after sign-off.
+
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Netlify site's build
+environment (they point at the **hosted** Supabase project, not localhost). The Edge
+Function and its secrets are deployed to Supabase separately (`supabase functions deploy
+pin-verify` and `supabase secrets set …`), not to Netlify.
+
+**Install / update needs a real HTTPS origin** — service workers do not run on plain
+`localhost` over the network. Do the pre-trip check on the deploy preview or production:
+install to the iOS home screen, confirm the update prompt appears on a new deploy, and
+confirm it holds while the outbox is non-empty.
+
+### Custom domain
+
+The trip runs on the free `*.netlify.app` subdomain; no custom domain is required. If one is
+ever wanted:
+
+1. Netlify → Site configuration → Domain management → **Add a domain**.
+2. Point DNS at Netlify — either delegate the domain to Netlify DNS (change the registrar's
+   nameservers) or add the records Netlify shows (an `ALIAS`/`ANAME` or `A` record for the
+   apex, a `CNAME` for `www`).
+3. Netlify provisions a Let's Encrypt certificate automatically once DNS resolves; force
+   HTTPS in the same panel.
+4. Update the absolute URls that are hard-coded for social cards — the `og:url` /
+   `og:image` / `twitter:image` tags in `index.html` and `start_url`/`scope` in the PWA
+   manifest (`vite.config.ts`) — to the new origin, or link previews and the installed
+   scope will still point at `bod2027.netlify.app`.

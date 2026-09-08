@@ -1,4 +1,4 @@
-import { Component, useEffect, useState } from 'react'
+import { Component, Suspense, useEffect, useState } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { Link, Outlet, useRouteError } from 'react-router-dom'
 import { recordCrash, describeError } from '@/lib/crash'
@@ -96,12 +96,25 @@ export function RouteErrorPanel({ scope = 'route' }: { scope?: 'route' | 'shell'
   return <CrashPanel message={message} scope={scope} details={stack} />
 }
 
+/**
+ * A quiet placeholder while a lazily-loaded route chunk arrives. Route chunks are small and,
+ * after the first visit, served from the service-worker precache, so this is momentary; it
+ * reserves vertical space without a jarring spinner in the sun.
+ */
+function RouteFallback() {
+  return <div className="min-h-[50vh]" aria-busy="true" aria-label="Loading" />
+}
+
 /** The pathless route's element: nothing but an Outlet (and the dev-only crash trigger). */
 export function RouteFrame() {
   return (
     <>
       <DevCrash where="route" />
-      <Outlet />
+      {/* Every page below is React.lazy (router.tsx); one Suspense boundary covers them all,
+          and it sits inside Layout's Outlet so the tab bar stays up while a chunk loads. */}
+      <Suspense fallback={<RouteFallback />}>
+        <Outlet />
+      </Suspense>
     </>
   )
 }

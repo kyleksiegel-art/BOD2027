@@ -41,8 +41,10 @@ export default defineConfig({
         short_name: 'BOD·27',
         description:
           'Live scoring, standings, and money for four rounds at Streamsong Resort, Feb 4–7 2027.',
-        theme_color: '#0c1013',
-        background_color: '#0c1013',
+        // Fairway Linen ground (--ground). The app is light-only, so the install splash and
+        // OS chrome match the warm sand page, not the retired dark theme.
+        theme_color: '#e9e1d0',
+        background_color: '#e9e1d0',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -80,5 +82,18 @@ export default defineConfig({
     // cache it immutably, while stable public files at /assets/ keep their own
     // (shorter) caching policy.
     assetsDir: '_assets',
+    rollupOptions: {
+      output: {
+        // Split the heavy libraries into their own long-lived chunks. They rarely change,
+        // so a shell/app edit no longer re-downloads them; they load in parallel with the
+        // app code; and none of them is anywhere near the 500 KB warning on its own. Route
+        // code is already split by React.lazy (router.tsx).
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          supabase: ['@supabase/supabase-js'],
+          'db-vendor': ['dexie', 'dexie-react-hooks', '@tanstack/react-query'],
+        },
+      },
+    },
   },
 })

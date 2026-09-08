@@ -601,3 +601,45 @@ horizontal clipping and leaves `overflow-y: visible`, so the document stays the 
   from Home to Rules has horizontal overflow at 375px.
 - Anything that needs its own horizontal scroll (the scorecard table, the round-by-round table)
   keeps its **own** `overflow-x-auto` wrapper. That is the right place for it — never the shell.
+
+## Phase 9 — Polish (2026-09-07, branch `phase-9-polish`) — the shape to reuse
+
+The polish pass. **No new tables, no schema change, no scoring change.** Photo upload is
+deliberately out (Kyle: "don't need photos") — `photo_url` still passes through unchanged.
+
+- **Code-splitting.** Route components are `React.lazy` (`src/router.tsx`); **Home stays
+  eager** (landing page, no Suspense flash). One `<Suspense>` boundary wraps the `<Outlet>` in
+  `RouteFrame` (`ErrorBoundary.tsx`) — it sits inside Layout so the tab bar stays up while a
+  chunk loads, and under the route error boundary. Vendors are split in `vite.config.ts`
+  `build.rollupOptions.output.manualChunks` (`react-vendor` / `supabase` / `db-vendor`).
+  `modern-screenshot` is a **dynamic `import()` inside `renderRecapImage`** (`recapImage.ts`),
+  not a static import — it only loads when a share image is actually rasterised. Result: main
+  app chunk **847 KB → 118 KB**, no chunk over 500 KB, Vite's size warning gone. The pure
+  helpers in `recapImage.ts` (`canShareFiles`, `recapImageFilename`, `SHARE_EXCLUDE_ATTR`) are
+  still static — only `domToBlob` is deferred.
+- **Light-only metadata caught up with Fairway Linen.** `index.html` had `class="dark"`, a dark
+  `theme-color` (`#0c1013`) and `black-translucent` status bar left over from the retired
+  dark-only theme (the app went light-only 2026-08-24). Now: no `dark` class, `theme-color`
+  `#e9e1d0` (the `--ground` sand), status bar `default`; PWA manifest `theme_color`/
+  `background_color` likewise `#e9e1d0`. **`.dark` is referenced nowhere in `src/`** — don't
+  reintroduce it.
+- **Hero LCP.** The Home hero is React-rendered, so the browser can't discover it from the HTML.
+  A `<link rel="preload" as="image" type="image/avif" imagesrcset=… imagesizes="100vw">` in
+  `index.html` (matching the AVIF `<source>`) plus `fetchPriority="high"` on the `<img>` makes
+  Lighthouse's LCP-discovery insight all-green. Browsers that can't decode AVIF skip the preload.
+- **Removed `public/ctp-inline.html`** — a 31 KB orphan mockup with no references that was being
+  served and precached.
+- **Lighthouse (real headless-Chrome run, production build, mobile):** Accessibility **100**,
+  SEO 92; Performance **75** (all diagnostics green — TBT 20 ms, CLS 0; the gap is FCP/LCP over
+  simulated Slow-4G, the SPA boot cost, not an asset/bundle problem). Best-practices reads 81
+  **only** on `localhost` (`is-on-https` is the single fail; passes on Netlify HTTPS).
+- **Perf ≥ 90 is not met in the lab** and is left that way on purpose: crossing it needs
+  **prerendering Home to static HTML (SSG)** — a real architecture change, not polish. Deferred
+  as a Kyle decision. The installed PWA serves from the SW precache (instant) and production adds
+  Brotli/HTTP-2/CDN, so the number the trip phones see is far better than the cold lab throttle.
+- **README** finished: env-vars table, Offline/diagnostics section, Deployment (Netlify env +
+  Edge Function deploy + the HTTPS install/update pre-trip check), Custom-domain steps.
+- Tests unchanged: `vitest run` → **184**. `tsc -b` + `npm run build` clean, no size warning.
+- **How to re-measure Lighthouse locally:** `npm run build` → `npm run preview -- --port 4173` →
+  `CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npx lighthouse
+  http://localhost:4173/ --form-factor=mobile --chrome-flags="--headless=new"`.

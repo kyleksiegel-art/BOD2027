@@ -1,23 +1,29 @@
+import { lazy } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { RouteErrorPanel, RouteFrame } from '@/components/ErrorBoundary'
+// Home is eager: it is the landing page, so paint it the instant the main bundle lands
+// rather than flashing the Suspense fallback. Every other page is a lazy chunk, split out
+// of the initial bundle and precached by the service worker after the first visit. The one
+// Suspense boundary that resolves them lives in RouteFrame (ErrorBoundary.tsx).
 import Home from '@/routes/Home'
-import Standings from '@/routes/Standings'
-import FieldReport from '@/routes/FieldReport'
-import Rounds from '@/routes/Rounds'
-import RoundDetail from '@/routes/RoundDetail'
-import Enter from '@/routes/Enter'
-import Money from '@/routes/Money'
-import Admin from '@/routes/Admin'
-import Diagnostics from '@/routes/Diagnostics'
-import NotFound from '@/routes/NotFound'
-import InfoLayout from '@/routes/info/InfoLayout'
-import Itinerary from '@/routes/info/Itinerary'
-import Courses from '@/routes/info/Courses'
-import CourseDetail from '@/routes/info/CourseDetail'
-import Players from '@/routes/info/Players'
-import Rules from '@/routes/info/Rules'
-import SideGames from '@/routes/info/SideGames'
+
+const Standings = lazy(() => import('@/routes/Standings'))
+const FieldReport = lazy(() => import('@/routes/FieldReport'))
+const Rounds = lazy(() => import('@/routes/Rounds'))
+const RoundDetail = lazy(() => import('@/routes/RoundDetail'))
+const Enter = lazy(() => import('@/routes/Enter'))
+const Money = lazy(() => import('@/routes/Money'))
+const Admin = lazy(() => import('@/routes/Admin'))
+const Diagnostics = lazy(() => import('@/routes/Diagnostics'))
+const NotFound = lazy(() => import('@/routes/NotFound'))
+const InfoLayout = lazy(() => import('@/routes/info/InfoLayout'))
+const Itinerary = lazy(() => import('@/routes/info/Itinerary'))
+const Courses = lazy(() => import('@/routes/info/Courses'))
+const CourseDetail = lazy(() => import('@/routes/info/CourseDetail'))
+const Players = lazy(() => import('@/routes/info/Players'))
+const Rules = lazy(() => import('@/routes/info/Rules'))
+const SideGames = lazy(() => import('@/routes/info/SideGames'))
 
 export const router = createBrowserRouter([
   {

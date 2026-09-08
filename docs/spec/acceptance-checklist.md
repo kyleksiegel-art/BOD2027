@@ -816,7 +816,52 @@ scores on that DB are fake) and clears on the next `supabase db reset`.
 
 ## Phase 9 — Polish
 
-_(To be filled in at end of Phase 9.)_
+Built on branch `phase-9-polish`. **Photo upload is deliberately out of scope** (Kyle,
+2026-09-07 — "don't need photos"); `photo_url` continues to pass through unchanged and the
+upload Edge Function is not built. No new tables, no schema change, no scoring change.
+
+### Implemented
+
+| Requirement | Verification |
+|---|---|
+| **Accessibility ≥ 90** | **Lighthouse mobile = 100.** Real run: `npx lighthouse` (13.4.1) via headless Chrome against the production build (`npm run preview`), `--form-factor=mobile`. Report JSON in session |
+| **Bundle code-split** (Vite warning was firing at 847 KB) | Route components are `React.lazy` (`src/router.tsx`) behind one Suspense boundary in `RouteFrame` (`ErrorBoundary.tsx`); vendors split via `manualChunks` (`react-vendor` / `supabase` / `db-vendor`); `modern-screenshot` (~25 KB) moved to a dynamic `import()` inside `renderRecapImage` so it only loads on a share. Main app chunk **847 KB → 118 KB**; no chunk over 500 KB; the build warning is gone. Verified live: Home eager (no flash), Standings / RoundDetail / Admin lazy chunks resolve, **no console errors** |
+| Lighthouse perf hygiene | **TBT 20 ms, CLS 0**, LCP-discovery insight all-green (`fetchpriority=high`, discoverable in initial document, not lazy). Hero (the Home LCP) preloaded in `index.html` with `imagesrcset`/`imagesizes` matching the AVIF `<source>`, and `fetchPriority="high"` on the `<img>` |
+| Stale dark-mode metadata fixed (app went light-only 2026-08-24) | `index.html` no longer has `class="dark"`; `theme-color` `#0c1013` → `#e9e1d0` (the `--ground` sand); `apple-mobile-web-app-status-bar-style` `black-translucent` → `default`. PWA manifest `theme_color`/`background_color` in `vite.config.ts` likewise → `#e9e1d0`. Verified live: light theme renders correctly at 375 px |
+| Orphan mockup removed from the deploy | `public/ctp-inline.html` (31 KB, no code references, was being served at `/ctp-inline.html` and precached by the SW) deleted |
+| Favicon / home-screen icons | Already complete (`public/icon.svg` + `favicon-32.png` + `apple-touch-icon.png` + the three PWA PNGs; links in `index.html`). Confirmed present — no change needed |
+| README complete | Env-vars table, full test scripts, an **Offline behaviour** section (outbox, comparator, diagnostics, export), **Deployment** (Netlify env + Edge Function deploy + the HTTPS install/update pre-trip check), and **Custom domain** steps. The "will fill in as the build progresses" stub is gone |
+
+### Automated tests
+
+`npx vitest run` → **184 pass** (unchanged — no logic touched). `npx tsc -b --noEmit` clean;
+`npm run build` clean with no chunk-size warning.
+
+### Manual tests
+
+- Lighthouse mobile (headless Chrome, production build, simulated Slow-4G): **Accessibility
+  100**, SEO 92, Performance 75, Best-practices 81. (Best-practices is 81 **only** because the
+  local run is over `http://localhost` — the sole failing audit is `is-on-https`, which passes
+  on Netlify's HTTPS, so real BP ≈ 100.)
+- Browser walk-through at 375 px on the dev server: Home (eager), Standings, RoundDetail
+  (recap + report, which triggers the `modern-screenshot` dynamic chunk) — all render, light
+  theme correct, **zero console errors**.
+
+### Deferred / not met
+
+- **Performance ≥ 90 is not met in the Lighthouse lab (75).** Diagnostics are all green (TBT
+  20 ms, CLS 0, LCP discovery optimal); the gap is **FCP 3.2 s / LCP 5.1 s over simulated
+  Slow-4G**, which is the inherent cost of a client-rendered SPA booting React before first
+  paint — not a fixable asset or bundle problem (the hero is a lean 42 KB AVIF; the bundle is
+  split). Crossing 90 in the lab would require **prerendering Home to static HTML (SSG)**, a
+  real architectural change left as a decision for Kyle (see handoff) rather than done in a
+  polish pass. It matters less than the number suggests: the trip phones run the app
+  **installed as a PWA**, served entirely from the service-worker precache (instant), and real
+  production adds Brotli + HTTP/2 + CDN + a real network faster than Lighthouse's throttle. The
+  final ≥90 determination is a pre-trip measurement on the deploy preview / production.
+- **Photo upload** — out of scope by Kyle's instruction; `photo_url` still passes through.
+- **Production Netlify deploy + on-device Lighthouse** — a dashboard/hardware action, owed
+  pre-trip (see the definition-of-done tracker).
 
 ---
 
@@ -841,5 +886,5 @@ These are the final acceptance criteria. Every line needs verification evidence 
 - [ ] Anon can read every public table and Realtime events actually arrive (demonstrate with `curl` and a socket client)
 - [x] Failed PIN attempts on one device never lock out a device that already holds a valid session — `scripts/verify-write-path.sh` §10: unlock 429 while the live session writes 200 (Phase 5A)
 - [x] Buy-in mode reconciles to the cent — `money.test.ts` (awarded + pending === buy-ins across the pot split, payouts, carry-to-contributors, void, shortened-fold and pending cases) and the live Money page (Collected $400 = Awarded + Pending, "Reconciles to the cent"). A pre-trip real-settlement run at trip's end is still owed on real phones
-- [ ] Lighthouse mobile performance and accessibility both above 90
-- [ ] Deployed and reachable at a live Netlify URL
+- [~] Lighthouse mobile performance and accessibility both above 90 — **accessibility 100** (real headless-Chrome run against the production build, Phase 9). **Performance 75 in the lab** with all diagnostics green (TBT 20 ms, CLS 0, LCP discovery optimal); the gap is FCP/LCP over simulated Slow-4G, inherent to the client-rendered SPA. Not met in the lab without prerendering Home (a deferred decision); the installed PWA serves from the SW precache and the final gate is a pre-trip production measurement. See Phase 9 §"Deferred / not met"
+- [~] Deployed and reachable at a live Netlify URL — the SPA builds clean and is served on branch deploy previews; the production `main` merge + final URL confirmation is a pre-trip dashboard action

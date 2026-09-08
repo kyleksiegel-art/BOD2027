@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="theme-color" content="#0c1013" />
+<meta name="theme-color" content="#e9e1d0" />
 <title>Board of Directors — Streamsong 2027</title>
 <meta name="description" content="The Board of Directors — Streamsong 2027. February 4–7. Live scoring, standings, and money for four rounds at Streamsong Resort." />
 
@@ -14,8 +14,21 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="BOD·27" />
+
+<!-- The hero photo is the Home LCP, but it is rendered by React (a <picture> in Home.tsx),
+     so the browser can't discover it from the HTML. Preload it — matching the AVIF <source>'s
+     srcset/sizes — so the fetch starts during the JS download instead of after it. Browsers
+     that can't decode AVIF simply skip this preload and negotiate WebP/JPG as usual. -->
+<link
+  rel="preload"
+  as="image"
+  type="image/avif"
+  imagesrcset="/assets/hero/hero-640.avif 640w, /assets/hero/hero-1080.avif 1080w, /assets/hero/hero-1600.avif 1600w"
+  imagesizes="100vw"
+  fetchpriority="high"
+/>
 
 <meta property="og:site_name" content="Board of Directors — Streamsong 2027" />
 <meta property="og:title" content="Board of Directors — Streamsong 2027" />
