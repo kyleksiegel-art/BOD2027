@@ -4,14 +4,17 @@
 // and paints it to a canvas, so the image is the card exactly as rendered — tokens, course
 // accent, Fraunces axes and all. The self-hosted woff2 fonts are same-origin and get embedded.
 // Elements marked `data-share-exclude` (the footer's buttons) are left out of the picture.
-import { domToBlob } from 'modern-screenshot'
-
+//
+// modern-screenshot (~130 KB) is dynamically imported inside renderRecapImage so it stays
+// out of the initial bundle — it is only ever needed when a share image is actually
+// rasterised, which is off the boot path (pre-rendered in an effect after fonts load).
 export const SHARE_EXCLUDE_ATTR = 'data-share-exclude'
 
 export async function renderRecapImage(el: HTMLElement): Promise<Blob> {
   // A card with no layout (hidden tab, display:none ancestor) rasterises to a 2px-wide
   // ribbon of wrapped text. Refuse rather than share that; the tap path retries.
   if (el.offsetWidth < 200) throw new Error('recap card has no layout width')
+  const { domToBlob } = await import('modern-screenshot')
   const ground = getComputedStyle(el).backgroundColor
   return domToBlob(el, {
     type: 'image/png',

@@ -101,6 +101,9 @@ function HeroPhoto() {
         alt="Streamsong Resort — the Black course windmill and sand bunkers"
         className="absolute inset-0 h-full w-full object-cover [object-position:center_42%]"
         decoding="async"
+        // The hero is the largest-contentful paint on Home. It is above the fold and never
+        // lazy; high priority (paired with the preload in index.html) is the LCP lever.
+        fetchPriority="high"
         onError={() => setSourcesFailed(true)}
       />
     </picture>
