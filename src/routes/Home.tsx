@@ -103,7 +103,11 @@ function HeroPhoto() {
         decoding="async"
         // The hero is the largest-contentful paint on Home. It is above the fold and never
         // lazy; high priority (paired with the preload in index.html) is the LCP lever.
-        fetchPriority="high"
+        // React 18 doesn't own `fetchpriority` as a prop (any spelling triggers an "unknown
+        // prop" warning on every render, though it still forwards it), so set the DOM
+        // attribute imperatively — the reconciler leaves it alone and the console stays clean.
+        // React 19 makes `fetchPriority` a first-class prop; this ref can go then.
+        ref={(el) => el?.setAttribute('fetchpriority', 'high')}
         onError={() => setSourcesFailed(true)}
       />
     </picture>

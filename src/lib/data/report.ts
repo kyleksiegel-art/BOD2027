@@ -232,13 +232,23 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
 
   // ── Headline ──
   const winFirst = multi ? recap.winners.map((w) => firstName(w.name)).join(' and ') : firstName(winner.name)
-  let head = `${winFirst} ${multi ? 'share' : 'takes'} ${theShort}.`
+  const roundClause = `${winFirst} ${multi ? 'share' : 'takes'} ${theShort}`
+  let head = `${roundClause}.`
   if (champLeader) {
     const lf = firstName(champLeaderName)
-    if (remainingRounds === 0) head += ` ${lf} takes the week.`
-    else if (roundNumber === 1) head += ` ${lf} leads the week.`
-    else if (leaderBefore === champLeader.playerId) head += ` ${lf} keeps the week.`
-    else head += ` ${lf} takes the week lead.`
+    let verb: string, tail: string
+    if (remainingRounds === 0) { verb = 'takes'; tail = 'the week' }
+    else if (roundNumber === 1) { verb = 'leads'; tail = 'the week' }
+    else if (leaderBefore === champLeader.playerId) { verb = 'keeps'; tail = 'the week' }
+    else { verb = 'takes'; tail = 'the week lead' }
+    // The round winner is usually the week leader too. Folding the two into one sentence
+    // avoids repeating the name back-to-back ("Jon takes the Red. Jon leads the week."), and
+    // a shared "takes" collapses to "… and the week" rather than saying it twice.
+    if (!multi && winner.playerId === champLeader.playerId) {
+      head = verb === 'takes' ? `${roundClause} and ${tail}.` : `${roundClause} and ${verb} ${tail}.`
+    } else {
+      head = `${roundClause}. ${lf} ${verb} ${tail}.`
+    }
   }
 
   return {

@@ -111,7 +111,7 @@ describe('buildRoundReport', () => {
 
   it('round 1: winner, wire-to-wire, leads the week — and names the whole field', () => {
     const vm = buildRoundReport(1, makeDb('final'))!
-    expect(vm.headline).toBe('Jon takes the Blue. Jon leads the week.')
+    expect(vm.headline).toBe('Jon takes the Blue and leads the week.')
     const body = text(vm)
     expect(body).toContain('Jon Aronson won the Blue with 37 points, 1 clear of the field.')
     expect(body).toContain('Aronson led from the 1st and was never caught.')
@@ -129,7 +129,7 @@ describe('buildRoundReport', () => {
     const vm = buildRoundReport(2, makeDb('final'))!
     // Denove 37 (birdie 15), Hersh 36, Aronson 36 + 1 − 2 − 1 − 1 = 33.
     // Overall: Denove 73, Hersh 72, Aronson 70. Last round of the trip, so the week is decided.
-    expect(vm.headline).toBe('Chris takes the Blue. Chris takes the week.')
+    expect(vm.headline).toBe('Chris takes the Blue and the week.')
     const body = text(vm)
     expect(body).toContain(
       'Chris Denove won the Blue with 37 points, 1 clear of the field. Denove was behind at the turn — the first round this week won from there.',
