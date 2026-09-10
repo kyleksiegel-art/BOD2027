@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { COUNTDOWN_TARGET_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
 import { useRoundsList, useStandings, useRoundDetail } from '@/lib/data/selectors'
-import { courseSlug } from '@/lib/format'
+import { courseSlug, formatBack, formatLiveLine } from '@/lib/format'
+import type { StandingsVM, StandingsLiveRound } from '@/lib/data/compute'
+import { useSyncSnapshot } from '@/lib/sync/engine'
 
 const TARGET = new Date(COUNTDOWN_TARGET_ISO).getTime()
 
@@ -28,6 +30,25 @@ function remainingFrom(now: number): Remaining {
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
+
+// Dev-only clock override for previewing the countdown flip and the live board without
+// waiting for February: open /?now=2027-02-03T23:59:30-05:00 (any ISO string). The offset is
+// kept in sessionStorage so it survives reloads in that tab; /?now=clear removes it. Compiled
+// out of production builds (import.meta.env.DEV).
+const FAKE_CLOCK_OFFSET_MS = (() => {
+  if (!import.meta.env.DEV) return 0
+  try {
+    const key = 'bod:fakeNow'
+    const q = new URLSearchParams(window.location.search).get('now')
+    if (q === 'clear') sessionStorage.removeItem(key)
+    else if (q) sessionStorage.setItem(key, String(new Date(q).getTime() - Date.now()))
+    const off = Number(sessionStorage.getItem(key))
+    return Number.isFinite(off) ? off : 0
+  } catch {
+    return 0
+  }
+})()
+const nowMs = () => Date.now() + FAKE_CLOCK_OFFSET_MS
 
 function CountdownUnit({ value, label }: { value: string; label: string }) {
   return (
@@ -119,27 +140,37 @@ function LiveLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
     <Link
       to={to}
-      className="flex min-h-[44px] items-center justify-center rounded-sm border border-hair-strong px-4 text-[0.82rem] font-semibold uppercase tracking-[0.1em] text-paper transition-colors hover:border-gold hover:text-gold-bright"
+      className="flex min-h-[48px] items-center justify-center whitespace-nowrap rounded-sm border border-hair-strong px-3 text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-paper transition-colors hover:border-gold hover:text-gold-bright"
     >
       {children}
     </Link>
   )
 }
 
-/**
- * Once the trip is underway the countdown is dead weight — this replaces it with the one
- * thing worth glancing at from the lock screen: what's live, who leads it, and who leads the
- * championship, with one tap into the screen you actually need. Reads only from selectors,
- * so it is offline-identical to every other screen.
- */
-function LivePanel() {
-  const roundsList = useRoundsList()
-  const standings = useStandings()
+/** The one filled button on the page — the action the cart actually needs mid-round. */
+function PrimaryLink({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="flex min-h-[48px] items-center justify-center whitespace-nowrap rounded-sm border border-gold bg-gold-fill px-3 text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-paper transition-colors hover:brightness-95"
+    >
+      {children}
+    </Link>
+  )
+}
 
-  // Pick the round in play, else the next one up. buildRoundDetail(0) returns null, so the
-  // detail hook is always called (hook-order safe) and simply idles when nothing is live.
-  const inProgress = roundsList?.find((r) => r.round.status === 'in_progress')
-  const { vm: liveDetail } = useRoundDetail(inProgress?.round.round_number ?? 0)
+type LiveMode = 'playing' | 'between' | 'done'
+
+/**
+ * Once the trip is underway the countdown is dead weight — this replaces it with what's worth
+ * glancing at from the cart: the round in play and how far through it the group is, one tap into
+ * score entry, and the championship board itself (the Standings page's own rows, so ranking and
+ * tiebreaks can't drift). Reads only from selectors, so it is offline-identical to every other
+ * screen; the board re-renders as saved scores and round statuses change.
+ */
+function LivePanel({ standings }: { standings: StandingsVM | undefined }) {
+  const roundsList = useRoundsList()
+  const { pending } = useSyncSnapshot()
 
   if (!roundsList || !standings) {
     return (
@@ -150,10 +181,12 @@ function LivePanel() {
     )
   }
 
+  const inProgress = roundsList.find((r) => r.round.status === 'in_progress')
   const nextUp = roundsList.find((r) => r.round.status === 'upcoming')
   const allDone =
     roundsList.length > 0 &&
     roundsList.every((r) => r.round.status === 'final' || r.round.status === 'abandoned')
+  const mode: LiveMode = inProgress ? 'playing' : allDone ? 'done' : 'between'
 
   const leaders = standings.hasCountingRound
     ? standings.rows.filter((r) => r.position === 1)
@@ -169,13 +202,13 @@ function LivePanel() {
     <div className="py-8">
       <hr className="border-0 [background:linear-gradient(90deg,var(--gold)_0%,transparent_100%)] [height:1.5px]" />
 
-      {inProgress ? (
+      {mode === 'playing' && inProgress ? (
         <OnCourse
           course={inProgress.course.name}
           roundNo={inProgress.round.round_number}
-          detail={liveDetail}
+          live={standings.liveRound}
         />
-      ) : allDone ? (
+      ) : mode === 'done' ? (
         <Complete overall={overall} />
       ) : nextUp ? (
         <BetweenRounds course={nextUp.course.name} roundNo={nextUp.round.round_number} />
@@ -183,25 +216,16 @@ function LivePanel() {
         <p className="mt-6 text-center text-paper-dim">The trip is underway.</p>
       )}
 
-      {/* Championship line — shown whenever a round has counted, in every live state. */}
-      {overall && !allDone && (
-        <p className="mt-6 text-center text-[0.9rem] text-paper-dim">
-          {overall.tied ? 'Tied at the top' : 'Leading the championship'} —{' '}
-          <strong className="font-semibold text-paper">{overall.text}</strong>{' '}
-          <span className="tnum text-gold">{overall.points} pts</span>
-        </p>
-      )}
-
       <div className="mt-6 grid grid-cols-2 gap-3">
-        {inProgress ? (
+        {mode === 'playing' ? (
           <>
-            <LiveLink to="/enter">Enter scores</LiveLink>
-            <LiveLink to="/standings">Standings</LiveLink>
+            <PrimaryLink to="/enter">Enter scores</PrimaryLink>
+            <LiveLink to="/standings">View standings</LiveLink>
           </>
-        ) : allDone ? (
+        ) : mode === 'done' ? (
           <>
             <LiveLink to="/standings">Final standings</LiveLink>
-            <LiveLink to="/money">The money</LiveLink>
+            <LiveLink to="/money">Money</LiveLink>
           </>
         ) : (
           <>
@@ -210,45 +234,55 @@ function LivePanel() {
           </>
         )}
       </div>
+
+      {standings.hasCountingRound && (
+        <HomeBoard standings={standings} mode={mode} pending={pending} />
+      )}
     </div>
   )
+}
+
+/** "Round 3 · Through 13" — the same rule as the Standings status line, so both screens agree. */
+function progressLine(live: StandingsLiveRound): string {
+  if (live.allComplete) return `Round ${live.roundNumber} · scores in`
+  if (!live.started) return `Round ${live.roundNumber} · no scores in yet`
+  if (live.thruMax - live.thruMin <= 1) return `Round ${live.roundNumber} · through ${live.thruMax}`
+  return `Round ${live.roundNumber} · through ${live.thruMin}–${live.thruMax}`
 }
 
 function OnCourse({
   course,
   roundNo,
-  detail,
+  live,
 }: {
   course: string
   roundNo: number
-  detail: ReturnType<typeof useRoundDetail>['vm']
+  live: StandingsLiveRound | null
 }) {
-  const leader = detail?.leaderboard[0]
-  const holesTotal = detail?.holes?.length ?? 18
-  const leaderHasScore = leader && leader.totalPoints > 0 && leader.thru > 0
+  const card = ROUNDS.find((r) => r.no === roundNo)
 
   return (
     <>
       <div className="mt-6 flex items-center justify-center gap-2">
-        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-gold-bright" />
-        <span className="eyebrow">On the course now</span>
+        <span className="live-dot inline-block h-2 w-2 rounded-full" aria-hidden />
+        <span className="eyebrow">Playing now</span>
       </div>
       <h2 className="fx-head mt-3 text-center font-display text-[clamp(2rem,10vw,3rem)] font-semibold leading-none text-paper">
         {course}
       </h2>
       <p className="mt-2 text-center text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
         Round {roundNo} of 4
-      </p>
-      <p className="mt-4 text-center text-[0.95rem]">
-        {leaderHasScore ? (
+        {card ? (
           <>
-            <strong className="font-semibold text-paper">{leader!.name}</strong> leads{' '}
-            <span className="tnum text-gold">{leader!.totalPoints} pts</span>
-            <span className="tnum text-paper-faint"> · thru {leader!.thru}/{holesTotal}</span>
+            {' · '}
+            <span className="text-gold">{card.day}</span> · {card.tee}
           </>
-        ) : (
-          <span className="text-paper-dim">No scores in yet — tee it up.</span>
-        )}
+        ) : null}
+      </p>
+      {/* Saved scoring progress, never elapsed time. Uneven groups get an honest range; the
+          board below carries each player's own thru. */}
+      <p className="tnum mt-4 text-center text-[0.95rem] font-semibold text-gold">
+        {live ? progressLine(live) : `Round ${roundNo} · no scores in yet`}
       </p>
     </>
   )
@@ -274,6 +308,84 @@ function BetweenRounds({ course, roundNo }: { course: string; roundNo: number })
         ) : null}
       </p>
     </>
+  )
+}
+
+/**
+ * The compact championship board. Rows come straight from `useStandings()` — the Standings
+ * page's own ranking, competition ties and countback — so nothing here can disagree with it.
+ * Labelled as the championship (all counting rounds) so totals aren't read as today's points;
+ * the per-row live line carries today's points and each player's own thru. "Not started" and
+ * "Did not play" render in italics so an unplayed round is never mistaken for a zero.
+ */
+function HomeBoard({
+  standings,
+  mode,
+  pending,
+}: {
+  standings: StandingsVM
+  mode: LiveMode
+  pending: number
+}) {
+  return (
+    <section className="mt-8" aria-label="Championship standings">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="eyebrow block">
+          {mode === 'done' ? 'Final championship standings' : 'Championship standings'}
+        </span>
+        <span className="shrink-0 text-[0.66rem] uppercase tracking-[0.1em] text-paper-faint">
+          All rounds · pts
+        </span>
+      </div>
+      <ol className="mt-3 border-t border-hair">
+        {standings.rows.map((r) => {
+          const isLeader = r.position === 1
+          const liveLine = r.live ? formatLiveLine(r.live) : null
+          const unplayed = r.live !== null && (r.live.thru === 0 || r.live.status === 'did_not_play')
+          return (
+            <li
+              key={r.playerId}
+              className={`grid min-h-[56px] grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-hair px-2 py-2.5 ${
+                isLeader ? 'leader-row' : ''
+              }`}
+            >
+              <span
+                className={`tnum font-display text-[1.15rem] ${isLeader ? 'text-gold' : 'text-paper-faint'}`}
+              >
+                {r.position}
+              </span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate text-[1rem] text-paper">{r.name}</span>
+                {liveLine && (
+                  <span className={`tnum text-[0.72rem] text-paper-faint ${unplayed ? 'italic' : ''}`}>
+                    {liveLine}
+                  </span>
+                )}
+              </span>
+              <span className="flex flex-col items-end gap-0.5 text-right">
+                <span
+                  className={`tnum fx-title font-display text-[1.45rem] font-semibold leading-none ${
+                    isLeader ? 'text-gold-bright' : 'text-paper'
+                  }`}
+                >
+                  {r.total}
+                </span>
+                <span className="tnum text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-paper-faint">
+                  {formatBack(r.gapToLeader)}
+                </span>
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+      {/* Offline honesty: totals above include saves still sitting in this phone's outbox. */}
+      {pending > 0 && (
+        <p className="mt-2 text-[0.74rem] text-gold">
+          {pending} {pending === 1 ? 'save' : 'saves'} on this phone waiting to sync — totals
+          include {pending === 1 ? 'it' : 'them'}.
+        </p>
+      )}
+    </section>
   )
 }
 
@@ -408,13 +520,36 @@ function CardRound({
   )
 }
 
+/** The roster — the pre-trip centrepiece, a footnote once the board carries the names. */
+function FieldList() {
+  return (
+    <section className="mt-8">
+      <span className="eyebrow block">The Field</span>
+      <div className="mt-4 grid grid-cols-1 gap-x-5 gap-y-3 min-[420px]:grid-cols-2">
+        {PLAYERS.map((name, i) => (
+          <div
+            key={name}
+            className="flex items-baseline gap-3 border-b border-hair pb-3"
+          >
+            <span className="tnum min-w-[1.1rem] font-display text-[0.8rem] text-gold">
+              {pad(i + 1)}
+            </span>
+            <span className="text-paper">{name}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default function Home() {
-  const [r, setR] = useState<Remaining>(() => remainingFrom(Date.now()))
+  const [r, setR] = useState<Remaining>(() => remainingFrom(nowMs()))
   const [openRound, setOpenRound] = useState<number | null>(null)
+  const standings = useStandings()
 
   useEffect(() => {
     if (r.done) return
-    const id = window.setInterval(() => setR(remainingFrom(Date.now())), 1000)
+    const id = window.setInterval(() => setR(remainingFrom(nowMs())), 1000)
     return () => window.clearInterval(id)
     // Re-arm only when we cross into the "done" state.
   }, [r.done])
@@ -424,6 +559,7 @@ export default function Home() {
   // whole pre-trip window even while demo/test rounds sit in the database, and it flips over on
   // its own the morning of the 4th.
   const showLive = r.done
+  const boardUp = showLive && (standings?.hasCountingRound ?? false)
 
   return (
     <div>
@@ -464,25 +600,11 @@ export default function Home() {
 
       <div className="mx-auto max-w-[720px] px-5 pb-4">
         {/* Before first tee: countdown. Once underway: the live board. */}
-        {showLive ? <LivePanel /> : <Countdown r={r} />}
+        {showLive ? <LivePanel standings={standings} /> : <Countdown r={r} />}
 
-        {/* The Field */}
-        <section className="mt-8">
-          <span className="eyebrow block">The Field</span>
-          <div className="mt-4 grid grid-cols-1 gap-x-5 gap-y-3 min-[420px]:grid-cols-2">
-            {PLAYERS.map((name, i) => (
-              <div
-                key={name}
-                className="flex items-baseline gap-3 border-b border-hair pb-3"
-              >
-                <span className="tnum min-w-[1.1rem] font-display text-[0.8rem] text-gold">
-                  {pad(i + 1)}
-                </span>
-                <span className="text-paper">{name}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* The Field — until a round has counted. Once the board is up, the names are on it,
+            so the roster drops below the schedule. */}
+        {!boardUp && <FieldList />}
 
         {/* The Card */}
         <section className="mt-10">
@@ -503,6 +625,8 @@ export default function Home() {
             Tap a round for its leaderboard.
           </p>
         </section>
+
+        {boardUp && <FieldList />}
 
         <footer className="mt-10 border-t border-hair pt-6 text-center text-[0.7rem] uppercase tracking-[0.14em] text-paper-faint">
           Net Stableford · 100% Allowance · See You in Florida
