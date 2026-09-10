@@ -163,7 +163,11 @@ export function useAdminAction() {
     }
   }, [])
 
-  return { busy, report, run }
+  // Clear a stale report — e.g. a Start-round refusal that a subsequent tee save has just
+  // resolved should not linger under the fresh "Tees saved." (audit F-015).
+  const reset = useCallback(() => setReport(null), [])
+
+  return { busy, report, run, reset }
 }
 
 /** Parse a number field, treating a blank as null rather than 0. */

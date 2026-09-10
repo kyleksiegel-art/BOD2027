@@ -185,7 +185,9 @@ function RoundPanel({
         <Button
           tone="primary"
           disabled={setup.busy || !canSave}
-          onClick={() => void setup.run('Tees saved.', () => saveRoundPlayersQueued(entries()))}
+          onClick={() =>
+            void setup.run('Tees saved.', () => saveRoundPlayersQueued(entries()), () => life.reset())
+          }
         >
           {setup.busy ? 'Saving…' : 'Save tees & status'}
         </Button>
