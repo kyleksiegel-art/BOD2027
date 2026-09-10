@@ -21,7 +21,7 @@
 import { db } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { clientId } from '@/lib/clientId'
-import { readToken } from '@/lib/auth/session'
+import { readToken, lock } from '@/lib/auth/session'
 import { computeHandicap } from '@/lib/scoring'
 import { nextStamp } from './clock'
 import { incomingWins, compareStamps, stampOf, type Stamp } from './comparator'
@@ -50,6 +50,10 @@ const TERMINAL_ERRORS = new Set([
   'missing_required_field',
   'round_not_found',
   'round_upcoming',
+  // A round that has been finalized (or abandoned) is closed to scoring until an admin
+  // reopens it — a queued cell that lands after the fact is refused, kept in dead letter.
+  'round_final',
+  'round_abandoned',
   'course_data_is_placeholder',
   'no_round_player_row',
   'player_not_playing',
@@ -107,6 +111,19 @@ export class TransportError extends Error {
     this.name = 'TransportError'
   }
 }
+
+/**
+ * The server refused our SESSION, not the change: `fn_require_session` raises 28000
+ * "invalid or expired session". That is neither an outage nor a verdict on the payload, so
+ * it must cost no attempt — otherwise a tee change queued on a session that has since
+ * expired retries itself into dead letter while the editor still says "saved".
+ */
+export function isAuthRefusal(message: string): boolean {
+  return /invalid or expired session|\b28000\b/i.test(message)
+}
+
+export const AUTH_EXPIRED_NOTE =
+  'Your admin session has expired — the tee change is kept on this phone and will send after you unlock again.'
 
 export interface Transport {
   call(fn: RpcFn, args: Record<string, unknown>): Promise<RpcResult[]>
@@ -336,6 +353,9 @@ export interface FlushReport {
   /** Entries still queued when the flush returned. */
   remaining: number
   message: string | null
+  /** The server refused this device's session; token-gated entries were deferred, not
+   *  penalised, and the local session was cleared so the PIN gate re-prompts. */
+  authExpired?: boolean
 }
 
 let inFlight: Promise<FlushReport> | null = null
@@ -411,6 +431,7 @@ async function drain(): Promise<FlushReport> {
   let sent = 0
   let deadLettered = 0
   let offline = false
+  let authExpired = false
   let message: string | null = null
 
   // Concurrency cap: a shared cursor over the batch list, CONCURRENCY workers.
@@ -421,6 +442,9 @@ async function drain(): Promise<FlushReport> {
       const i = cursor++
       if (i >= batches.length) return
       const batch = batches[i]
+      // Once the session has been refused there is no point sending the other token-gated
+      // batches with the same dead token; they wait for the next unlock like the first did.
+      if (authExpired && batch.kind === 'round_player') continue
       try {
         const results = await transport.call(rpcFor(batch.kind), argsFor(batch, token))
         const outcome = await settle(batch.entries, results)
@@ -434,6 +458,15 @@ async function drain(): Promise<FlushReport> {
           offline = true
           message = e.message
           return
+        }
+        if (batch.kind === 'round_player' && e instanceof TransportError && isAuthRefusal(e.message)) {
+          // The token is dead, the change is fine. Cost no attempt, drop the dead session
+          // locally so the PIN gate re-prompts, and let the next unlock's flush send it —
+          // exactly the "no token → defer" path above, reached one request too late.
+          authExpired = true
+          message ??= AUTH_EXPIRED_NOTE
+          await lock()
+          continue
         }
         message = e instanceof Error ? e.message : String(e)
         deadLettered += await penalise(batch.entries, message, 'exhausted')
@@ -454,7 +487,7 @@ async function drain(): Promise<FlushReport> {
   }
 
   const remaining = await db.outbox.count()
-  return { status, sent, deadLettered, remaining, message }
+  return { status, sent, deadLettered, remaining, message, authExpired }
 }
 
 function rpcFor(kind: OutboxKind): RpcFn {
