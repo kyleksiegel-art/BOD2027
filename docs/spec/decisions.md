@@ -817,3 +817,33 @@ for it yet) and asked for it to go in "with the combo tees." Two decisions:
 
 Consequence for the brief: Bone Valley has **four** par 3s (3, 7, 12, 16), the same as every
 other course, so the CTP-by-par-3-count rule divides the trip's par 3s evenly. The rule stays.
+
+## Audit fixes (2026-09-09)
+
+### A finalized round is closed to score entry; admin reopens it deliberately
+The brief snapshots money "when a round is marked final … frozen after", but `rpc_upsert_scores`
+refused only `upcoming` rounds and the Enter screen let a final round be picked and edited. A
+post-final edit (or a cell queued offline and flushed later) re-derived the round and moved the
+payee under a "Frozen" label; the recap and Money page then disagreed. Decision, implemented on
+the audit's recommendation and **reversible**: scores/CTP on a `final` or `abandoned` round are
+refused (`round_final` / `round_abandoned`, terminal in the outbox); a new session-gated
+`rpc_reopen_round` puts a final round back in progress non-destructively (scores and tees kept,
+the frozen `round_money` row removed) so a correction is finalize → reopen → fix → finalize. The
+alternative — keep final rounds editable and drop the word "frozen" everywhere — is Kyle's to
+choose instead. What is NOT locked: the live handicap index (2026-08-22 decision) still
+re-derives final rounds' points and payees when edited; that trade-off stands as decided.
+
+### One round-winner resolver
+`resolveRoundWinnerIds` in `compute.ts` is the single source for "who won this round" (points,
+then countback on that round, shared only if unbreakable). Money paid off it already; the recap
+now names its winner from it too, and says "on countback" when that is what decided it.
+
+### Did-not-play is settable again, and saving tees preserves status/override
+The 2026-08-22 simplification removed the status picker but the editor kept sending
+`status: 'playing'`, so any tee save converted a DNP back to playing. The Rounds editor has a
+Playing / Did not play select per player and the payload is built from the saved row.
+
+### A session refusal during a queued tee-change flush is an auth event, not a failure
+`fn_require_session`'s 28000 on `rpc_upsert_round_player` used to count as a retryable error
+(8 attempts → dead letter) while the editor said "Tees saved." Now it costs no attempt, clears the
+dead local session so the PIN gate re-prompts, and the change waits for the next online unlock.
