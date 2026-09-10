@@ -674,3 +674,32 @@ publishes it.
 - `supabase test db` → **234**. `vitest run` → 184 (no `src/` change). **Pushed to the hosted
   project by Kyle 2026-09-09** (`supabase db push`, single migration) and read back over PostgREST:
   published, 7 tees, par 3s 3/7/12/16. Production now scores Round 4.
+
+## Home live board (2026-09-09, branch `home-live-board`) — the shape to reuse
+
+Home's post-countdown panel (`LivePanel` in `src/routes/Home.tsx`) now carries the board
+itself. **No data or scoring change** — everything reads `useStandings()` / `useRoundsList()`.
+
+- **Three modes** from round status alone: `playing` (an `in_progress` round) → "Playing now"
+  + live dot, course, "Round N of 4 · day · tee", a **saved-progress line** from
+  `StandingsLiveRound` using the *same rule as the Standings status line* (`through 13`,
+  `through 12–13` when the group is spread by more than a hole, `no scores in yet`, `scores
+  in`) — never elapsed time; `between` → "Up next", no dot; `done` → `Complete` + "Final
+  standings" / "Money" (the tab's name, not "Payouts").
+- **Buttons**: playing = filled `PrimaryLink` "Enter scores" (`bg-gold-fill text-paper`, the
+  app's existing filled treatment) + outlined "View standings"; labels are `whitespace-nowrap`
+  at 0.78rem so two fit at 375px.
+- **`HomeBoard`** renders `standings.rows` verbatim whenever `hasCountingRound` — position
+  (competition ties), name, total, `formatBack`, and the per-row `formatLiveLine` (italic for
+  "Not started" / "Did not play"). It replaced the old single-leader "X leads" sentence, which
+  named one player on a tie. Labelled "Championship standings · All rounds · pts" so totals
+  aren't read as today's. Under it, `useSyncSnapshot().pending > 0` prints a one-line "N saves
+  on this phone waiting to sync" — per-row sync markers were deliberately NOT plumbed through
+  compute.
+- **The Field** (`FieldList`) sits above the Card until the board is up, then below it.
+- **Dev-only clock: `/?now=2027-02-03T23:59:30-05:00`** (any ISO) stores an offset in
+  `sessionStorage` (`bod:fakeNow`) that `nowMs()` adds to `Date.now()`; `/?now=clear` removes
+  it. Gated on `import.meta.env.DEV`. Other states are reached by toggling `rounds.status` in
+  the local DB; Dexie's merge never deletes scores, so **clear IndexedDB after deleting rows**.
+- Verified at 375px: playing (uneven thru, DNP), between rounds, not started, all final.
+  Tests unchanged (184). `npm run build` clean.
