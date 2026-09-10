@@ -2,11 +2,13 @@ import { useState } from 'react'
 import {
   clearRoundScores,
   finalizeRound,
+  reopenRound,
   saveRound,
   saveRoundPlayersQueued,
   startRound,
   type RoundPlayerInput,
 } from '@/lib/data/admin'
+import { roundPlayerEntries, type RpStatus } from '@/lib/data/roundSetup'
 import type { AdminRoundVM, AdminSettingsVM } from '@/lib/data/compute'
 import type { PlayerRow } from '@/lib/data/types'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -78,23 +80,28 @@ function RoundPanel({
       vm.participants.map((p) => [p.playerId, p.row?.tee_id ?? vm.tees[0]?.id ?? '']),
     ),
   )
+  // Playing / did not play, per player. Seeded from the saved row so that saving tees never
+  // changes anyone's status by accident (audit F-001: it used to force everyone to playing).
+  const [statusById, setStatusById] = useState<Record<string, RpStatus>>(() =>
+    Object.fromEntries(vm.participants.map((p) => [p.playerId, p.row?.status ?? 'playing'])),
+  )
   const [holesCounted, setHolesCounted] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
+  const [confirmReopen, setConfirmReopen] = useState(false)
 
   const unassigned = vm.participants.filter((p) => p.row === null)
   const canSave = vm.tees.length > 0 && vm.participants.every((p) => teeById[p.playerId])
 
   function entries(): RoundPlayerInput[] {
-    return vm.participants.map((p) => ({
+    return roundPlayerEntries({
       roundId: vm.round.id,
-      playerId: p.playerId,
-      teeId: teeById[p.playerId],
-      indexUsed: tripIndexOf.get(p.playerId) ?? 0,
-      allowanceUsed: settings.allowance,
-      capUsed: settings.handicapCap,
-      status: 'playing',
-      manualOverride: null,
-    }))
+      participants: vm.participants.map((p) => ({ playerId: p.playerId, row: p.row })),
+      teeById,
+      statusById,
+      indexById: tripIndexOf,
+      allowance: settings.allowance,
+      cap: settings.handicapCap,
+    })
   }
 
   return (
@@ -126,13 +133,20 @@ function RoundPanel({
             className="flex items-center gap-3 rounded-md border border-hair p-3"
           >
             <div className="min-w-0 flex-1">
-              <div className="font-semibold text-paper">{p.name}</div>
+              <div className="font-semibold text-paper">
+                {p.name}
+                {statusById[p.playerId] === 'did_not_play' ? (
+                  <span className="ml-2 text-[0.72rem] font-normal uppercase tracking-[0.1em] text-paper-faint">
+                    did not play
+                  </span>
+                ) : null}
+              </div>
               <div className="text-[0.75rem] text-paper-faint tnum">
                 index {tripIndexOf.get(p.playerId) ?? '—'}
                 {p.row ? ` · ${p.row.strokes_received} strokes` : ''}
               </div>
             </div>
-            <div className="w-40">
+            <div className="w-40 space-y-2">
               <select
                 aria-label={`Tee for ${p.name}`}
                 className={inputClass}
@@ -149,6 +163,19 @@ function RoundPanel({
                   </option>
                 ))}
               </select>
+              {/* A player sitting a round out scores 0, sets no low handicap, is skipped by the
+                  finalize check and the shortened-round cutoff, and cannot win a CTP. */}
+              <select
+                aria-label={`Status for ${p.name}`}
+                className={inputClass}
+                value={statusById[p.playerId] ?? 'playing'}
+                onChange={(e) =>
+                  setStatusById((s) => ({ ...s, [p.playerId]: e.target.value as RpStatus }))
+                }
+              >
+                <option value="playing">Playing</option>
+                <option value="did_not_play">Did not play</option>
+              </select>
             </div>
           </div>
         ))}
@@ -160,11 +187,12 @@ function RoundPanel({
           disabled={setup.busy || !canSave}
           onClick={() => void setup.run('Tees saved.', () => saveRoundPlayersQueued(entries()))}
         >
-          {setup.busy ? 'Saving…' : 'Save tees'}
+          {setup.busy ? 'Saving…' : 'Save tees & status'}
         </Button>
         <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
           Strokes come from each player's index (Players tab) and the tee. Change an index there
-          and it applies everywhere.{' '}
+          and it applies everywhere. Mark anyone sitting the round out as “Did not play” — they
+          score 0 and the round can be finalized without them.{' '}
           <strong className="text-paper-dim">Tee changes queue like scores and work offline</strong>
           {' '}— strokes recompute on this phone straight away and sync when you have a connection.
         </p>
@@ -215,14 +243,18 @@ function RoundPanel({
 
         <ul className="mt-2 space-y-1 text-[0.85rem] text-paper-dim tnum">
           {vm.participants
-            .filter((p) => p.row?.status === 'playing')
+            .filter((p) => p.row !== null)
             .map((p) => (
               <li key={p.playerId} className="flex justify-between">
                 <span>{p.name}</span>
-                <span>
-                  thru {p.thru}
-                  {p.missingHoles > 0 ? ` · ${p.missingHoles} to go` : ''}
-                </span>
+                {p.row?.status === 'did_not_play' ? (
+                  <span className="italic">did not play</span>
+                ) : (
+                  <span>
+                    thru {p.thru}
+                    {p.missingHoles > 0 ? ` · ${p.missingHoles} to go` : ''}
+                  </span>
+                )}
               </li>
             ))}
         </ul>
@@ -281,10 +313,40 @@ function RoundPanel({
         ) : null}
 
         {vm.round.status === 'final' ? (
-          <p className="mt-4 text-[0.85rem] text-paper-dim">
-            Final{vm.round.holes_counted !== null ? ` over ${vm.round.holes_counted} holes` : ''}.
-            Money is frozen.
-          </p>
+          <div className="mt-4">
+            <p className="text-[0.85rem] text-paper-dim">
+              Final{vm.round.holes_counted !== null ? ` over ${vm.round.holes_counted} holes` : ''}.
+              Score entry is closed and the round winner is settled.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {confirmReopen ? (
+                <>
+                  <Button
+                    tone="danger"
+                    disabled={disabled || life.busy}
+                    onClick={() => {
+                      setConfirmReopen(false)
+                      void life.run('Round reopened — scoring is open again. Finalize it when the correction is in.', () =>
+                        reopenRound(vm.round.id),
+                      )
+                    }}
+                  >
+                    Yes, reopen for corrections
+                  </Button>
+                  <Button onClick={() => setConfirmReopen(false)}>Cancel</Button>
+                </>
+              ) : (
+                <Button disabled={disabled} onClick={() => setConfirmReopen(true)}>
+                  Reopen round
+                </Button>
+              )}
+            </div>
+            <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
+              Reopening keeps every score and tee, puts the round back in progress so a hole can
+              be corrected on the Enter screen, and un-settles its money until it is finalized
+              again.
+            </p>
+          </div>
         ) : null}
 
         {vm.round.status !== 'upcoming' ? (

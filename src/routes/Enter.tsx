@@ -303,6 +303,17 @@ export default function Enter() {
         </section>
       ) : null}
 
+      {vm.blocked?.reason === 'round_closed' ? (
+        <p className="mt-5 rounded-md border border-hair bg-ground-2 p-4 text-[0.9rem] text-paper-dim">
+          Round {vm.round.round_number} is {vm.round.status === 'abandoned' ? 'abandoned' : 'final'} —
+          scoring is closed and its winner is settled. To correct a hole, reopen the round from{' '}
+          <Link to="/admin" className="underline underline-offset-2">
+            admin
+          </Link>
+          , fix it, then finalize again.
+        </p>
+      ) : null}
+
       {vm.blocked?.reason === 'round_upcoming' ? (
         <p className="mt-5 rounded-md border border-hair bg-ground-2 p-4 text-[0.9rem] text-paper-dim">
           Round {vm.round.round_number} hasn’t started. Start it from{' '}

@@ -11,7 +11,7 @@
 
 begin;
 
-select plan(71);
+select plan(76);
 
 create extension if not exists pgtap with schema extensions;
 
@@ -416,6 +416,42 @@ select ok((public.rpc_pin_gate('192.0.2.77') ->> 'retry_after')::int between 1 a
   'the global brake lasts at most 60 seconds');
 
 -- ── 9. Revoking sessions ─────────────────────────────────────────────────────
+-- ── Final rounds are closed to scoring (2026-09-09 audit, F-009) ────────────
+-- Round 1 is seeded final. A cell for it is refused per cell, in the terminal vocabulary
+-- the outbox dead-letters on; so is a CTP. Reopening (session-gated) makes it writable
+-- again and drops the frozen round_money row.
+create temporary table t_r1 as
+select (select id from public.rounds where round_number = 1) as r1;
+
+select is(
+  (select public.rpc_upsert_scores(jsonb_build_array(jsonb_build_object(
+      'round_id', r1, 'player_id', jon, 'hole_number', 1, 'gross_strokes', 4,
+      'picked_up', false, 'client_updated_at_raw', '2027-02-04T20:00:00Z', 'client_id', client_a)))
+     -> 0 ->> 'error'
+   from t_r1, t_ids),
+  'round_final', 'a final round refuses scores');
+
+select is(
+  (select public.rpc_upsert_ctp(jsonb_build_array(jsonb_build_object(
+      'round_id', r1, 'hole_number', 6, 'player_id', jon,
+      'client_updated_at_raw', '2027-02-04T20:00:00Z', 'client_id', client_a)))
+     -> 0 ->> 'error'
+   from t_r1, t_ids),
+  'round_final', 'a final round refuses closest-to-pin results too');
+
+select throws_ok(
+  $$ select public.rpc_reopen_round('nope', (select r1 from t_r1)) $$,
+  '28000', null, 'rpc_reopen_round requires a session');
+
+select is(
+  (select public.rpc_reopen_round('good-token', r1) ->> 'reopened' from t_r1),
+  'true', 'a valid session can reopen a final round');
+
+select is(
+  (select r.status::text || '/' || coalesce((select count(*)::text from public.round_money m where m.round_id = r.id), '0')
+     from public.rounds r, t_r1 where r.id = t_r1.r1),
+  'in_progress/0', 'reopening puts the round back in progress and removes the frozen money row');
+
 select ok(public.rpc_revoke_all_sessions('good-token') >= 1,
   'a valid session can revoke all sessions (changing the PIN must invalidate tokens)');
 select throws_ok(
