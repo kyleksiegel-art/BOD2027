@@ -796,3 +796,24 @@ synthetic `error` event on the `<img>` in the browser: sources went from 2 → 0
 moved from the AVIF variant to `/assets/hero.jpg`, which then loaded.
 
 Tests: no logic changed, so the suite is unchanged at 148. `tsc -b` + `npm run build` clean.
+
+### Bone Valley card seeded from the printed card, and the seed publishes it (2026-09-09)
+
+Kyle photographed the printed Bone Valley scorecard in the cart (the resort publishes no PDF
+for it yet) and asked for it to go in "with the combo tees." Two decisions:
+
+1. **The seed flips `data_is_placeholder` itself.** The rule stands that only
+   `rpc_validate_and_publish_course` may clear the flag from the app — but a migration cannot
+   hold a session, and a transcribed printed card is exactly the trust level Red/Blue/Black were
+   seeded at (`data_is_placeholder = false` from day one). Rather than leave Round 4 blocked until
+   someone taps Validate & publish on a card that is already complete, the migration re-runs the
+   RPC's checks in a `do` block and raises if any fails. Same checks, same outcome, no hidden
+   partial publish.
+2. **Illegible cells were settled by reconciliation, not by eye.** Black 16/17 read as 185-or-195
+   and 355-or-365 at photo resolution. Black In must equal the printed 3190 and each of the three
+   combo tees must equal its printed total; 185/365 is the only combination that satisfies all
+   four. The same ▲/▼ convention as the 2021 cards (▲ = back tee of the pair) was assumed and is
+   confirmed by those three totals reconciling.
+
+Consequence for the brief: Bone Valley has **four** par 3s (3, 7, 12, 16), the same as every
+other course, so the CTP-by-par-3-count rule divides the trip's par 3s evenly. The rule stays.

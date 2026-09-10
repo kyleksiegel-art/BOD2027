@@ -25,7 +25,8 @@ insert into public.sessions (token_hash, expires_at)
 values (public.fn_token_hash('expired-token'), now() - interval '1 second');
 
 -- Fixtures. Round 3 (Blue) is in progress with Chris DNP; round 4 (Bone Valley) is
--- upcoming on a placeholder course.
+-- upcoming. Bone Valley's real card has been seeded and published since 2026-09-09, so
+-- the placeholder hard-block cases below re-open it for the length of this transaction.
 create temporary table t_ids as
 select
   (select id from public.rounds  where round_number = 3)      as r3,
@@ -188,7 +189,10 @@ select is(
    where (x ->> 'applied')::boolean),
   1, 'a malformed cell fails alone; the rest of the batch still applies') from t_ids;
 
--- The Bone Valley hard block, proved independently of the upcoming-status check.
+-- The placeholder hard block, proved independently of the upcoming-status check. Bone
+-- Valley is published now, so un-publish it here (rolled back with the transaction).
+update public.courses set data_is_placeholder = true
+ where id = (select course_id from public.rounds where round_number = 4);
 update public.rounds set status = 'in_progress' where round_number = 4;
 insert into public.round_players (
   round_id, player_id, tee_id, index_used, allowance_used, cap_used,
@@ -205,6 +209,8 @@ select is(pg_temp.score_err(pg_temp.cell(r4, jon, 1, 4, false, now(), client_a))
 from t_ids;
 
 update public.rounds set status = 'upcoming' where round_number = 4;
+update public.courses set data_is_placeholder = false
+ where id = (select course_id from public.rounds where round_number = 4);
 
 -- ── 5. The comparator (SQL guard — site 1 of 4) ──────────────────────────────
 -- Hole 18 of round 3 is unscored in the seed, so this sequence starts from nothing.
@@ -315,11 +321,11 @@ select is(pg_temp.ctp_err(jsonb_build_object(
     'client_updated_at_raw', now(), 'client_id', client_a)),
   null, 'a null player_id is accepted — "no winner yet", or a carry') from t_ids;
 
--- Bone Valley's holes have null par, so nothing there is a par 3 yet.
+-- Bone Valley hole 5 is a par 4 on the real card (its par 3s are 3, 7, 12, 16).
 select is(pg_temp.ctp_err(jsonb_build_object(
     'round_id', r4, 'hole_number', 5, 'player_id', jon, 'distance_feet', 10,
     'client_updated_at_raw', now(), 'client_id', client_a)),
-  'hole_is_not_a_par_3', 'a placeholder card has no par 3s, so CTP is refused there')
+  'hole_is_not_a_par_3', 'CTP on a par 4 is refused (Bone Valley 5)')
 from t_ids;
 
 -- ── 7. round_players: the server owns the handicap math ──────────────────────
