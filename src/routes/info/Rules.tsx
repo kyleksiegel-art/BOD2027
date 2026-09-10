@@ -72,8 +72,8 @@ export default function Rules() {
           <strong className="font-semibold text-paper">{Math.round(allowance * 100)}% allowance</strong>
           . No playing handicap exceeds{' '}
           <strong className="font-semibold text-paper">{cap}</strong> — the cap is applied last.
-          Strokes fall on holes by the course’s stroke index. Handicaps are locked in per round; a
-          later index change doesn’t rewrite a round already played.
+          Strokes fall on holes by the course’s stroke index. Each player’s handicap index is set
+          and locked in before the first round, and the same index is used for every round.
         </p>
         <p>
           We <strong className="font-semibold text-paper">play off the low handicap</strong>: in
