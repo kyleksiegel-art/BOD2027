@@ -470,6 +470,9 @@ export default function Enter() {
             <div className="mt-2 min-h-[1.25rem] text-[0.82rem] tnum" aria-live="polite">
               {write.status === 'error' ? (
                 <span className="text-gold-bright">{write.message}</span>
+              ) : write.status === 'superseded' ? (
+                // Another phone's newer value won — the screen shows it now; say so.
+                <span className="text-gold-bright">{write.message}</span>
               ) : dirty && !allEntered ? (
                 // The hole can't be saved until the whole group is in — say who's left.
                 <span className="text-gold-bright">

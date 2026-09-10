@@ -12,8 +12,9 @@ import type { HoleResult, HoleInfo } from '@/lib/scoring'
  * (circle = net birdie/eagle, square = net bogey or worse), picked-up ("PU") marks, and
  * strokes-received pips. Holes beyond a shortened round's cutoff are struck through.
  */
-export function Scorecard({ vm }: { vm: RoundDetailVM }) {
+export function Scorecard({ vm, pending }: { vm: RoundDetailVM; pending?: Set<string> }) {
   const [mode, setMode] = useState<'points' | 'gross'>('points')
+  const pendingCells = pending ?? EMPTY_PENDING
   if (!vm.holes) return null
   const holes = vm.holes
   const front = holes.filter((h) => h.holeNumber <= 9)
@@ -48,6 +49,7 @@ export function Scorecard({ vm }: { vm: RoundDetailVM }) {
                 results={resultsByPlayer.get(p.playerId)!}
                 cutoff={vm.holesCounted}
                 mode={mode}
+                pending={pendingCells}
               />
             ))}
           </tbody>
@@ -59,6 +61,7 @@ export function Scorecard({ vm }: { vm: RoundDetailVM }) {
   )
 }
 
+const EMPTY_PENDING: Set<string> = new Set()
 const CELL = 'w-8 min-w-8 px-0 py-1.5 text-center tnum'
 const LABEL = 'sticky left-0 z-10 bg-ground pr-3 text-left whitespace-nowrap'
 const SUB = 'w-9 min-w-9 px-0 py-1.5 text-center tnum text-paper-faint bg-ground-2/40'
@@ -162,6 +165,7 @@ function PlayerRow({
   results,
   cutoff,
   mode,
+  pending,
 }: {
   player: PlayerRoundVM
   front: HoleInfo[]
@@ -169,6 +173,7 @@ function PlayerRow({
   results: Map<number, HoleResult>
   cutoff: number
   mode: 'points' | 'gross'
+  pending: Set<string>
 }) {
   if (player.status === 'did_not_play') {
     return (
@@ -200,11 +205,25 @@ function PlayerRow({
     <tr className="border-b border-hair">
       <th className={`${LABEL} py-2.5 font-medium text-paper`}>{player.name}</th>
       {front.map((h) => (
-        <ScoreCell key={h.holeNumber} hole={h} result={results.get(h.holeNumber)} cutoff={cutoff} mode={mode} />
+        <ScoreCell
+          key={h.holeNumber}
+          hole={h}
+          result={results.get(h.holeNumber)}
+          cutoff={cutoff}
+          mode={mode}
+          unsynced={pending.has(`${player.playerId}|${h.holeNumber}`)}
+        />
       ))}
       <td className={`${SUB} font-semibold text-paper-dim`}>{outVal}</td>
       {back.map((h) => (
-        <ScoreCell key={h.holeNumber} hole={h} result={results.get(h.holeNumber)} cutoff={cutoff} mode={mode} />
+        <ScoreCell
+          key={h.holeNumber}
+          hole={h}
+          result={results.get(h.holeNumber)}
+          cutoff={cutoff}
+          mode={mode}
+          unsynced={pending.has(`${player.playerId}|${h.holeNumber}`)}
+        />
       ))}
       <td className={`${SUB} font-semibold text-paper-dim`}>{inVal}</td>
       <td className={`${SUB} font-display text-[0.95rem] font-semibold text-gold-bright`}>{totVal}</td>
@@ -227,12 +246,22 @@ function ScoreCell({
   result,
   cutoff,
   mode,
+  unsynced,
 }: {
   hole: HoleInfo
   result: HoleResult | undefined
   cutoff: number
   mode: 'points' | 'gross'
+  unsynced: boolean
 }) {
+  // A subtle amber underdot: this cell is entered on this phone but not yet on the server.
+  const syncMark = unsynced ? (
+    <span
+      className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-gold-fill"
+      aria-label="not yet synced"
+    />
+  ) : null
+
   const excluded = hole.holeNumber > cutoff
   if (excluded) {
     return (
@@ -246,8 +275,11 @@ function ScoreCell({
   }
   if (result.pickedUp) {
     return (
-      <td className={`${CELL}`}>
-        <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-paper-faint">PU</span>
+      <td className={CELL}>
+        <span className="relative inline-flex items-center justify-center">
+          <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-paper-faint">PU</span>
+          {syncMark}
+        </span>
       </td>
     )
   }
@@ -267,6 +299,7 @@ function ScoreCell({
         >
           {value}
         </span>
+        {syncMark}
       </span>
     </td>
   )
@@ -289,6 +322,9 @@ function Legend() {
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="line-through">–</span> excluded (past the counted cutoff)
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-gold-fill" /> on this phone, awaiting sync
       </span>
     </div>
   )

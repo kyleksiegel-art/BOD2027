@@ -5,7 +5,7 @@ import { Leaderboard } from '@/components/round/Leaderboard'
 import { Scorecard } from '@/components/round/Scorecard'
 import { RoundRecap } from '@/components/round/RoundRecap'
 import { RoundReport } from '@/components/round/RoundReport'
-import { useRoundDetail, useRoundRecap, useRoundReport } from '@/lib/data/selectors'
+import { useRoundDetail, useRoundRecap, useRoundReport, usePendingScoreCells } from '@/lib/data/selectors'
 import { courseSlug, formatDay, formatTeeTime } from '@/lib/format'
 
 export default function RoundDetail() {
@@ -14,6 +14,7 @@ export default function RoundDetail() {
   const { vm, loading } = useRoundDetail(n)
   const recap = useRoundRecap(n)
   const report = useRoundReport(n)
+  const pendingCells = usePendingScoreCells(vm?.round.id ?? null)
 
   if (loading) {
     return (
@@ -81,7 +82,7 @@ export default function RoundDetail() {
           {recap ? <RoundRecap vm={recap} /> : <Leaderboard vm={vm} />}
           {/* The report is an addition under the recap, only once the round is final. */}
           {report && <RoundReport vm={report} />}
-          <Scorecard vm={vm} />
+          <Scorecard vm={vm} pending={pendingCells} />
         </>
       )}
     </Page>

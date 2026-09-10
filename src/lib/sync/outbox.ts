@@ -356,6 +356,10 @@ export interface FlushReport {
   /** The server refused this device's session; token-gated entries were deferred, not
    *  penalised, and the local session was cleared so the PIN gate re-prompts. */
   authExpired?: boolean
+  /** Cells this device sent that lost the comparator to ANOTHER device's newer write and
+   *  were rolled back to that winner. The scorer needs to be told, not left with a silent
+   *  revert under a "Saved" label (audit F-013). */
+  superseded: number
 }
 
 let inFlight: Promise<FlushReport> | null = null
@@ -375,7 +379,7 @@ export function flushOutbox(): Promise<FlushReport> {
 async function drain(): Promise<FlushReport> {
   const all = await db.outbox.orderBy('seq').toArray()
   if (all.length === 0) {
-    return { status: 'idle', sent: 0, deadLettered: 0, remaining: 0, message: null }
+    return { status: 'idle', sent: 0, deadLettered: 0, remaining: 0, message: null, superseded: 0 }
   }
 
   // Coalesce: latest per key wins, the rest are superseded and dropped. Whole-tuple
@@ -430,6 +434,7 @@ async function drain(): Promise<FlushReport> {
 
   let sent = 0
   let deadLettered = 0
+  let supersededCount = 0
   let offline = false
   let authExpired = false
   let message: string | null = null
@@ -450,6 +455,7 @@ async function drain(): Promise<FlushReport> {
         const outcome = await settle(batch.entries, results)
         sent += outcome.sent
         deadLettered += outcome.deadLettered
+        supersededCount += outcome.superseded
         if (outcome.error !== null) message ??= outcome.error
       } catch (e) {
         if (e instanceof OfflineError) {
@@ -487,7 +493,7 @@ async function drain(): Promise<FlushReport> {
   }
 
   const remaining = await db.outbox.count()
-  return { status, sent, deadLettered, remaining, message, authExpired }
+  return { status, sent, deadLettered, remaining, message, authExpired, superseded: supersededCount }
 }
 
 function rpcFor(kind: OutboxKind): RpcFn {
@@ -522,6 +528,8 @@ function keyOfResult(kind: OutboxKind, key: Record<string, unknown>): string {
 interface Settlement {
   sent: number
   deadLettered: number
+  /** Cells rolled back to another device's newer write (a "stale" whose winner isn't ours). */
+  superseded: number
   /** The first refusal in this batch, so the UI can say what the server actually said. */
   error: string | null
 }
@@ -533,6 +541,7 @@ async function settle(entries: OutboxEntry[], results: RpcResult[]): Promise<Set
   const rows: { kind: OutboxKind; row: ServerRow }[] = []
   const dead: { entry: OutboxEntry; error: string; reason: DeadLetterEntry['reason'] }[] = []
   const retry: { entry: OutboxEntry; error: string }[] = []
+  let superseded = 0
 
   for (const result of results) {
     const entry = byKey.get(keyOfResult(entries[0].kind, result.key))
@@ -544,6 +553,15 @@ async function settle(entries: OutboxEntry[], results: RpcResult[]): Promise<Set
       // one we should be showing. The returned winner is the rollback.
       settled.push(entry.seq!)
       if (result.row) rows.push({ kind: entry.kind, row: result.row })
+      // A stale loss to a DIFFERENT device (not our own echo) is a real override the scorer
+      // must be told about — our value was replaced by the other phone's newer one.
+      if (
+        result.error === 'stale' &&
+        result.row &&
+        (result.row.client_id ?? '').toLowerCase() !== entry.client_id.toLowerCase()
+      ) {
+        superseded += 1
+      }
     } else if (TERMINAL_ERRORS.has(result.error)) {
       dead.push({ entry, error: result.error, reason: 'terminal' })
     } else {
@@ -574,7 +592,7 @@ async function settle(entries: OutboxEntry[], results: RpcResult[]): Promise<Set
     },
   )
 
-  return { sent: settled.length, deadLettered, error: dead[0]?.error ?? retry[0]?.error ?? null }
+  return { sent: settled.length, deadLettered, superseded, error: dead[0]?.error ?? retry[0]?.error ?? null }
 }
 
 /** A whole batch failed against a server that did answer. Count one attempt each. */
