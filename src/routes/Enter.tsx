@@ -303,6 +303,17 @@ export default function Enter() {
         </section>
       ) : null}
 
+      {vm.blocked?.reason === 'round_closed' ? (
+        <p className="mt-5 rounded-md border border-hair bg-ground-2 p-4 text-[0.9rem] text-paper-dim">
+          Round {vm.round.round_number} is {vm.round.status === 'abandoned' ? 'abandoned' : 'final'} —
+          scoring is closed and its winner is settled. To correct a hole, reopen the round from{' '}
+          <Link to="/admin" className="underline underline-offset-2">
+            admin
+          </Link>
+          , fix it, then finalize again.
+        </p>
+      ) : null}
+
       {vm.blocked?.reason === 'round_upcoming' ? (
         <p className="mt-5 rounded-md border border-hair bg-ground-2 p-4 text-[0.9rem] text-paper-dim">
           Round {vm.round.round_number} hasn’t started. Start it from{' '}
@@ -458,6 +469,9 @@ export default function Enter() {
 
             <div className="mt-2 min-h-[1.25rem] text-[0.82rem] tnum" aria-live="polite">
               {write.status === 'error' ? (
+                <span className="text-gold-bright">{write.message}</span>
+              ) : write.status === 'superseded' ? (
+                // Another phone's newer value won — the screen shows it now; say so.
                 <span className="text-gold-bright">{write.message}</span>
               ) : dirty && !allEntered ? (
                 // The hole can't be saved until the whole group is in — say who's left.

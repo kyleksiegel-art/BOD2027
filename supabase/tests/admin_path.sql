@@ -16,7 +16,7 @@
 
 begin;
 
-select plan(106);
+select plan(108);
 
 create extension if not exists pgtap with schema extensions;
 
@@ -71,6 +71,7 @@ select ok(has_function_privilege('anon', 'public.' || fn, 'execute'), 'anon may 
     'rpc_start_round(text,uuid)',
     'rpc_finalize_round(text,uuid,int)',
     'rpc_abandon_round(text,uuid)',
+    'rpc_reopen_round(text,uuid)',
     'rpc_set_manual_override(text,uuid,uuid,int)',
     'rpc_upsert_settings(text,text,jsonb)',
     'rpc_upsert_itinerary(text,jsonb)',
@@ -107,6 +108,8 @@ select throws_ok($$ select public.rpc_finalize_round('nope', null, null) $$,
   '28000', null, 'rpc_finalize_round requires a session');
 select throws_ok($$ select public.rpc_abandon_round('nope', null) $$,
   '28000', null, 'rpc_abandon_round requires a session');
+select throws_ok($$ select public.rpc_reopen_round('nope', null) $$,
+  '28000', null, 'rpc_reopen_round requires a session');
 select throws_ok($$ select public.rpc_set_manual_override('nope', null, null, 1) $$,
   '28000', null, 'rpc_set_manual_override requires a session');
 select throws_ok($$ select public.rpc_upsert_settings('nope', 'allowance', '1'::jsonb) $$,

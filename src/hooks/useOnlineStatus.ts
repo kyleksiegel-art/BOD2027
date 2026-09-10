@@ -1,28 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { useSyncExternalStore } from 'react'
+import { getReachability, subscribeReachability, probe } from '@/lib/sync/reachability'
 
 /**
- * Connection status — STUB for Phase 1.
+ * Whether the server is actually reachable — the signal /admin gates its writes on.
  *
- * This reflects only `navigator.onLine`, which reports link state, not real
- * reachability. Phase 6 replaces this with a reachability probe (a real fetch
- * against a known endpoint) backing the connection badge, because a phone on
- * hotel wifi with no route to Supabase still reports `onLine === true`.
+ * `navigator.onLine` reports LINK state, not reachability: on a dead cell or a captive portal
+ * it stays true, which is exactly when an admin write would fail (audit F-017 — this used to
+ * be a `navigator.onLine`-only stub, so admin controls looked live on a dead connection). So
+ * the answer comes from the reachability probe (src/lib/sync/reachability.ts), the same source
+ * the connection badge uses. Until the first probe answers we fall back to the OS's link state
+ * — trusting a negative immediately, optimistic on a positive — and kick a probe on mount so
+ * "unknown" resolves quickly.
  */
 export function useOnlineStatus(): boolean {
-  const [online, setOnline] = useState(() =>
-    typeof navigator === 'undefined' ? true : navigator.onLine,
-  )
+  const reach = useSyncExternalStore(subscribeReachability, getReachability, getReachability)
 
   useEffect(() => {
-    const up = () => setOnline(true)
-    const down = () => setOnline(false)
-    window.addEventListener('online', up)
-    window.addEventListener('offline', down)
-    return () => {
-      window.removeEventListener('online', up)
-      window.removeEventListener('offline', down)
-    }
+    void probe()
   }, [])
 
-  return online
+  if (reach === 'online') return true
+  if (reach === 'offline') return false
+  return typeof navigator === 'undefined' ? true : navigator.onLine
 }

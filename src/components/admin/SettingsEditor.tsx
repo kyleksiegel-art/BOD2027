@@ -12,9 +12,11 @@ import { Button, Field, Report, Section, inputClass, num, useAdminAction } from 
  * "let's use 95%" works — but it is also why the server validates the shape of every value
  * rather than trusting this form, and why the note below says it out loud.
  *
- * The exception is handicaps themselves, which are snapshotted per round. Changing the
- * allowance here does NOT move a round that has already been set up until that round is
- * re-snapshotted.
+ * The exceptions are allowance and cap, which are captured onto each round's players when
+ * that round's tees are saved (round_players.allowance_used / cap_used). Changing the
+ * allowance here does NOT move a round already set up until its tees are saved again on the
+ * Rounds tab. A player's index lives on the Players tab and, like the points table, is read
+ * live — the trip locks its indexes in before the first round.
  */
 export function SettingsEditor({
   settings,
@@ -26,9 +28,10 @@ export function SettingsEditor({
   return (
     <>
       <p className="mt-4 text-[0.88rem] leading-relaxed text-paper-dim">
-        The points table, allowance and cap are applied when scores are read, so a change
-        here moves every leaderboard immediately — including finished rounds. Handicaps
-        already snapshotted into a round do not move until that round is re-snapshotted.
+        The points table is read live, so changing it re-derives every leaderboard at once —
+        finished rounds included. Allowance and cap are captured when a round’s tees are saved,
+        so a change here applies to rounds set up afterward; re-save a round’s tees on the Rounds
+        tab to apply it to that round.
       </p>
       <PointsTableCard settings={settings} disabled={disabled} />
       <HandicapCard settings={settings} disabled={disabled} />
@@ -94,7 +97,7 @@ function HandicapCard({ settings, disabled }: { settings: AdminSettingsVM; disab
   const valid = pct !== null && pct > 0 && pct <= 100 && capValue !== null
 
   return (
-    <Section title="Handicap" meta="Applied when a round is snapshotted">
+    <Section title="Handicap" meta="Captured when a round’s tees are saved">
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Field label="Allowance %" hint="100 is full handicap; 95 is the WHS alternative.">
           <input

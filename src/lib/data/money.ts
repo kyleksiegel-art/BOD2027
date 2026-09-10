@@ -11,17 +11,15 @@
 //
 // All arithmetic is INTEGER CENTS; rounding happens only at display. The cent-splits and the
 // greedy settlement come from the tested pure engine in src/lib/scoring/money.ts.
+import { settle, allocateEvenCents, type Transfer, type NetBalance, type RoundStatus } from '@/lib/scoring'
 import {
-  settle,
-  compareCountback,
-  allocateEvenCents,
-  type Transfer,
-  type NetBalance,
-  type CountbackContext,
-  type CountbackRound,
-  type RoundStatus,
-} from '@/lib/scoring'
-import { buildRoundDetail, buildStandings, type Db, type RoundDetailVM, type StandingsVM } from './compute'
+  buildRoundDetail,
+  buildStandings,
+  resolveRoundWinnerIds,
+  type Db,
+  type RoundDetailVM,
+  type StandingsVM,
+} from './compute'
 import type { SettingRow } from './types'
 
 // ── Settings → PurseSettings ──────────────────────────────────────────────────
@@ -106,40 +104,11 @@ export interface MoneyVM {
   hasMoney: boolean
 }
 
-// ── Countback / round-winner helpers (reuse the tested engine primitives) ───────
+// ── Round-winner helper ─────────────────────────────────────────────────────────
 
 /** A round counts toward the money once it is in play and stays counting unless abandoned. */
 function isCounting(status: RoundStatus): boolean {
   return status !== 'abandoned' && status !== 'upcoming'
-}
-
-function countbackContext(details: Map<number, RoundDetailVM>, roundOrder: readonly number[]): CountbackContext {
-  const rounds = new Map<number, CountbackRound>()
-  for (const [rn, d] of details) {
-    if (!d.holes) continue
-    const pph = new Map<string, Map<number, number>>()
-    for (const p of d.players) {
-      if (p.status !== 'playing') continue
-      const m = new Map<number, number>()
-      for (const hr of p.holeResults) m.set(hr.holeNumber, hr.points ?? 0)
-      pph.set(p.playerId, m)
-    }
-    rounds.set(rn, {
-      roundNumber: rn,
-      status: d.round.status as RoundStatus,
-      holesCounted: d.holesCounted,
-      pointsByPlayerHole: pph,
-    })
-  }
-  return { rounds, roundOrder }
-}
-
-/** The subset of `candidates` that a countback cannot separate from the leader. */
-function tiedAtTopByCountback(candidates: string[], ctx: CountbackContext): string[] {
-  if (candidates.length <= 1) return candidates
-  const order = [...candidates].sort((a, b) => compareCountback(a, b, ctx).cmp)
-  const top = order[0]
-  return order.filter((id) => id === top || compareCountback(top, id, ctx).cmp === 0)
 }
 
 /**
@@ -148,20 +117,13 @@ function tiedAtTopByCountback(candidates: string[], ctx: CountbackContext): stri
  * has scored yet (nothing to award).
  */
 export function resolveRoundWinner(detail: RoundDetailVM): WinnerVM | null {
-  if (!detail.holes) return null
+  // One rule, one place: compute.ts resolveRoundWinnerIds is what the recap card names its
+  // winner from, so the payee here can never differ from the card (audit F-010).
+  const { ids } = resolveRoundWinnerIds(detail)
+  if (ids.length === 0) return null
   const lb = detail.leaderboard
-  if (lb.length === 0 || lb[0].totalPoints <= 0) return null
-  const top = lb[0].totalPoints
-  let tiedIds = lb.filter((p) => p.totalPoints === top).map((p) => p.playerId)
-
-  if (tiedIds.length > 1) {
-    const rn = detail.round.round_number
-    const ctx = countbackContext(new Map([[rn, detail]]), [rn])
-    tiedIds = tiedAtTopByCountback(tiedIds, ctx)
-  }
-
   const nameById = new Map(lb.map((p) => [p.playerId, p.name]))
-  return { playerIds: tiedIds, names: tiedIds.map((id) => nameById.get(id) ?? 'Player'), points: top }
+  return { playerIds: ids, names: ids.map((id) => nameById.get(id) ?? 'Player'), points: lb[0].totalPoints }
 }
 
 // ── Championship places (1st / 2nd overall) ─────────────────────────────────────

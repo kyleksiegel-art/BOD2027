@@ -13,6 +13,8 @@ import {
   resolveStrokesReceived,
   tallyHolesWon,
   compareOverall,
+  compareCountback,
+  compareBestRounds,
   DEFAULT_COUNTBACK_ROUND_ORDER,
 } from '@/lib/scoring'
 import type {
@@ -252,6 +254,42 @@ export function buildRoundDetail(roundNumber: number, dbData: Db): RoundDetailVM
   }
 }
 
+// ── Round winner ─────────────────────────────────────────────────────────────
+/**
+ * Who wins THIS round: top points, a tie broken by a countback on this round (holes 10–18,
+ * 13–18, 16–18, 18 — or the shortened-round windows), and only a tie the countback cannot
+ * split is shared. This is the ONE place that rule lives: the Money page pays off it and the
+ * recap card names its winner from it, so the two can never disagree (audit F-010 — the
+ * recap used to name everyone tied on points while Money paid the countback winner).
+ */
+export function resolveRoundWinnerIds(detail: RoundDetailVM): { ids: string[]; onCountback: boolean } {
+  if (!detail.holes) return { ids: [], onCountback: false }
+  const lb = detail.leaderboard
+  if (lb.length === 0 || lb[0].totalPoints <= 0) return { ids: [], onCountback: false }
+  const top = lb[0].totalPoints
+  const tied = lb.filter((p) => p.totalPoints === top).map((p) => p.playerId)
+  if (tied.length <= 1) return { ids: tied, onCountback: false }
+
+  const pointsByPlayerHole = new Map<string, Map<number, number>>()
+  for (const p of lb) {
+    const m = new Map<number, number>()
+    for (const hr of p.holeResults) m.set(hr.holeNumber, hr.points ?? 0)
+    pointsByPlayerHole.set(p.playerId, m)
+  }
+  const rn = detail.round.round_number
+  const round: CountbackRound = {
+    roundNumber: rn,
+    status: detail.round.status,
+    holesCounted: detail.holesCounted,
+    pointsByPlayerHole,
+  }
+  const ctx: CountbackContext = { rounds: new Map([[rn, round]]), roundOrder: [rn] }
+  const order = [...tied].sort((a, b) => compareCountback(a, b, ctx).cmp)
+  const winner = order[0]
+  const ids = order.filter((id) => id === winner || compareCountback(winner, id, ctx).cmp === 0)
+  return { ids, onCountback: ids.length < tied.length }
+}
+
 // ── Championship standings ───────────────────────────────────────────────────
 /** A player's state in the round currently in progress. Null when no round is live. */
 export interface StandingLive {
@@ -266,6 +304,7 @@ export interface StandingVM extends StandingRow {
   sortOrder: number
   byRound: RoundPointsEntry[] // per-round points, aligned to StandingsVM.roundColumns
   live: StandingLive | null // the in-progress round, per player; null when nothing is live
+  tie: boolean // shares its position with another player (a genuinely unbreakable tie) → render "T{position}"
 }
 
 export interface RoundColumn {
@@ -328,6 +367,82 @@ export interface StandingsVM {
   liveRoundNumbers: number[] // in_progress rounds included provisionally
   hasCountingRound: boolean
   liveRound: StandingsLiveRound | null // the in-progress round, for the status line; null when none
+  /** How the leader (or a level top pair) was decided, when points alone didn't — e.g.
+   *  "Kyle leads on holes won (4–2)". Null when 1st is clear on points or genuinely shared. */
+  tiebreakNote: string | null
+}
+
+/**
+ * The overall-championship tiebreak, assembled once from a set of round details. Extracted so
+ * buildStandings and the round report break a tie on identical numbers (report used to rank the
+ * week on raw points and name the wrong leader — audit F-011). Built over the given counting
+ * rounds only; pass the rounds ≤ N to ask "who leads the week through round N".
+ */
+export function buildOverallTiebreak(
+  champs: PlayerChampionship[],
+  detailByRound: Map<number, RoundDetailVM | null>,
+  countingRoundNumbers: number[],
+): { breakTie: (a: string, b: string) => number; ctx: OverallTiebreakContext } {
+  const counting = new Set(countingRoundNumbers)
+  const roundPointsById = new Map<string, readonly number[]>(
+    champs.map((c) => [c.playerId, c.byRound.filter((r) => r.counts && counting.has(r.roundNumber)).map((r) => r.points)]),
+  )
+  const holeCells: HoleNetCell[][] = []
+  const cbRounds = new Map<number, CountbackRound>()
+  for (const rn of countingRoundNumbers) {
+    const d = detailByRound.get(rn)
+    if (!d) continue
+    const playing = d.players.filter((p) => p.status === 'playing')
+    if (d.holes) {
+      for (let holeNo = 1; holeNo <= d.holesCounted; holeNo++) {
+        holeCells.push(
+          playing.map((p) => {
+            const hr = p.holeResults.find((h) => h.holeNumber === holeNo)
+            return { playerId: p.playerId, net: hr?.net ?? null, completed: hr?.completed ?? false }
+          }),
+        )
+      }
+    }
+    const pointsByPlayerHole = new Map<string, Map<number, number>>()
+    for (const p of playing) {
+      const m = new Map<number, number>()
+      for (const hr of p.holeResults) m.set(hr.holeNumber, hr.points ?? 0)
+      pointsByPlayerHole.set(p.playerId, m)
+    }
+    cbRounds.set(rn, { roundNumber: rn, status: d.round.status, holesCounted: d.holesCounted, pointsByPlayerHole })
+  }
+  const ctx: OverallTiebreakContext = {
+    roundPointsById,
+    holesWonById: tallyHolesWon(holeCells),
+    countback: { rounds: cbRounds, roundOrder: DEFAULT_COUNTBACK_ROUND_ORDER },
+  }
+  return { breakTie: (a, b) => compareOverall(a, b, ctx), ctx }
+}
+
+/**
+ * How a two-player overall tie was decided, in plain words, so the standings can say which
+ * tiebreaker was applied and on which holes (brief: "Always show which tiebreaker was applied").
+ * `a` is assumed to rank ahead of `b`. Null when they are genuinely level after every stage.
+ */
+export function explainOverallTiebreak(
+  a: string,
+  b: string,
+  ctx: OverallTiebreakContext,
+): string | null {
+  if (compareBestRounds(ctx.roundPointsById.get(a) ?? [], ctx.roundPointsById.get(b) ?? []) !== 0) {
+    return 'best single round'
+  }
+  const ha = ctx.holesWonById.get(a) ?? 0
+  const hb = ctx.holesWonById.get(b) ?? 0
+  if (ha !== hb) return `holes won ${ha}–${hb}`
+  const cb = compareCountback(a, b, ctx.countback)
+  if (cb.cmp !== 0 && cb.roundNumber !== null && cb.holes) {
+    const lo = cb.holes[0]
+    const hi = cb.holes[cb.holes.length - 1]
+    const window = lo === hi ? `hole ${hi}` : `holes ${lo}–${hi}`
+    return `countback, R${cb.roundNumber} ${window}`
+  }
+  return null
 }
 
 export function buildStandings(dbData: Db): StandingsVM {
@@ -354,50 +469,9 @@ export function buildStandings(dbData: Db): StandingsVM {
     .filter((r) => r.status === 'in_progress')
     .map((r) => r.round_number)
 
-  // ── Overall tiebreak context: best single round → holes won → countback ──
-  // Everything is drawn from the SAME round details used for the totals, so a tie is broken
-  // on exactly the numbers shown on the board. Built over counting rounds only.
-  const roundPointsById = new Map<string, readonly number[]>(
-    champs.map((c) => [c.playerId, c.byRound.filter((r) => r.counts).map((r) => r.points)]),
-  )
-  const holeCells: HoleNetCell[][] = []
-  const cbRounds = new Map<number, CountbackRound>()
-  for (const rn of countingRoundNumbers) {
-    const d = detailByRound.get(rn)
-    if (!d) continue
-    const playing = d.players.filter((p) => p.status === 'playing')
-    // Holes-won: one cell-set per counted hole.
-    if (d.holes) {
-      for (let holeNo = 1; holeNo <= d.holesCounted; holeNo++) {
-        holeCells.push(
-          playing.map((p) => {
-            const hr = p.holeResults.find((h) => h.holeNumber === holeNo)
-            return { playerId: p.playerId, net: hr?.net ?? null, completed: hr?.completed ?? false }
-          }),
-        )
-      }
-    }
-    // Countback: per-player per-hole Stableford points.
-    const pointsByPlayerHole = new Map<string, Map<number, number>>()
-    for (const p of playing) {
-      const m = new Map<number, number>()
-      for (const hr of p.holeResults) m.set(hr.holeNumber, hr.points ?? 0)
-      pointsByPlayerHole.set(p.playerId, m)
-    }
-    cbRounds.set(rn, {
-      roundNumber: rn,
-      status: d.round.status,
-      holesCounted: d.holesCounted,
-      pointsByPlayerHole,
-    })
-  }
-  const countback: CountbackContext = { rounds: cbRounds, roundOrder: DEFAULT_COUNTBACK_ROUND_ORDER }
-  const tbCtx: OverallTiebreakContext = {
-    roundPointsById,
-    holesWonById: tallyHolesWon(holeCells),
-    countback,
-  }
-  const breakTie = (a: string, b: string) => compareOverall(a, b, tbCtx)
+  // The overall tiebreak — best single round → holes won → countback — built over the SAME
+  // details used for the totals, so a tie breaks on exactly the numbers shown on the board.
+  const { breakTie, ctx: tbCtx } = buildOverallTiebreak(champs, detailByRound, countingRoundNumbers)
 
   // Position change is movement between the two most recent counting rounds.
   let previousPositions: Map<string, number> | undefined
@@ -430,7 +504,13 @@ export function buildStandings(dbData: Db): StandingsVM {
     }
   }
 
-  const rows = computeStandings(champs, previousPositions, breakTie).map((r) => {
+  const ranked = computeStandings(champs, previousPositions, breakTie)
+  // A position shared by more than one player is a genuinely unbreakable tie — competition
+  // ranking only merges positions the tiebreak returned 0 for.
+  const positionCount = new Map<number, number>()
+  for (const r of ranked) positionCount.set(r.position, (positionCount.get(r.position) ?? 0) + 1)
+
+  const rows: StandingVM[] = ranked.map((r) => {
     const p = nameById.get(r.playerId)
     const pr = liveDetail ? liveByPlayer.get(r.playerId) : undefined
     const live: StandingLive | null = pr
@@ -447,8 +527,24 @@ export function buildStandings(dbData: Db): StandingsVM {
       sortOrder: p?.sort_order ?? 999,
       byRound: byRoundByPlayer.get(r.playerId) ?? [],
       live,
+      tie: (positionCount.get(r.position) ?? 1) > 1,
     }
   })
+
+  // The 1st-place note: only when the top two are level on points. Shared position → the
+  // tiebreak couldn't separate them; otherwise say what did (holes won / countback / best round).
+  let tiebreakNote: string | null = null
+  if (ranked.length >= 2 && ranked[0].total === ranked[1].total) {
+    const a = ranked[0]
+    const b = ranked[1]
+    const firstName = (id: string) => (nameById.get(id)?.name ?? 'Player').split(/\s+/)[0]
+    if (a.position === b.position) {
+      tiebreakNote = `${firstName(a.playerId)} and ${firstName(b.playerId)} are level after every tiebreaker.`
+    } else {
+      const how = explainOverallTiebreak(a.playerId, b.playerId, tbCtx)
+      if (how) tiebreakNote = `${firstName(a.playerId)} leads on ${how}.`
+    }
+  }
 
   return {
     rows,
@@ -457,6 +553,7 @@ export function buildStandings(dbData: Db): StandingsVM {
     liveRoundNumbers,
     hasCountingRound: countingRoundNumbers.length > 0,
     liveRound,
+    tiebreakNote,
   }
 }
 
@@ -479,11 +576,28 @@ export function buildRoundsList(dbData: Db): RoundListItemVM[] {
         round.status === 'final' || round.status === 'in_progress'
           ? buildRoundDetail(round.round_number, dbData)
           : null
-      const leader = detail?.leaderboard[0]
+      // Name the winner/leader, not just leaderboard[0]: a final round uses the round countback
+      // (so a points tie names its actual winner), and a still-tied round names everyone at the
+      // top rather than one arbitrary player (audit F-007).
+      let leaderName: string | null = null
+      if (detail && detail.leaderboard.length > 0 && detail.leaderboard[0].totalPoints > 0) {
+        const nameById = new Map(detail.leaderboard.map((p) => [p.playerId, p.name]))
+        let ids: string[]
+        if (round.status === 'final') {
+          ids = resolveRoundWinnerIds(detail).ids
+        } else {
+          const top = detail.leaderboard[0].totalPoints
+          ids = detail.leaderboard.filter((p) => p.totalPoints === top).map((p) => p.playerId)
+        }
+        leaderName =
+          ids.length === 1
+            ? (nameById.get(ids[0]) ?? null)
+            : ids.map((id) => firstName(nameById.get(id) ?? 'Player')).join(' & ')
+      }
       return {
         round,
         course,
-        leaderName: leader && leader.totalPoints > 0 ? leader.name : null,
+        leaderName,
         playerCount: dbData.round_players.filter((rp) => rp.round_id === round.id && rp.status === 'playing').length,
       }
     })
@@ -523,7 +637,10 @@ export interface EnterVM {
    * Non-null means score entry is HARD blocked, with the specific reasons to show. The
    * server refuses these writes too (rpc_upsert_scores) — this is the humane half.
    */
-  blocked: { reason: 'course_card_incomplete' | 'round_upcoming'; issues: string[] } | null
+  blocked: {
+    reason: 'course_card_incomplete' | 'round_upcoming' | 'round_closed'
+    issues: string[]
+  } | null
   /** Players with no round_players row: they cannot be scored until one is created. */
   missingRoundPlayers: string[]
   hole: EnterHoleVM | null
@@ -647,6 +764,11 @@ export function buildEnterHole(
     blocked = { reason: 'course_card_incomplete', issues: courseCardIssues(course.id, dbData) }
   } else if (round.status === 'upcoming') {
     blocked = { reason: 'round_upcoming', issues: [] }
+  } else if (round.status === 'final' || round.status === 'abandoned') {
+    // Closed to scoring once finalized (the server refuses too — rpc_upsert_scores
+    // 'round_final'). A correction goes through admin → Reopen round, so the round's
+    // winner and money cannot drift underneath a "Final" badge (audit F-009).
+    blocked = { reason: 'round_closed', issues: [] }
   }
 
   const detail = buildRoundDetail(roundNumber, dbData)
@@ -1319,8 +1441,9 @@ export interface RecapStanding {
 }
 export interface RecapCtpWinner {
   holeNumber: number
-  name: string | null // null => carry / no winner recorded
-  open: boolean // hole not yet played (live) — distinct from a played-but-no-winner carry
+  name: string | null // the winner's name, or null when there is no winner
+  recorded: boolean // a ctp_results row exists for this hole (an explicit "no winner" vs nothing entered)
+  open: boolean // hole not yet played (live) — distinct from a played hole with no result recorded
 }
 export interface RecapMover {
   name: string
@@ -1362,6 +1485,8 @@ export interface RoundRecapVM {
   headline: RecapHeadlineSeg[]
   narrative: string
   winners: RecapWinner[] // co-winners share the top on a tie
+  /** Final only: the round was decided by a countback among players level on points. */
+  onCountback: boolean
   margin: number // top points minus the best non-winner; 0 when tied at the top
   runnerUp: RecapWinner | null
   standing: RecapStanding[] // this round's order (playing only), desc
@@ -1420,12 +1545,12 @@ function pickDispatch(x: {
   remaining: number
   theShort: string
   biggestMove: RecapMover | null
+  winnerTookWeek: boolean
 }): string {
-  const { act, leadLabel, multi, margin, remaining, theShort, biggestMove } = x
+  const { act, leadLabel, multi, margin, remaining, theShort, winnerTookWeek } = x
   const final = act === 'final'
   const late = final || act === 'closing'
-  if (final && !multi && biggestMove && firstName(biggestMove.name) === leadLabel)
-    return `${leadLabel} came for the round and left with the week.`
+  if (final && winnerTookWeek) return `${leadLabel} came for the round and left with the week.`
   if (late && !multi && margin >= 6) return `${leadLabel} turned it into a procession.`
   if (late && margin <= 1)
     return final ? 'It went to the very last holes.' : 'Nothing to separate them down the stretch.'
@@ -1636,13 +1761,24 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
   const act: RecapAct =
     official || complete ? 'final' : remaining <= 4 ? 'closing' : roundThru >= 6 ? 'moving' : 'opening'
 
-  // Winner(s) / current leader(s) + margin.
+  // Winner(s) / current leader(s) + margin. While the round is live, everyone level on
+  // points shares the lead; once it is final the round's own tiebreak (countback) decides
+  // the winner — the same resolution the Money page pays off.
   const top = playing[0].totalPoints
+  const resolved = act === 'final' ? resolveRoundWinnerIds(detail) : null
+  const winnerIds = new Set(
+    resolved && resolved.ids.length > 0
+      ? resolved.ids
+      : playing.filter((p) => p.totalPoints === top).map((p) => p.playerId),
+  )
+  const onCountback = resolved?.onCountback ?? false
   const winners: RecapWinner[] = playing
-    .filter((p) => p.totalPoints === top)
+    .filter((p) => winnerIds.has(p.playerId))
     .map((p) => ({ name: p.name, points: p.totalPoints }))
   const multi = winners.length > 1
-  const firstLoser = playing.find((p) => p.totalPoints < top) ?? null
+  // The best of the rest — on a countback win this is the player who lost the countback,
+  // so the margin is 0 and the copy says "on countback" instead of "by N".
+  const firstLoser = playing.find((p) => !winnerIds.has(p.playerId)) ?? null
   const margin = firstLoser ? top - firstLoser.totalPoints : 0
   const runnerUp = firstLoser ? { name: firstLoser.name, points: firstLoser.totalPoints } : null
   const standing: RecapStanding[] = playing.map((p) => ({
@@ -1666,6 +1802,10 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
   let biggestMove: RecapMover | null = null
   let week: RecapWeekVM | null = null
   let priorBestRound: number | null = null
+  // True only when the SINGLE round winner is now the sole week leader and wasn't before —
+  // "came for the round and left with the week" (audit F-002: it used to fire for any player
+  // who merely moved up a place, contradicting the week line on the same card).
+  let winnerTookWeek = false
   const countingBefore = dbData.rounds.some(
     (r) => r.round_number < roundNumber && (r.status === 'final' || r.status === 'in_progress'),
   )
@@ -1681,10 +1821,25 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
         }
     priorBestRound = anyPrior ? mx : null
     const nmById = new Map(dbData.players.map((p) => [p.id, p.name]))
+    // Break the week's ties on the real chain (best round → holes won → countback), over the
+    // rounds up to each point — otherwise a points tie names an arbitrary week leader (F-011).
+    const countingNums = (upto: number) =>
+      dbData.rounds
+        .filter((r) => r.round_number <= upto && (r.status === 'final' || r.status === 'in_progress'))
+        .map((r) => r.round_number)
+    const detailsFor = (nums: number[]) => {
+      const m = new Map<number, RoundDetailVM | null>()
+      for (const rn of nums) m.set(rn, buildRoundDetail(rn, dbData))
+      return m
+    }
+    const nowNums = countingNums(roundNumber)
+    const beforeNums = countingNums(roundNumber - 1)
+    const breakTieNow = buildOverallTiebreak(champs, detailsFor(nowNums), nowNums).breakTie
+    const breakTieBefore = buildOverallTiebreak(champs, detailsFor(beforeNums), beforeNums).breakTie
     const beforePos = new Map(
-      standingsThroughRound(champs, roundNumber - 1).map((r) => [r.playerId, r.position]),
+      standingsThroughRound(champs, roundNumber - 1, breakTieBefore).map((r) => [r.playerId, r.position]),
     )
-    const after = standingsThroughRound(champs, roundNumber) // sorted by position
+    const after = standingsThroughRound(champs, roundNumber, breakTieNow) // sorted by position
     const weekRows: RecapWeekRow[] = after.map((r) => ({
       playerId: r.playerId,
       name: nmById.get(r.playerId) ?? 'Unknown',
@@ -1699,12 +1854,16 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     }
     const wl = weekRows[0]
     const gap2 = weekRows[1] ? wl.overall - weekRows[1].overall : 0
-    const line =
-      wl.change > 0
-        ? `${firstName(wl.name)} ${live ? 'is flipping the week' : 'seizes the week lead'} — ${ordinalOf(
-            wl.position + wl.change,
-          )} to the overall lead.`
+    const weekShared =
+      weekRows[1] != null && weekRows[0].position === weekRows[1].position && weekRows[0].overall === weekRows[1].overall
+    const line = weekShared
+      ? `${firstName(wl.name)} and ${firstName(weekRows[1].name)} share the week lead.`
+      : wl.change > 0
+        ? `${firstName(wl.name)} ${live ? 'moves into the week lead' : 'takes the week lead'}${gap2 > 0 ? ` by ${gap2}` : ''}.`
         : `${firstName(wl.name)} holds the week lead${gap2 > 0 ? ` by ${gap2}` : ''}.`
+    const winnerId = winnerIds.size === 1 ? [...winnerIds][0] : null
+    winnerTookWeek =
+      !multi && winnerId !== null && wl.playerId === winnerId && !weekShared && (beforePos.get(winnerId) ?? 99) !== 1
     const countingThrough = dbData.rounds.filter(
       (r) => r.round_number <= roundNumber && (r.status === 'final' || r.status === 'in_progress'),
     ).length
@@ -1727,6 +1886,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
   const ctpWinners: RecapCtpWinner[] = parThrees.map((holeNumber) => ({
     holeNumber,
     name: ctpByHole.has(holeNumber) ? ctpByHole.get(holeNumber) ?? null : null,
+    recorded: ctpByHole.has(holeNumber),
     open: !ctpByHole.has(holeNumber) && holeNumber > roundThru,
   }))
   const nextPar3 = parThrees.find((h) => h > roundThru) ?? null
@@ -1801,10 +1961,20 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
           : [{ text: `All square, ${remaining} to play.` }]
       break
     default: // final
-      headline = [{ text: leadLabel, gold: true }, { text: multi ? ` share ${theShort}.` : ` takes ${theShort}.` }]
+      headline = [
+        { text: leadLabel, gold: true },
+        { text: multi ? ` share ${theShort}.` : onCountback ? ` takes ${theShort} on countback.` : ` takes ${theShort}.` },
+      ]
   }
 
-  const marginPhrase = margin > 0 ? ` — ${margin} clear of ${runnerFirst}` : multi ? ' — level at the top' : ''
+  const marginPhrase =
+    margin > 0
+      ? ` — ${margin} clear of ${runnerFirst}`
+      : multi
+        ? ' — level at the top'
+        : onCountback && runnerFirst
+          ? ` — level with ${runnerFirst}, decided on countback`
+          : ''
   let narrative: string
   switch (act) {
     case 'opening':
@@ -1844,7 +2014,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
   const highlights = buildHighlights({ playing, holesCounted, holeLeaders, act, winPoints, priorBestRound })
 
   // ── Dispatch: one line of editorial voice, chosen by the strongest hook available ──
-  const dispatch = pickDispatch({ act, leadLabel, multi, margin, remaining, theShort, biggestMove })
+  const dispatch = pickDispatch({ act, leadLabel, multi, margin, remaining, theShort, biggestMove, winnerTookWeek })
 
   return {
     week,
@@ -1860,6 +2030,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     headline,
     narrative,
     winners,
+    onCountback,
     margin,
     runnerUp,
     standing,

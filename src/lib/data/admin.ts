@@ -224,6 +224,11 @@ export async function saveRoundPlayersQueued(entries: RoundPlayerInput[]): Promi
   if (report && report.deadLettered > 0) {
     return { ok: false, errors: [report.message ?? 'The server refused the change.'] }
   }
+  if (report?.authExpired) {
+    // Kept and queued, but NOT on the server: say so rather than "saved". The flush already
+    // cleared the dead session, so the gate re-prompts on the next admin action.
+    return { ok: false, errors: [report.message ?? 'Your session has expired — unlock to send this change.'] }
+  }
   return { ok: true, errors: [] }
 }
 
@@ -274,6 +279,19 @@ export async function finalizeRound(roundId: string, holesCounted: number | null
  */
 export function clearRoundScores(roundId: string) {
   return call<unknown>('rpc_clear_round_scores', { p_round_id: roundId })
+}
+
+/**
+ * Put a finalized round back in progress so a score can be corrected — the non-destructive
+ * counterpart of finalize (scores and tees stay; the frozen money row goes, to be rewritten
+ * when the round is finalized again). Added after the 2026-09-09 audit: a final round is
+ * closed to score entry, so this is the only door back in.
+ */
+export async function reopenRound(roundId: string): Promise<CheckedResult> {
+  const r = await call<{ reopened: boolean; errors: string[] }>('rpc_reopen_round', {
+    p_round_id: roundId,
+  })
+  return { ok: r.reopened, errors: r.errors ?? [] }
 }
 
 /** The one door that makes an index edit retroactive — for one named round, deliberately. */

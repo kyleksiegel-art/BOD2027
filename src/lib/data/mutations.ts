@@ -22,8 +22,10 @@ export interface ScoreCellInput {
   pickedUp: boolean
 }
 
-/** 'queued' — recorded locally, not yet on the server. Normal, not an error. */
-export type WriteStatus = 'idle' | 'saving' | 'queued' | 'error'
+/** 'queued' — recorded locally, not yet on the server. Normal, not an error.
+ *  'superseded' — the save landed, but another phone's newer value for a cell won and replaced
+ *  ours; the scorer is shown the winner and told, rather than left with a silent revert. */
+export type WriteStatus = 'idle' | 'saving' | 'queued' | 'error' | 'superseded'
 
 export interface WriteState {
   status: WriteStatus
@@ -93,6 +95,13 @@ export async function saveCells(cells: ScoreCellInput[]): Promise<boolean> {
       status: 'error',
       message: `The server refused ${report.deadLettered} entr${report.deadLettered === 1 ? 'y' : 'ies'} (${report.message ?? 'see Diagnostics'}). Kept — nothing was lost.`,
     })
+  } else if (report.superseded > 0) {
+    // The save landed but another phone had a newer value for a cell; the screen now shows
+    // that winner. Tell the scorer rather than let it revert silently under "Saved".
+    publish({
+      status: 'superseded',
+      message: `A newer score from another phone replaced ${report.superseded === 1 ? 'one entry' : `${report.superseded} entries`}.`,
+    })
   } else if (report.status === 'offline' || report.remaining > 0) {
     publish({ status: 'queued', message: PENDING_NOTE })
   } else {
@@ -131,6 +140,13 @@ export async function saveCtp(result: CtpPayload): Promise<boolean> {
     publish({
       status: 'error',
       message: `The server refused ${report.deadLettered} entr${report.deadLettered === 1 ? 'y' : 'ies'} (${report.message ?? 'see Diagnostics'}). Kept — nothing was lost.`,
+    })
+  } else if (report.superseded > 0) {
+    // The save landed but another phone had a newer value for a cell; the screen now shows
+    // that winner. Tell the scorer rather than let it revert silently under "Saved".
+    publish({
+      status: 'superseded',
+      message: `A newer score from another phone replaced ${report.superseded === 1 ? 'one entry' : `${report.superseded} entries`}.`,
     })
   } else if (report.status === 'offline' || report.remaining > 0) {
     publish({ status: 'queued', message: PENDING_NOTE })

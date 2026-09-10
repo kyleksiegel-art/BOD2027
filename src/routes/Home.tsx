@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { COUNTDOWN_TARGET_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
 import { useRoundsList, useStandings, useRoundDetail } from '@/lib/data/selectors'
-import { courseSlug, formatBack, formatLiveLine } from '@/lib/format'
+import { courseSlug, formatStandingBack, formatPosition, formatLiveLine } from '@/lib/format'
 import type { StandingsVM, StandingsLiveRound } from '@/lib/data/compute'
 import { useSyncSnapshot } from '@/lib/sync/engine'
 
@@ -352,7 +352,7 @@ function HomeBoard({
               <span
                 className={`tnum font-display text-[1.15rem] ${isLeader ? 'text-gold' : 'text-paper-faint'}`}
               >
-                {r.position}
+                {formatPosition(r.position, r.tie)}
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="truncate text-[1rem] text-paper">{r.name}</span>
@@ -371,7 +371,7 @@ function HomeBoard({
                   {r.total}
                 </span>
                 <span className="tnum text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-paper-faint">
-                  {formatBack(r.gapToLeader)}
+                  {formatStandingBack(r.position, r.gapToLeader)}
                 </span>
               </span>
             </li>

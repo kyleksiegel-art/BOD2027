@@ -1,5 +1,5 @@
-import { buildChampionships, buildRoundDetail, buildRoundRecap } from './compute'
-import type { Db } from './compute'
+import { buildChampionships, buildRoundDetail, buildRoundRecap, buildOverallTiebreak } from './compute'
+import type { Db, RoundDetailVM } from './compute'
 import { standingsThroughRound } from '@/lib/scoring'
 import { courseShortName, formatDay, formatDayLong } from '@/lib/format'
 
@@ -90,8 +90,26 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   const remainingRounds = rounds.filter((r) => r.round_number > roundNumber && r.status !== 'abandoned').length
   const latest = !rounds.some((r) => r.round_number > roundNumber && (r.status === 'final' || r.status === 'in_progress'))
   const champs = buildChampionships(dbData)
-  const overall = standingsThroughRound(champs, roundNumber)
-  const before = roundNumber > 1 ? standingsThroughRound(champs, roundNumber - 1) : []
+  // Break the week's ties on the real chain, over the rounds up to each point — the report used
+  // to rank the week on raw points and name the wrong leader on a tie (audit F-011).
+  const countingNums = (upto: number) =>
+    rounds.filter((r) => r.round_number <= upto && (r.status === 'final' || r.status === 'in_progress')).map((r) => r.round_number)
+  const detailsFor = (nums: number[]) => {
+    const m = new Map<number, RoundDetailVM | null>()
+    for (const rn of nums) m.set(rn, buildRoundDetail(rn, dbData))
+    return m
+  }
+  const nowNums = countingNums(roundNumber)
+  const breakTieNow = buildOverallTiebreak(champs, detailsFor(nowNums), nowNums).breakTie
+  const overall = standingsThroughRound(champs, roundNumber, breakTieNow)
+  const before =
+    roundNumber > 1
+      ? standingsThroughRound(
+          champs,
+          roundNumber - 1,
+          buildOverallTiebreak(champs, detailsFor(countingNums(roundNumber - 1)), countingNums(roundNumber - 1)).breakTie,
+        )
+      : []
   const champLeader = overall[0]
   const champSecond = overall.find((r) => r.position > 1) ?? null
   const champGap = champLeader && champSecond ? champLeader.total - champSecond.total : 0
@@ -149,6 +167,10 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   if (prevRound) {
     let best: { name: string; pts: number; delta: number } | null = null
     for (const p of playing) {
+      // A player who sat out the previous round posts 0 there, so their "jump" would be their
+      // whole score — meaningless. Skip anyone who didn't play the round we're comparing to.
+      const prevRp = dbData.round_players.find((rp) => rp.round_id === prevRound.id && rp.player_id === p.playerId)
+      if (prevRp?.status === 'did_not_play') continue
       const c = champs.find((x) => x.playerId === p.playerId)
       const prevPts = c?.byRound.find((r) => r.roundNumber === prevRound.round_number && r.counts)?.points
       if (prevPts === undefined) continue

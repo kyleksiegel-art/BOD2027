@@ -239,3 +239,23 @@ export function usePendingHoles(roundId: string | null): number[] {
     }, [roundId]) ?? []
   )
 }
+
+/**
+ * The exact score cells in this round still owed to the server, as a set of "playerId|hole"
+ * keys — so the scorecard can mark an unsynced cell (brief §UI: "Unsynced scores marked subtly
+ * on the scorecard"; audit F-018). Read straight off the outbox like every other read.
+ */
+export function usePendingScoreCells(roundId: string | null): Set<string> {
+  return (
+    useLiveQuery(async () => {
+      const keys = new Set<string>()
+      if (!roundId) return keys
+      const entries = await db.outbox.where('kind').equals('score').toArray()
+      for (const e of entries) {
+        const p = e.payload as ScorePayload
+        if (p.round_id === roundId) keys.add(`${p.player_id}|${p.hole_number}`)
+      }
+      return keys
+    }, [roundId]) ?? new Set<string>()
+  )
+}

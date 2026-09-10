@@ -703,3 +703,76 @@ itself. **No data or scoring change** — everything reads `useStandings()` / `u
   the local DB; Dexie's merge never deletes scores, so **clear IndexedDB after deleting rows**.
 - Verified at 375px: playing (uneven thru, DNP), between rounds, not started, all final.
   Tests unchanged (184). `npm run build` clean.
+
+## Audit fixes (2026-09-09, branch `audit/p1-fixes`) — the shape to reuse
+
+A full QA/product/tournament-ops audit (`audit/REPORT.md`, `audit/findings.md`) found four P1s;
+these are their fixes. No scoring math changed.
+
+- **A final round is closed to scoring** (F-009). `rpc_upsert_scores` / `rpc_upsert_ctp` refuse
+  `final` (`round_final`) and `abandoned` (`round_abandoned`) rounds per cell — both are in the
+  outbox's `TERMINAL_ERRORS`, so a cell queued offline and flushed after a finalize dead-letters
+  instead of moving the "frozen" winner. `buildEnterHole` blocks with `reason: 'round_closed'`;
+  Enter shows the way back: **admin → Reopen round** (`rpc_reopen_round`, session-gated: final →
+  in_progress, `holes_counted` null, `round_money` row deleted; finalize rewrites it). Migration
+  `20260910120000_lock_final_rounds.sql` re-declares the two write RPCs with the extra branch.
+  **CTP on an `upcoming` round is still accepted** (unchanged; `write_path.sql` reaches the par-3
+  check through it). *Still true and still a Kyle decision:* an index edit on Players re-derives
+  final rounds (live index) — the only thing `round_money` freezes is the $ figure.
+- **The round winner is resolved in ONE place** (F-010): `compute.ts` `resolveRoundWinnerIds()`
+  (top points → countback on that round → shared only if unbreakable). `money.ts`
+  `resolveRoundWinner` and the recap's `winners` both read it; `RecapVM.onCountback` drives
+  "takes the Red on countback" / "on countback" in the Winner · pays fact. While a round is
+  live, level players still share the lead.
+- **"Save tees" never changes status or override** (F-001). `src/lib/data/roundSetup.ts`
+  `roundPlayerEntries()` builds the payload from the saved row (`status`, `manual_override`)
+  plus the editor's choices; the Rounds editor gained a **Playing / Did not play** select per
+  player (the only way to mark a DNP since the 2026-08-22 simplification removed it).
+- **An expired session does not burn retry attempts** (F-021). `outbox.ts` `isAuthRefusal()`
+  recognises `fn_require_session`'s 28000 / "invalid or expired session"; a `round_player` batch
+  refused that way costs no attempt, `lock()`s the dead local session (PinGate re-prompts) and
+  is deferred until the next online unlock (`FlushReport.authExpired`). The editor reports it
+  instead of "Tees saved."
+- Tests: `roundSetup.test.ts` (2), `authexpiry.test.ts` (3), `recap-winner.test.ts` (3). Full
+  `vitest run` → **192**. `supabase test db` → **241** (`write_path.sql` plan 76 — final-round
+  refusals + reopen; `admin_path.sql` plan 108 — reopen grant + gate).
+- Things that will bite: a Dexie mirror keeps rows the server deleted (F-014, unfixed) — after a
+  `db reset` or "Clear scores", clear IndexedDB on the test browser or the merge keeps the
+  newer-stamped ghosts and they *win* over the re-seeded rows.
+
+## Audit P2/P3 fixes (2026-09-09, branch `audit/p1-fixes`) — the shape to reuse
+
+The rest of the audit (`audit/REPORT.md`), after Kyle's four rulings (keep live index + lock
+pre-trip + fix copy; keep final-round lock + Reopen; CTP "par or better"; money page as-is).
+
+- **One overall-tiebreak builder.** `compute.ts buildOverallTiebreak(champs, detailByRound,
+  countingRoundNumbers)` returns `{ breakTie, ctx }`; `explainOverallTiebreak(a, b, ctx)` says
+  which stage decided it ("holes won 4–2" / "countback, R3 hole 18"). `buildStandings`, the
+  recap week block, and `report.ts` all use it, so the **week leader is the same everywhere on
+  a tie** (was raw `standingsThroughRound` → arbitrary sort order). `standingsThroughRound`
+  gained an optional `breakTie`.
+- **Standings tie UI.** `StandingVM.tie` (shares a position) → `formatPosition` renders `T1`;
+  `formatStandingBack(position, gap)` gives `LEADER` / `LEVEL` (level on points, behind on a
+  tiebreak) / `N BACK` — never `LEADER` for a countback loser. `StandingsVM.tiebreakNote` is the
+  one-line "Kyle leads on holes won (4–2)". Home board uses the same helpers.
+- **One round-winner rule.** `compute.ts resolveRoundWinnerIds(detail)` (top points → round
+  countback → shared only if unbreakable). `money.ts resolveRoundWinner`, the recap `winners`,
+  and the rounds list all read it; recap says "takes the Red on countback". Live rounds still
+  share the lead. Money pools a 1st-place tie into one line.
+- **Final rounds closed to scoring** (`rpc_upsert_scores`/`_ctp` refuse `final`/`abandoned`,
+  terminal in the outbox; Enter blocks `round_closed`; `rpc_reopen_round` + a Reopen button).
+  Migration `20260910120000_lock_final_rounds.sql`.
+- **Sync/offline honesty.** `useOnlineStatus` now reads the reachability probe (admin gate
+  actually trips on a dead cell); `ConnectionBadge` reuses it. `mergeStampedRows` reconciles
+  server-side deletions on a full hydrate (`deleted` count) so a missed "Clear scores" DELETE
+  can't leave **ghost rows** — this replaces the old "clear IndexedDB after deleting rows"
+  caveat. `FlushReport.superseded` → a `'superseded'` write status + an Enter notice when
+  another phone's newer value wins (no more silent revert under "Saved"). The scorecard marks
+  an unsynced cell (`usePendingScoreCells`, a gold-fill underdot + legend).
+- **Admin.** Finalize refusal lists the missing **hole numbers** (migration
+  `20260910130000_finalize_lists_holes.sql`); `useAdminAction` gained `reset()` so a Save-tees
+  clears a resolved Start-round refusal. The Rounds editor has a **Playing / Did not play**
+  picker again, and "Save tees" preserves status + manual override (`roundSetup.ts`).
+- Tests: `roundSetup` (2), `authexpiry` (3), `recap-winner` (3), `audit-p2` (3),
+  `deletion-superseded` (5). Full `vitest run` → **201**; `supabase test db` → **241**;
+  `tsc -b` + `npm run build` clean.

@@ -33,9 +33,17 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
   const total = vm.holeLeaders.length
   const ribbonRight = ribbonCaption(vm.act, vm.leadChangeCount, vm.roundThru, total)
 
+  // On a shared lead the margin is to the next player DOWN, so "leads by N" would be wrong —
+  // say how many are level and, if anyone's chasing, how far clear the pair is (audit F-006).
+  const shared = vm.winners.length > 1
+  const leadPhrase = shared
+    ? `${vm.winners.length}-way tie${vm.margin > 0 ? `, ${vm.margin} clear` : ''}`
+    : vm.margin > 0
+      ? `leads by ${vm.margin}`
+      : 'tied'
   const heroCaption = vm.live
-    ? `pts · ${vm.margin > 0 ? `leads by ${vm.margin}` : 'tied'}${leader?.projection !== null ? ` · proj ${leader.projection}` : ''}`
-    : `pts · ${vm.margin > 0 ? `won by ${vm.margin}` : 'shared'}`
+    ? `pts · ${leadPhrase}${leader?.projection !== null ? ` · proj ${leader.projection}` : ''}`
+    : `pts · ${shared ? 'shared' : vm.margin > 0 ? `won by ${vm.margin}` : 'shared'}`
 
   return (
     <section ref={cardRef} className="round recap-card mt-6 overflow-hidden rounded-lg" data-course={slug}>
@@ -267,7 +275,8 @@ function ActFacts({ vm }: { vm: RoundRecapVM }) {
           {vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')}
           {vm.roundWinnerCents ? ` · ${formatMoney(vm.roundWinnerCents)}` : ''}{' '}
           <Small>
-            {vm.winners[0]?.points} pts{vm.margin > 0 ? `, by ${vm.margin}` : ''}
+            {vm.winners[0]?.points} pts
+            {vm.margin > 0 ? `, by ${vm.margin}` : vm.onCountback ? ', on countback' : vm.winners.length > 1 ? ', shared' : ''}
           </Small>
         </>
       ),
@@ -326,7 +335,8 @@ function CtpChips({ vm }: { vm: RoundRecapVM }) {
             c.name ? 'border-hair bg-[var(--leader-tint)] text-paper' : 'border-hair text-paper-faint'
           }`}
         >
-          <b className="font-semibold">{c.holeNumber}</b> {c.name ? c.name.split(/\s+/)[0] : c.open ? 'open' : 'carry'}
+          <b className="font-semibold">{c.holeNumber}</b>{' '}
+          {c.name ? c.name.split(/\s+/)[0] : c.open ? 'open' : c.recorded ? 'no winner' : '—'}
         </span>
       ))}
     </span>

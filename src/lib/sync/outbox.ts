@@ -21,7 +21,7 @@
 import { db } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { clientId } from '@/lib/clientId'
-import { readToken } from '@/lib/auth/session'
+import { readToken, lock } from '@/lib/auth/session'
 import { computeHandicap } from '@/lib/scoring'
 import { nextStamp } from './clock'
 import { incomingWins, compareStamps, stampOf, type Stamp } from './comparator'
@@ -50,6 +50,10 @@ const TERMINAL_ERRORS = new Set([
   'missing_required_field',
   'round_not_found',
   'round_upcoming',
+  // A round that has been finalized (or abandoned) is closed to scoring until an admin
+  // reopens it — a queued cell that lands after the fact is refused, kept in dead letter.
+  'round_final',
+  'round_abandoned',
   'course_data_is_placeholder',
   'no_round_player_row',
   'player_not_playing',
@@ -107,6 +111,19 @@ export class TransportError extends Error {
     this.name = 'TransportError'
   }
 }
+
+/**
+ * The server refused our SESSION, not the change: `fn_require_session` raises 28000
+ * "invalid or expired session". That is neither an outage nor a verdict on the payload, so
+ * it must cost no attempt — otherwise a tee change queued on a session that has since
+ * expired retries itself into dead letter while the editor still says "saved".
+ */
+export function isAuthRefusal(message: string): boolean {
+  return /invalid or expired session|\b28000\b/i.test(message)
+}
+
+export const AUTH_EXPIRED_NOTE =
+  'Your admin session has expired — the tee change is kept on this phone and will send after you unlock again.'
 
 export interface Transport {
   call(fn: RpcFn, args: Record<string, unknown>): Promise<RpcResult[]>
@@ -336,6 +353,13 @@ export interface FlushReport {
   /** Entries still queued when the flush returned. */
   remaining: number
   message: string | null
+  /** The server refused this device's session; token-gated entries were deferred, not
+   *  penalised, and the local session was cleared so the PIN gate re-prompts. */
+  authExpired?: boolean
+  /** Cells this device sent that lost the comparator to ANOTHER device's newer write and
+   *  were rolled back to that winner. The scorer needs to be told, not left with a silent
+   *  revert under a "Saved" label (audit F-013). */
+  superseded: number
 }
 
 let inFlight: Promise<FlushReport> | null = null
@@ -355,7 +379,7 @@ export function flushOutbox(): Promise<FlushReport> {
 async function drain(): Promise<FlushReport> {
   const all = await db.outbox.orderBy('seq').toArray()
   if (all.length === 0) {
-    return { status: 'idle', sent: 0, deadLettered: 0, remaining: 0, message: null }
+    return { status: 'idle', sent: 0, deadLettered: 0, remaining: 0, message: null, superseded: 0 }
   }
 
   // Coalesce: latest per key wins, the rest are superseded and dropped. Whole-tuple
@@ -410,7 +434,9 @@ async function drain(): Promise<FlushReport> {
 
   let sent = 0
   let deadLettered = 0
+  let supersededCount = 0
   let offline = false
+  let authExpired = false
   let message: string | null = null
 
   // Concurrency cap: a shared cursor over the batch list, CONCURRENCY workers.
@@ -421,11 +447,15 @@ async function drain(): Promise<FlushReport> {
       const i = cursor++
       if (i >= batches.length) return
       const batch = batches[i]
+      // Once the session has been refused there is no point sending the other token-gated
+      // batches with the same dead token; they wait for the next unlock like the first did.
+      if (authExpired && batch.kind === 'round_player') continue
       try {
         const results = await transport.call(rpcFor(batch.kind), argsFor(batch, token))
         const outcome = await settle(batch.entries, results)
         sent += outcome.sent
         deadLettered += outcome.deadLettered
+        supersededCount += outcome.superseded
         if (outcome.error !== null) message ??= outcome.error
       } catch (e) {
         if (e instanceof OfflineError) {
@@ -434,6 +464,15 @@ async function drain(): Promise<FlushReport> {
           offline = true
           message = e.message
           return
+        }
+        if (batch.kind === 'round_player' && e instanceof TransportError && isAuthRefusal(e.message)) {
+          // The token is dead, the change is fine. Cost no attempt, drop the dead session
+          // locally so the PIN gate re-prompts, and let the next unlock's flush send it —
+          // exactly the "no token → defer" path above, reached one request too late.
+          authExpired = true
+          message ??= AUTH_EXPIRED_NOTE
+          await lock()
+          continue
         }
         message = e instanceof Error ? e.message : String(e)
         deadLettered += await penalise(batch.entries, message, 'exhausted')
@@ -454,7 +493,7 @@ async function drain(): Promise<FlushReport> {
   }
 
   const remaining = await db.outbox.count()
-  return { status, sent, deadLettered, remaining, message }
+  return { status, sent, deadLettered, remaining, message, authExpired, superseded: supersededCount }
 }
 
 function rpcFor(kind: OutboxKind): RpcFn {
@@ -489,6 +528,8 @@ function keyOfResult(kind: OutboxKind, key: Record<string, unknown>): string {
 interface Settlement {
   sent: number
   deadLettered: number
+  /** Cells rolled back to another device's newer write (a "stale" whose winner isn't ours). */
+  superseded: number
   /** The first refusal in this batch, so the UI can say what the server actually said. */
   error: string | null
 }
@@ -500,6 +541,7 @@ async function settle(entries: OutboxEntry[], results: RpcResult[]): Promise<Set
   const rows: { kind: OutboxKind; row: ServerRow }[] = []
   const dead: { entry: OutboxEntry; error: string; reason: DeadLetterEntry['reason'] }[] = []
   const retry: { entry: OutboxEntry; error: string }[] = []
+  let superseded = 0
 
   for (const result of results) {
     const entry = byKey.get(keyOfResult(entries[0].kind, result.key))
@@ -511,6 +553,15 @@ async function settle(entries: OutboxEntry[], results: RpcResult[]): Promise<Set
       // one we should be showing. The returned winner is the rollback.
       settled.push(entry.seq!)
       if (result.row) rows.push({ kind: entry.kind, row: result.row })
+      // A stale loss to a DIFFERENT device (not our own echo) is a real override the scorer
+      // must be told about — our value was replaced by the other phone's newer one.
+      if (
+        result.error === 'stale' &&
+        result.row &&
+        (result.row.client_id ?? '').toLowerCase() !== entry.client_id.toLowerCase()
+      ) {
+        superseded += 1
+      }
     } else if (TERMINAL_ERRORS.has(result.error)) {
       dead.push({ entry, error: result.error, reason: 'terminal' })
     } else {
@@ -541,7 +592,7 @@ async function settle(entries: OutboxEntry[], results: RpcResult[]): Promise<Set
     },
   )
 
-  return { sent: settled.length, deadLettered, error: dead[0]?.error ?? retry[0]?.error ?? null }
+  return { sent: settled.length, deadLettered, superseded, error: dead[0]?.error ?? retry[0]?.error ?? null }
 }
 
 /** A whole batch failed against a server that did answer. Count one attempt each. */

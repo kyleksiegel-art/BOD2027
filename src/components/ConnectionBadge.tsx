@@ -1,6 +1,4 @@
-import { useSyncExternalStore } from 'react'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
-import { getReachability, subscribeReachability } from '@/lib/sync/reachability'
 import { useSyncSnapshot } from '@/lib/sync/engine'
 
 /**
@@ -14,15 +12,13 @@ import { useSyncSnapshot } from '@/lib/sync/engine'
  * whenever the outbox is non-empty and disappears the moment it drains, which is the
  * "brief confirmation when it drains" the brief asks for.
  *
- * Reachability comes from the probe (src/lib/sync/reachability.ts), never from
- * `navigator.onLine` alone — until the first probe answers, the OS's link state stands in.
+ * Reachability comes from the probe (via useOnlineStatus), never from `navigator.onLine`
+ * alone — until the first probe answers, the OS's link state stands in.
  */
 export function ConnectionBadge() {
-  const link = useOnlineStatus()
-  const reach = useSyncExternalStore(subscribeReachability, getReachability, getReachability)
+  const online = useOnlineStatus()
   const { pending, deadLetter } = useSyncSnapshot()
 
-  const online = reach === 'unknown' ? link : reach === 'online'
   const label =
     deadLetter > 0
       ? `${deadLetter} stuck`
