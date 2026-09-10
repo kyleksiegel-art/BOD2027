@@ -13,6 +13,7 @@ import {
   resolveStrokesReceived,
   tallyHolesWon,
   compareOverall,
+  compareCountback,
   DEFAULT_COUNTBACK_ROUND_ORDER,
 } from '@/lib/scoring'
 import type {
@@ -250,6 +251,42 @@ export function buildRoundDetail(roundNumber: number, dbData: Db): RoundDetailVM
     leaderboard,
     parByHole,
   }
+}
+
+// ── Round winner ─────────────────────────────────────────────────────────────
+/**
+ * Who wins THIS round: top points, a tie broken by a countback on this round (holes 10–18,
+ * 13–18, 16–18, 18 — or the shortened-round windows), and only a tie the countback cannot
+ * split is shared. This is the ONE place that rule lives: the Money page pays off it and the
+ * recap card names its winner from it, so the two can never disagree (audit F-010 — the
+ * recap used to name everyone tied on points while Money paid the countback winner).
+ */
+export function resolveRoundWinnerIds(detail: RoundDetailVM): { ids: string[]; onCountback: boolean } {
+  if (!detail.holes) return { ids: [], onCountback: false }
+  const lb = detail.leaderboard
+  if (lb.length === 0 || lb[0].totalPoints <= 0) return { ids: [], onCountback: false }
+  const top = lb[0].totalPoints
+  const tied = lb.filter((p) => p.totalPoints === top).map((p) => p.playerId)
+  if (tied.length <= 1) return { ids: tied, onCountback: false }
+
+  const pointsByPlayerHole = new Map<string, Map<number, number>>()
+  for (const p of lb) {
+    const m = new Map<number, number>()
+    for (const hr of p.holeResults) m.set(hr.holeNumber, hr.points ?? 0)
+    pointsByPlayerHole.set(p.playerId, m)
+  }
+  const rn = detail.round.round_number
+  const round: CountbackRound = {
+    roundNumber: rn,
+    status: detail.round.status,
+    holesCounted: detail.holesCounted,
+    pointsByPlayerHole,
+  }
+  const ctx: CountbackContext = { rounds: new Map([[rn, round]]), roundOrder: [rn] }
+  const order = [...tied].sort((a, b) => compareCountback(a, b, ctx).cmp)
+  const winner = order[0]
+  const ids = order.filter((id) => id === winner || compareCountback(winner, id, ctx).cmp === 0)
+  return { ids, onCountback: ids.length < tied.length }
 }
 
 // ── Championship standings ───────────────────────────────────────────────────
@@ -523,7 +560,10 @@ export interface EnterVM {
    * Non-null means score entry is HARD blocked, with the specific reasons to show. The
    * server refuses these writes too (rpc_upsert_scores) — this is the humane half.
    */
-  blocked: { reason: 'course_card_incomplete' | 'round_upcoming'; issues: string[] } | null
+  blocked: {
+    reason: 'course_card_incomplete' | 'round_upcoming' | 'round_closed'
+    issues: string[]
+  } | null
   /** Players with no round_players row: they cannot be scored until one is created. */
   missingRoundPlayers: string[]
   hole: EnterHoleVM | null
@@ -647,6 +687,11 @@ export function buildEnterHole(
     blocked = { reason: 'course_card_incomplete', issues: courseCardIssues(course.id, dbData) }
   } else if (round.status === 'upcoming') {
     blocked = { reason: 'round_upcoming', issues: [] }
+  } else if (round.status === 'final' || round.status === 'abandoned') {
+    // Closed to scoring once finalized (the server refuses too — rpc_upsert_scores
+    // 'round_final'). A correction goes through admin → Reopen round, so the round's
+    // winner and money cannot drift underneath a "Final" badge (audit F-009).
+    blocked = { reason: 'round_closed', issues: [] }
   }
 
   const detail = buildRoundDetail(roundNumber, dbData)
@@ -1362,6 +1407,8 @@ export interface RoundRecapVM {
   headline: RecapHeadlineSeg[]
   narrative: string
   winners: RecapWinner[] // co-winners share the top on a tie
+  /** Final only: the round was decided by a countback among players level on points. */
+  onCountback: boolean
   margin: number // top points minus the best non-winner; 0 when tied at the top
   runnerUp: RecapWinner | null
   standing: RecapStanding[] // this round's order (playing only), desc
@@ -1636,13 +1683,24 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
   const act: RecapAct =
     official || complete ? 'final' : remaining <= 4 ? 'closing' : roundThru >= 6 ? 'moving' : 'opening'
 
-  // Winner(s) / current leader(s) + margin.
+  // Winner(s) / current leader(s) + margin. While the round is live, everyone level on
+  // points shares the lead; once it is final the round's own tiebreak (countback) decides
+  // the winner — the same resolution the Money page pays off.
   const top = playing[0].totalPoints
+  const resolved = act === 'final' ? resolveRoundWinnerIds(detail) : null
+  const winnerIds = new Set(
+    resolved && resolved.ids.length > 0
+      ? resolved.ids
+      : playing.filter((p) => p.totalPoints === top).map((p) => p.playerId),
+  )
+  const onCountback = resolved?.onCountback ?? false
   const winners: RecapWinner[] = playing
-    .filter((p) => p.totalPoints === top)
+    .filter((p) => winnerIds.has(p.playerId))
     .map((p) => ({ name: p.name, points: p.totalPoints }))
   const multi = winners.length > 1
-  const firstLoser = playing.find((p) => p.totalPoints < top) ?? null
+  // The best of the rest — on a countback win this is the player who lost the countback,
+  // so the margin is 0 and the copy says "on countback" instead of "by N".
+  const firstLoser = playing.find((p) => !winnerIds.has(p.playerId)) ?? null
   const margin = firstLoser ? top - firstLoser.totalPoints : 0
   const runnerUp = firstLoser ? { name: firstLoser.name, points: firstLoser.totalPoints } : null
   const standing: RecapStanding[] = playing.map((p) => ({
@@ -1801,10 +1859,20 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
           : [{ text: `All square, ${remaining} to play.` }]
       break
     default: // final
-      headline = [{ text: leadLabel, gold: true }, { text: multi ? ` share ${theShort}.` : ` takes ${theShort}.` }]
+      headline = [
+        { text: leadLabel, gold: true },
+        { text: multi ? ` share ${theShort}.` : onCountback ? ` takes ${theShort} on countback.` : ` takes ${theShort}.` },
+      ]
   }
 
-  const marginPhrase = margin > 0 ? ` — ${margin} clear of ${runnerFirst}` : multi ? ' — level at the top' : ''
+  const marginPhrase =
+    margin > 0
+      ? ` — ${margin} clear of ${runnerFirst}`
+      : multi
+        ? ' — level at the top'
+        : onCountback && runnerFirst
+          ? ` — level with ${runnerFirst}, decided on countback`
+          : ''
   let narrative: string
   switch (act) {
     case 'opening':
@@ -1860,6 +1928,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     headline,
     narrative,
     winners,
+    onCountback,
     margin,
     runnerUp,
     standing,

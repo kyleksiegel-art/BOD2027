@@ -267,7 +267,8 @@ function ActFacts({ vm }: { vm: RoundRecapVM }) {
           {vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')}
           {vm.roundWinnerCents ? ` · ${formatMoney(vm.roundWinnerCents)}` : ''}{' '}
           <Small>
-            {vm.winners[0]?.points} pts{vm.margin > 0 ? `, by ${vm.margin}` : ''}
+            {vm.winners[0]?.points} pts
+            {vm.margin > 0 ? `, by ${vm.margin}` : vm.onCountback ? ', on countback' : vm.winners.length > 1 ? ', shared' : ''}
           </Small>
         </>
       ),
