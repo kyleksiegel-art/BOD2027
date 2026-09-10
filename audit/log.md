@@ -96,3 +96,13 @@ _(in progress)_
 - Browser verification (local seed after `db reset`, IndexedDB cleared first because of F-014): Enter R1 shows the closed banner; admin R3 "Save tees & status" keeps Chris did_not_play (DB confirmed); admin R2 Reopen → in_progress, round_money gone, score accepted, re-finalized at 15 over the API.
 - Stopped before P2/P3 per the brief; recommendations are in REPORT.md.
 - Local DB left at the seed state except: R2 Jon hole 1 = 5 (written on the reopened round), R4 tee time 8:40. `supabase db reset` restores everything.
+
+## Phase 8 (continued) — P2/P3 fixes after Kyle's decisions
+- Kyle's calls: keep live index (lock pre-trip) + fix copy; keep final-round lock + Reopen; CTP "par or better"; money display leave as-is.
+- Batch 1 `copy:` — F-003 Rules/Settings live-index wording.
+- Batch 2 `standings/recap/report:` — F-002/005/006/007/011/012/016/019 via one shared buildOverallTiebreak; T-positions, LEVEL, tiebreak note, pooled-tie money line, CTP labels.
+- Batch 3 `sync/offline:` — F-013 superseded notice, F-014 hydrate deletion reconciliation, F-017 admin reachability gate, F-018 scorecard mark; ConnectionBadge de-duplicated onto useOnlineStatus.
+- Batch 4 `admin:` — F-020 finalize lists missing holes (migration 20260910130000), F-015 stale-refusal clear.
+- Tests added: audit-p2.test.ts (3 cases), deletion-superseded.test.ts (5). New tests total 201.
+- Browser-verified: rounds list "Jon & Adam", recap week line, admin offline banner+disable on API-down, scorecard sync dot, superseded flow (unit), finalize hole list, F-015 clear. Console clean after ConnectionBadge dedup.
+- F-008: committed repo already consistent on PIN 1922; only the gitignored local .env had a stale 2718 comment (corrected locally, not committed).

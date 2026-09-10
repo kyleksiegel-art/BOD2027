@@ -117,3 +117,35 @@ One entry per finding. Format: ID · severity · classification · route/state �
 
 ## F-009 (addendum 2) — an index edit after the trip re-derives every finalized round and moves the frozen money
 - Admin → Players: Jon 9.2 → 10.0 → Save. All four `final` rounds re-derived (Standings 139/138/137/63), R1's "FROZEN" winner became "Jon & Kyle", R3's became Jon, settlement changed. Reverted to 9.2 (state restored). This is the live-index decision (2026-08-22) meeting the "frozen" label: the only thing frozen is the $50 figure. The Rules page still claims the opposite (F-003).
+
+---
+
+## Resolution log (2026-09-09, branch `audit/p1-fixes`)
+
+Kyle's rulings on the four open decisions: **handicap index** — keep live, lock indexes pre-trip, fix the copy; **final rounds** — keep locked + Reopen; **CTP** — "par or better" (current copy) stands; **money display** — leave as-is (F-004 closed, no change).
+
+| ID | Status | Commit |
+|---|---|---|
+| F-001 | FIXED | `rounds:` — DNP preserved on tee save + status picker |
+| F-002 | FIXED | `standings/recap/report:` — "left with the week" gated on the actual week leader |
+| F-003 | FIXED | `copy:` — Rules/Settings state the live-index rule |
+| F-004 | CLOSED — leave as-is (Kyle) | — |
+| F-005 | FIXED | `standings/recap/report:` — CTP "no winner" vs unplayed vs open |
+| F-006 | FIXED | `standings/recap/report:` — shared-lead subtitle |
+| F-007 | FIXED | `standings/recap/report:` — rounds list names all tied leaders / countback winner |
+| F-008 | CLOSED — committed files already consistent (1922); stale comment was in the gitignored local `.env`, corrected there | — |
+| F-009 | FIXED | `rounds:` — final rounds closed to scoring + Reopen |
+| F-010 | FIXED | `recap:` + `standings/recap/report:` — one round-winner resolver |
+| F-011 | FIXED | `standings/recap/report:` — week leader via the tiebreak chain |
+| F-012 | FIXED | `standings/recap/report:` — T{n}, LEVEL, tiebreak note |
+| F-013 | FIXED | `sync/offline:` — superseded notice |
+| F-014 | FIXED | `sync/offline:` — hydrate deletion reconciliation |
+| F-015 | FIXED | `admin:` — stale Start refusal cleared on tee save |
+| F-016 | FIXED | `standings/recap/report:` — pooled 1st/2nd tie line |
+| F-017 | FIXED | `sync/offline:` — admin gate on the reachability probe |
+| F-018 | FIXED | `sync/offline:` — scorecard unsynced mark |
+| F-019 | FIXED | `standings/recap/report:` — jump skips a DNP prior round |
+| F-020 | FIXED | `admin:` — finalize lists missing hole numbers |
+| F-021 | FIXED | `outbox:` — expired session costs no attempt |
+
+Every P0/P1/P2/P3 is resolved (F-004 by decision). Gates after the full batch: `vitest run` **201**, `supabase test db` **241**, `tsc -b` + `npm run build` clean.

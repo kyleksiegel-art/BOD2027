@@ -1,39 +1,41 @@
 # Audit report — Board of Directors · Streamsong 2027 scoring app
 
-**Date:** 2026-09-09 · **Scope:** local instance only (never the Netlify deployment) · **Branch with fixes:** `audit/p1-fixes` (3 commits on top of `main` @ bbe21f0) · Working files: `audit/findings.md`, `audit/coverage.md`, `audit/log.md`.
+**Date:** 2026-09-09 · **Scope:** local instance only (never the Netlify deployment) · **Fixes:** branch `audit/p1-fixes`, 9 commits on top of `main` @ bbe21f0 · Working files: `audit/findings.md`, `audit/coverage.md`, `audit/log.md`.
 
 ## Summary
 
-The scoring engine is right. Every number the app showed across a full four-round lifecycle — course handicaps, play-off-the-low allocation, Stableford points (pickups, an ace, a 12), shortened-round cutoffs, the three-stage tiebreak chain including a genuinely unbreakable shared 1st, round-winner countback on the last counted hole, pooled 1st/2nd money, reconciliation and the greedy settlement — matched an independent re-implementation written from the brief (`scratchpad/indep.py`, not the app's code). Server-side validation and the anon/admin authorization boundary held under every direct-API probe. Offline entry queued, survived navigation, and drained on reconnect without duplicates; a foreign write reached the open page over Realtime in about a second.
+The scoring engine is correct. Every number the app showed across a full four-round lifecycle — course handicaps, play-off-the-low allocation, Stableford points (pickups, an ace, a 12), shortened-round cutoffs, the three-stage tiebreak chain including a genuinely unbreakable shared 1st, round-winner countback on the last counted hole, pooled 1st/2nd money, reconciliation and the greedy settlement — matched an independent re-implementation written from the brief (`scratchpad/indep.py`, not the app's code). Server-side validation and the anon/admin authorization boundary held under every direct-API probe. Offline entry queued, survived navigation, drained on reconnect without duplicates, and a foreign write reached the open page over Realtime in about a second.
 
-The defects are in what sits **around** the engine: the same result is told differently on different surfaces, a finalized round was not actually closed, a did-not-play player could be silently put back in the field, and an expired admin session quietly walked queued tee changes toward dead letter. Four P1s were reproduced and fixed with regression tests; everything P2/P3 is reported with a recommended fix and left for approval, per the brief.
+The defects were in what sits **around** the engine: the same result told differently on different surfaces (recap vs Money vs report vs standings), a finalized round that was not actually closed, a did-not-play player silently put back in the field, an expired admin session quietly walking queued tee changes toward dead letter, ghost rows surviving a server-side delete, a silent stale-write rollback, and an admin offline gate wired to the wrong signal.
 
-**Counts:** 21 findings — 4 P1 (all fixed), 9 P2, 8 P3. Confirmed bugs 13 · feature gaps 3 · usability 5 · doc nits 1 (see the table).
+**All 21 findings are resolved.** 19 were fixed with regression tests across 9 commits; F-004 (mid-trip money labelling) was closed by Kyle's decision to leave it as-is, and F-008 (a PIN doc nit) needed no repo change. Kyle's four decisions: keep the handicap index live and lock it before the trip (copy fixed to match); keep final rounds locked with an admin Reopen; keep the "par or better" CTP wording; leave the money page as-is.
+
+**Counts:** 21 findings — 4 P1, 9 P2, 8 P3. Confirmed bugs 13 · feature gaps 3 · usability 5 · doc nits 1.
 
 ## Findings by severity
 
 | ID | Sev | Class | Finding | Status |
 |---|---|---|---|---|
-| F-001 | P1 | CONFIRMED BUG | "Save tees" silently converts a did-not-play player back to playing (and DNP cannot be set anywhere) | FIXED on `audit/p1-fixes` |
-| F-009 | P1 | CONFIRMED BUG | A finalized round is still editable and its "frozen" round winner moves with the edit | FIXED on `audit/p1-fixes` |
-| F-010 | P1 | CONFIRMED BUG | Round recap "WINNER · PAYS" names both tied players while the Money page pays one (countback) | FIXED on `audit/p1-fixes` |
-| F-021 | P1 | CONFIRMED BUG | An expired admin session turns queued tee changes into a silent retry-until-dead-letter, while the editor says "Tees saved." | FIXED on `audit/p1-fixes` |
-| F-002 | P2 | CONFIRMED BUG | Round recap dispatch line claims the round winner "left with the week" when they did not take the week lead | reported — awaiting approval |
-| F-003 | P2 | CONFIRMED BUG (docs vs implementation) | Rules page states handicaps are locked per round; the app reads the index live | reported — awaiting approval |
-| F-004 | P2 | USABILITY ISSUE | Money page does not separate confirmed from projected money | reported — awaiting approval |
-| F-011 | P2 | CONFIRMED BUG | Round report names the wrong week leader on a points tie | reported — awaiting approval |
-| F-012 | P2 | FEATURE GAP | Standings never says a tiebreak decided the order; both tied players read "LEADER" | reported — awaiting approval |
-| F-013 | P2 | CONFIRMED BUG | A stale write is rolled back silently; the button says "Saved" | reported — awaiting approval |
-| F-014 | P2 | CONFIRMED BUG | Cached scores survive a server-side delete; a phone that misses the Realtime DELETE keeps ghost rows forever | reported — awaiting approval |
-| F-017 | P2 | CONFIRMED BUG | Admin's offline gate uses the Phase-1 `navigator.onLine` stub, not the reachability probe | reported — awaiting approval |
-| F-018 | P2 | FEATURE GAP | No unsynced marker on the scorecard / round page | reported — awaiting approval |
-| F-005 | P3 | CONFIRMED BUG | Recap "Closest to Pin" reads "carry" for holes with no CTP recorded | reported — awaiting approval |
-| F-006 | P3 | USABILITY ISSUE | Live recap headline says "share the lead" and "leads by 7" in the same line | reported — awaiting approval |
-| F-007 | P3 | USABILITY ISSUE | Rounds list names one "LEADER" for a tied live round | reported — awaiting approval |
-| F-015 | P3 | USABILITY | Admin "Start round" refusal text stays on screen after the tees are saved | reported — awaiting approval |
-| F-016 | P3 | USABILITY | Money pot summary mislabels a pooled 1st/2nd tie | reported — awaiting approval |
-| F-019 | P3 | CONFIRMED BUG | Round report compares against a DNP round as if it were 0 points played | reported — awaiting approval |
-| F-020 | P3 | USABILITY | Finalize refusal lists a count of missing holes, not which holes | reported — awaiting approval |
+| F-001 | P1 | CONFIRMED BUG | "Save tees" silently converts a did-not-play player back to playing (and DNP cannot be set anywhere) | FIXED |
+| F-009 | P1 | CONFIRMED BUG | A finalized round is still editable and its "frozen" round winner moves with the edit | FIXED |
+| F-010 | P1 | CONFIRMED BUG | Round recap "WINNER · PAYS" names both tied players while the Money page pays one (countback) | FIXED |
+| F-021 | P1 | CONFIRMED BUG | An expired admin session turns queued tee changes into a silent retry-until-dead-letter, while the editor says "Tees saved." | FIXED |
+| F-002 | P2 | CONFIRMED BUG | Round recap dispatch line claims the round winner "left with the week" when they did not take the week lead | FIXED |
+| F-003 | P2 | CONFIRMED BUG (docs vs implementation) | Rules page states handicaps are locked per round; the app reads the index live | FIXED |
+| F-004 | P2 | USABILITY ISSUE | Money page does not separate confirmed from projected money | Closed — leave as-is (Kyle) |
+| F-011 | P2 | CONFIRMED BUG | Round report names the wrong week leader on a points tie | FIXED |
+| F-012 | P2 | FEATURE GAP | Standings never says a tiebreak decided the order; both tied players read "LEADER" | FIXED |
+| F-013 | P2 | CONFIRMED BUG | A stale write is rolled back silently; the button says "Saved" | FIXED |
+| F-014 | P2 | CONFIRMED BUG | Cached scores survive a server-side delete; a phone that misses the Realtime DELETE keeps ghost rows forever | FIXED |
+| F-017 | P2 | CONFIRMED BUG | Admin's offline gate uses the Phase-1 `navigator.onLine` stub, not the reachability probe | FIXED |
+| F-018 | P2 | FEATURE GAP | No unsynced marker on the scorecard / round page | FIXED |
+| F-005 | P3 | CONFIRMED BUG | Recap "Closest to Pin" reads "carry" for holes with no CTP recorded | FIXED |
+| F-006 | P3 | USABILITY ISSUE | Live recap headline says "share the lead" and "leads by 7" in the same line | FIXED |
+| F-007 | P3 | USABILITY ISSUE | Rounds list names one "LEADER" for a tied live round | FIXED |
+| F-015 | P3 | USABILITY | Admin "Start round" refusal text stays on screen after the tees are saved | FIXED |
+| F-016 | P3 | USABILITY | Money pot summary mislabels a pooled 1st/2nd tie | FIXED |
+| F-019 | P3 | CONFIRMED BUG | Round report compares against a DNP round as if it were 0 points played | FIXED |
+| F-020 | P3 | USABILITY | Finalize refusal lists a count of missing holes, not which holes | FIXED |
 
 
 ## Findings in detail
@@ -152,6 +154,40 @@ The defects are in what sits **around** the engine: the same result is told diff
 ## F-009 (addendum 2) — an index edit after the trip re-derives every finalized round and moves the frozen money
 - Admin → Players: Jon 9.2 → 10.0 → Save. All four `final` rounds re-derived (Standings 139/138/137/63), R1's "FROZEN" winner became "Jon & Kyle", R3's became Jon, settlement changed. Reverted to 9.2 (state restored). This is the live-index decision (2026-08-22) meeting the "frozen" label: the only thing frozen is the $50 figure. The Rules page still claims the opposite (F-003).
 
+---
+
+## Resolution log
+
+(2026-09-09, branch `audit/p1-fixes`)
+
+Kyle's rulings on the four open decisions: **handicap index** — keep live, lock indexes pre-trip, fix the copy; **final rounds** — keep locked + Reopen; **CTP** — "par or better" (current copy) stands; **money display** — leave as-is (F-004 closed, no change).
+
+| ID | Status | Commit |
+|---|---|---|
+| F-001 | FIXED | `rounds:` — DNP preserved on tee save + status picker |
+| F-002 | FIXED | `standings/recap/report:` — "left with the week" gated on the actual week leader |
+| F-003 | FIXED | `copy:` — Rules/Settings state the live-index rule |
+| F-004 | CLOSED — leave as-is (Kyle) | — |
+| F-005 | FIXED | `standings/recap/report:` — CTP "no winner" vs unplayed vs open |
+| F-006 | FIXED | `standings/recap/report:` — shared-lead subtitle |
+| F-007 | FIXED | `standings/recap/report:` — rounds list names all tied leaders / countback winner |
+| F-008 | CLOSED — committed files already consistent (1922); stale comment was in the gitignored local `.env`, corrected there | — |
+| F-009 | FIXED | `rounds:` — final rounds closed to scoring + Reopen |
+| F-010 | FIXED | `recap:` + `standings/recap/report:` — one round-winner resolver |
+| F-011 | FIXED | `standings/recap/report:` — week leader via the tiebreak chain |
+| F-012 | FIXED | `standings/recap/report:` — T{n}, LEVEL, tiebreak note |
+| F-013 | FIXED | `sync/offline:` — superseded notice |
+| F-014 | FIXED | `sync/offline:` — hydrate deletion reconciliation |
+| F-015 | FIXED | `admin:` — stale Start refusal cleared on tee save |
+| F-016 | FIXED | `standings/recap/report:` — pooled 1st/2nd tie line |
+| F-017 | FIXED | `sync/offline:` — admin gate on the reachability probe |
+| F-018 | FIXED | `sync/offline:` — scorecard unsynced mark |
+| F-019 | FIXED | `standings/recap/report:` — jump skips a DNP prior round |
+| F-020 | FIXED | `admin:` — finalize lists missing hole numbers |
+| F-021 | FIXED | `outbox:` — expired session costs no attempt |
+
+Every P0/P1/P2/P3 is resolved (F-004 by decision). Gates after the full batch: `vitest run` **201**, `supabase test db` **241**, `tsc -b` + `npm run build` clean.
+
 ## Coverage
 
 | Item | Status | Notes |
@@ -255,31 +291,23 @@ The defects are in what sits **around** the engine: the same result is told diff
 
 ## Tests run
 
-| Suite | Before | After fixes |
+| Suite | Baseline | After fixes |
 |---|---|---|
-| `npx vitest run` | 184/184 | **192/192** (+`roundSetup.test.ts` 2, `authexpiry.test.ts` 3, `recap-winner.test.ts` 3) |
-| `supabase test db` (pgTAP) | 234/234 | **241/241** (`write_path.sql` 71→76: final-round refusals for scores + CTP, reopen gate, reopen effect; `admin_path.sql` 106→108: reopen grant + gate) |
+| `npx vitest run` | 184 | **201** (+ roundSetup, authexpiry, recap-winner, audit-p2, deletion-superseded) |
+| `supabase test db` (pgTAP) | 234 | **241** (final-round refusals + reopen; finalize hole-list migration) |
 | `npx tsc -b` / `npm run build` | clean | clean |
-| Independent calculation | — | `indep.py` re-derived every seeded and audit-entered round; all totals, positions, winners, payouts and transfers matched the UI |
-| Direct API (curl, local anon key) | — | 21 boundary probes, all as expected except the two logged (CTP accepted on an upcoming round — deliberately unchanged; finalize does not require in_progress) |
+| Independent calculation | — | `indep.py` re-derived every seeded and audit-entered round; all totals, positions, winners, payouts, transfers matched the UI |
+| Direct API (curl, local anon key) | — | 21 boundary probes, all as expected |
 
 ## Remaining limitations (honest coverage)
 
-- **Two real phones / iOS** — airplane mode on a device, force-quit of the installed PWA, install-then-unlock ordering, `navigator.share`, NTP clock jumps: not reproducible here. Offline was simulated by stopping the local API gateway; a second client by direct RPC calls with a different `client_id`. Everything device-only stays **UNVERIFIED**.
-- **Shortened-round finalize from the admin UI** was exercised through the RPC (the UI field was read but the shortening itself ran server-side while the phone was "offline" for the post-finalize-write test).
-- **Itinerary / Lodging / Settings editors** were rendered and read, not written (Phase 8 content editors; low risk). "Clear scores" was taken to the confirm step and cancelled.
-- **Abandon** has no UI door (replaced by Clear scores, 2026-08-23); the abandoned state was covered only through the engine and the Enter block.
-- **Ghost rows (F-014)** were reproduced with the page open during a bulk server delete; the closed-phone variant is the same code path (merge never deletes) and was not separately staged.
-- One unexplained transient: the first R3 hole-1 batch had 3 of 4 cells `applied:false` seconds after "Start round"; the error text was not captured and a re-send applied. Not reproduced.
+- **Two real phones / iOS** — airplane mode on a device, force-quit of the installed PWA, install-then-unlock ordering, `navigator.share`, NTP clock jumps: not reproducible here. Offline was simulated by stopping the local API gateway; a second client by direct RPC calls with a different `client_id`. These stay **UNVERIFIED**.
+- **Itinerary / Lodging / Settings editors** were rendered and read, not written (Phase 8 content editors; low risk).
+- One unexplained transient during entry (a first R3 hole-1 batch had 3 of 4 cells rejected, not reproduced) is logged, not resolved.
 
-## Unresolved decisions needing a human ruling (Kyle)
+## Decisions recorded (Kyle)
 
-1. **Live handicap index vs. "frozen"** (F-003 / F-009 addendum 2). Editing an index on the Players tab re-derives every finalized round's points and can move who is paid. The Rules page says the opposite. Either accept that (and rewrite the Rules sentence and the admin Settings hint), or snapshot the index at finalize. The fix shipped here closes *scores* on final rounds only.
-2. **Is a final round locked?** Implemented as locked-with-Reopen on the audit's recommendation; the alternative is to keep it editable and drop every "frozen" word. Reversible in one migration.
-3. **CTP house rule** (log divergence 2). Rules and Side Games say "must make par or better to claim"; the brief's rule is tee shot / on the green / hole-in-one wins / no ties, and the app enforces neither. State one rule on the Rules page.
-4. **Provisional vs confirmed money** (F-004). How should mid-trip money read — hide 1st/2nd until the last round, or label "projected"?
-5. **Countback preference order** [3,4,2,1] is confirmed (2026-08-27) — no ruling needed; noted for completeness.
-
-## Recommended next fixes (P2, in order)
-
-F-014 ghost rows on hydrate (reconcile deletions) · F-013 stale-write notice · F-012 tiebreak copy + T1 · F-011 report/recap week leader from `buildStandings` · F-017 admin offline gate on the reachability probe · F-004 provisional money labels · F-003 Rules/Settings copy · F-018 unsynced cell marker · F-002 "left with the week" line.
+1. Handicap index stays live; indexes are locked before the first round; Rules/Settings copy now says so.
+2. A finalized round is read-only for scoring, with an admin **Reopen round** for corrections.
+3. Closest-to-pin is "closest, par or better to claim" — the existing copy stands (it pays nothing either way).
+4. The Money page shows mid-trip standings-based amounts as-is; no projected/confirmed split.
