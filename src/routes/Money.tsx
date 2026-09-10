@@ -52,13 +52,26 @@ function PotSummary({ money }: { money: MoneyVM }) {
           {formatMoney(money.buyInPerPlayerCents)}/man × {money.players.length}
         </p>
         <dl className="mt-4 space-y-2">
-          <PotLine
-            label="1st place overall"
-            value={money.champFirstCents}
-            winner={money.firstPlace}
-            highlight
-          />
-          <PotLine label="2nd place overall" value={money.champSecondCents} winner={money.secondPlace} />
+          {(money.firstPlace?.playerIds.length ?? 0) > 1 ? (
+            // A tie for 1st pools 1st + 2nd and splits it (audit F-016): one line, not a
+            // "2nd place" line with no name. The per-player figures are exact in the ledger.
+            <PotLine
+              label={`1st & 2nd (shared ${money.firstPlace!.playerIds.length} ways)`}
+              value={money.champFirstCents + money.champSecondCents}
+              winner={money.firstPlace}
+              highlight
+            />
+          ) : (
+            <>
+              <PotLine
+                label="1st place overall"
+                value={money.champFirstCents}
+                winner={money.firstPlace}
+                highlight
+              />
+              <PotLine label="2nd place overall" value={money.champSecondCents} winner={money.secondPlace} />
+            </>
+          )}
           <PotLine
             label="Daily round winners"
             value={money.roundWinnersTotalCents}

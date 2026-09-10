@@ -96,6 +96,22 @@ export function formatBack(gap: number): string {
   return gap === 0 ? 'LEADER' : `${gap} BACK`
 }
 
+/**
+ * Position-aware version for the standings, where a player can be level on points yet behind
+ * on a tiebreak: 1st → "LEADER"; level on points but ranked lower → "LEVEL" (not "LEADER",
+ * which the points-only formatBack wrongly showed for a countback loser — audit F-012);
+ * otherwise "6 BACK".
+ */
+export function formatStandingBack(position: number, gap: number): string {
+  if (position === 1) return 'LEADER'
+  return gap === 0 ? 'LEVEL' : `${gap} BACK`
+}
+
+/** The position label, "T1" for a genuinely shared position (competition ranking). */
+export function formatPosition(position: number, tie: boolean): string {
+  return tie ? `T${position}` : String(position)
+}
+
 /** A player's live-round line: "+17 today · thru 12", "E today · thru 10", "+21 today · F", "Not started". */
 export function formatLiveLine(live: {
   status: 'playing' | 'did_not_play'

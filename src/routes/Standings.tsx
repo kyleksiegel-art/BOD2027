@@ -5,7 +5,7 @@ import { Movement } from '@/components/Movement'
 import { FieldReportStrip } from '@/components/FieldReportStrip'
 import { useStandings, useFieldReport } from '@/lib/data/selectors'
 import type { StandingsLiveRound } from '@/lib/data/compute'
-import { formatBack, formatLiveLine } from '@/lib/format'
+import { formatStandingBack, formatPosition, formatLiveLine } from '@/lib/format'
 
 /**
  * The live-round status line ("● ROUND 3 LIVE · SCORES THROUGH HOLE 12"). Renders only while
@@ -45,7 +45,7 @@ export default function Standings() {
 
   if (!standings) return <LoadingStandings />
 
-  const { rows, roundColumns, liveRound, hasCountingRound } = standings
+  const { rows, roundColumns, liveRound, hasCountingRound, tiebreakNote } = standings
   const live = liveRound !== null
   const hasUpcoming = roundColumns.some((c) => c.status === 'upcoming')
 
@@ -84,7 +84,7 @@ export default function Standings() {
                       isLeader ? 'text-gold' : 'text-paper-faint'
                     }`}
                   >
-                    {r.position}
+                    {formatPosition(r.position, r.tie)}
                   </span>
                   <span className="text-center text-[0.78rem]">
                     <Movement change={r.positionChange} />
@@ -114,13 +114,17 @@ export default function Standings() {
                         isLeader ? 'text-gold' : 'text-paper-faint'
                       }`}
                     >
-                      {formatBack(r.gapToLeader)}
+                      {formatStandingBack(r.position, r.gapToLeader)}
                     </span>
                   </span>
                 </li>
               )
             })}
           </ol>
+
+          {tiebreakNote && (
+            <p className="mt-3 text-[0.72rem] leading-relaxed text-paper-faint">{tiebreakNote}</p>
+          )}
 
           <section className="mt-10">
             <span className="eyebrow block">Round by round</span>

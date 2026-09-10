@@ -80,12 +80,13 @@ export function computeStandings(
 export function standingsThroughRound(
   players: PlayerChampionship[],
   throughRoundNumber: number,
+  breakTie?: (a: string, b: string) => number,
 ): StandingRow[] {
   const sliced = players.map((p) => ({
     playerId: p.playerId,
     byRound: p.byRound.filter((r) => r.roundNumber <= throughRoundNumber),
   }))
-  return computeStandings(sliced)
+  return computeStandings(sliced, undefined, breakTie)
 }
 
 /**
