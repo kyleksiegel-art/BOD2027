@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 5B — the seeded course cards, checked number by number against the printed ones.
+"""The seeded course cards, checked number by number against the printed ones (all four courses).
 
 The brief said "Black has five par 3s ... do not correct this." The printed 2021 scorecards
 say four par 3s and five par 5s. Rather than settle that by eye, this transcribes all three
@@ -44,6 +44,20 @@ CARDS = {
     'Black': ([508,326,423,581,177,321,158,408,408, 524,395,531,409,286,131,442,189,530],3310,3437,6747,72.0,130),
     'Silver':([466,309,394,550,158,299,135,377,360, 502,378,510,368,261,110,400,154,495],3048,3178,6226,69.5,125),
     'Gold':  ([420,276,306,450,135,252,103,357,317, 434,320,404,308,242,78,323,124,431],2616,2664,5280,65.1,116)}),
+ # Bone Valley — the printed card Kyle photographed 2026-09-09 (no resort PDF exists yet).
+ # All seven tees: the combos come off the card's ▲/▼ row (▼▼▲▲▼▼▲▼▲ / ▼▲▲▼▲▲▲▼▼,
+ # ▲ = back tee of the pair) and each reconciles to its printed total.
+ 'Bone Valley': dict(
+   par=[4,4,3,5,4,4,3,4,5, 4,4,3,4,5,4,3,4,5], out_par=36, in_par=36, total_par=72,
+   si=[5,7,13,9,1,17,15,3,11, 6,12,18,2,14,16,10,4,8],
+   tees={
+    'Green':        ([410,445,200,585,450,355,190,495,580, 415,380,150,475,520,345,205,405,585],3710,3480,7190,74.7,134),
+    'Black':        ([390,410,185,540,420,315,165,440,545, 390,350,135,445,470,305,185,365,545],3410,3190,6600,72.0,128),
+    'Silver':       ([350,375,145,500,395,290,145,405,530, 365,320,120,420,440,280,155,340,500],3135,2940,6075,69.4,120),
+    'Gold':         ([290,310,100,410,300,225,130,350,410, 305,225, 90,365,390,200,105,240,410],2525,2330,4855,63.3,105),
+    'Green/Black':  ([390,410,200,585,420,315,190,440,580, 390,380,150,445,520,345,205,365,545],3530,3345,6875,73.2,131),
+    'Black/Silver': ([350,375,185,540,395,290,165,405,545, 365,350,135,420,470,305,185,340,500],3250,3070,6320,70.6,125),
+    'Silver/Gold':  ([290,310,145,500,300,225,145,350,530, 305,320,120,365,440,280,155,240,410],2795,2635,5430,66.3,110)}),
 }
 
 problems = []

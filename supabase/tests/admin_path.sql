@@ -27,12 +27,18 @@ create temporary table t as
 select
   (select id from public.courses where name = 'Streamsong Red')   as red,
   (select id from public.courses where name = 'Streamsong Black') as black,
-  (select id from public.courses where data_is_placeholder)       as bone,
+  (select id from public.courses where name = 'Bone Valley')       as bone,
   (select id from public.rounds  where round_number = 1)          as r1,
   (select id from public.rounds  where round_number = 3)          as r3,
   (select id from public.rounds  where round_number = 4)          as r4,
   (select id from public.players where name = 'Jon Aronson')      as jon,
   (select id from public.players where name = 'Chris Denove')     as chris;
+
+-- Bone Valley's real card has been seeded and published since 2026-09-09. The cases
+-- below that need an EMPTY placeholder course (§7 refusal reasons, §10 round start)
+-- re-open it for this transaction only: flag back on, card wiped. Rolled back at the end.
+update public.courses set data_is_placeholder = true where id = (select bone from t);
+update public.holes set par = null, stroke_index = null where course_id = (select bone from t);
 
 -- ── 1. Hardening ─────────────────────────────────────────────────────────────
 select is(

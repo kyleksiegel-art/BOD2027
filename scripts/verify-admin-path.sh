@@ -22,7 +22,7 @@ RED=c0000000-0000-4000-8000-000000000001
 BONE=c0000000-0000-4000-8000-000000000004
 R1=e0000000-0000-4000-8000-000000000001   # Red, complete scores
 R3=e0000000-0000-4000-8000-000000000003   # Blue, in progress, Chris DNP
-R4=e0000000-0000-4000-8000-000000000004   # Bone Valley, placeholder card
+R4=e0000000-0000-4000-8000-000000000004   # Bone Valley
 JON=d0000000-0000-4000-8000-000000000001
 
 hdr=(-H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${ANON_KEY}" -H 'Content-Type: application/json')
@@ -71,11 +71,16 @@ if [ -z "${TOKEN}" ]; then echo "  FAILED to unlock — is the Edge Function run
 echo "  token ${TOKEN:0:12}… (the server stored only its SHA-256)"
 
 echo
-echo "── 4. Bone Valley refuses to publish, and says exactly what is missing ──"
-rpc rpc_validate_and_publish_course "{\"session_token\":\"${TOKEN}\",\"p_course_id\":\"${BONE}\"}"
+echo "── 4. a brand-new course (no card) refuses to publish, and says exactly what is missing ──"
+# Bone Valley's real card is seeded and published since 2026-09-09, so the empty-card
+# demonstration uses a throwaway course created here (db reset removes it).
+NEWC=$(curl -s -X POST "${API_URL}/rest/v1/rpc/rpc_upsert_course" "${hdr[@]}" \
+  -d "{\"session_token\":\"${TOKEN}\",\"p_id\":null,\"p_name\":\"Test Links\",\"p_architect\":\"Nobody\",\"p_year_opened\":2027,\"p_description\":\"x\"}" \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+rpc rpc_validate_and_publish_course "{\"session_token\":\"${TOKEN}\",\"p_course_id\":\"${NEWC}\"}"
 
-echo "── 5. …so round 4 refuses to start ──"
-rpc rpc_start_round "{\"session_token\":\"${TOKEN}\",\"p_round_id\":\"${R4}\"}"
+echo "── 5. Bone Valley's seeded card passes the same validation ──"
+rpc rpc_validate_and_publish_course "{\"session_token\":\"${TOKEN}\",\"p_course_id\":\"${BONE}\"}"
 
 echo "── 6. a card that IS complete publishes ──"
 rpc rpc_validate_and_publish_course "{\"session_token\":\"${TOKEN}\",\"p_course_id\":\"${RED}\"}"

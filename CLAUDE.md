@@ -13,7 +13,7 @@ This file is what a fresh session reads to restore context cheaply. Keep it curr
 
 ## The trip in one paragraph
 
-Four players (Jon Aronson, Kyle Siegel, Adam Hersh, Chris Denove) play four rounds at Streamsong Resort, one per day Feb 4–7 2027: Red (Thu), Blue (Fri), Black (Sat), Bone Valley (Sun). Net Stableford scoring, cumulative across all counting rounds. Money split three ways — championship, round winners, closest to pin — with the CTP pot per-round proportional to that round's par-3 count (Black has 5 par 3s; Red/Blue have 4; Bone Valley TBD). App is used one-handed in a cart in Florida sun, and must work fully offline.
+Four players (Jon Aronson, Kyle Siegel, Adam Hersh, Chris Denove) play four rounds at Streamsong Resort, one per day Feb 4–7 2027: Red (Thu), Blue (Fri), Black (Sat), Bone Valley (Sun). Net Stableford scoring, cumulative across all counting rounds. Money split three ways — championship, round winners, closest to pin — with the CTP pot per-round proportional to that round's par-3 count (the printed cards give every course four par 3s — Red, Blue, Black and Bone Valley alike). App is used one-handed in a cart in Florida sun, and must work fully offline.
 
 ## Architecture in one paragraph
 
@@ -40,7 +40,7 @@ Rules that are easy to forget:
 - **`scores` unique key:** `(round_id, player_id, hole_number)`. Whole-tuple replacement — the RPC replaces both `gross_strokes` and `picked_up` together, or neither. **No `COALESCE`-style partial merges.**
 - **`ctp_results` unique key:** `(round_id, hole_number)`. `player_id` nullable (no winner yet, or carry).
 - **`round_players` unique key:** `(round_id, player_id)`. Editable mid-round; changing the tee recomputes course/playing handicap, cap, and stroke allocation, then re-derives all points from stored gross scores.
-- **Bone Valley placeholder columns:** `courses.data_is_placeholder`, `holes.par`/`stroke_index` nullable, `tees.rating`/`slope` nullable, `hole_yardages.yardage` nullable. Only `rpc_validate_and_publish_course` may flip the flag.
+- **Bone Valley placeholder columns:** `courses.data_is_placeholder`, `holes.par`/`stroke_index` nullable, `tees.rating`/`slope` nullable, `hole_yardages.yardage` nullable. Only `rpc_validate_and_publish_course` may flip the flag from the app. **Bone Valley's real card is seeded and published since 2026-09-09** (`20260909120000_seed_bone_valley_card.sql`); the placeholder machinery stays for any new course and is exercised in tests by re-opening Bone Valley inside the transaction.
 - **Realtime is enabled on** `scores`, `ctp_results`, `rounds`, `settings`, `players`, `round_players`. Others are not published because nothing derived from them needs to reach four phones live.
 - **Two client timestamps on `scores` and `ctp_results`:** `client_updated_at_raw` (as sent) and `client_updated_at_effective` (`least(raw, now() + interval '5 min')`, computed server-side). **The comparator uses `_effective`.** `_raw` exists for diagnostics.
 
@@ -643,3 +643,34 @@ deliberately out (Kyle: "don't need photos") — `photo_url` still passes throug
 - **How to re-measure Lighthouse locally:** `npm run build` → `npm run preview -- --port 4173` →
   `CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npx lighthouse
   http://localhost:4173/ --form-factor=mobile --chrome-flags="--headless=new"`.
+
+## Bone Valley card (2026-09-09, branch `bone-valley-card`) — the shape to reuse
+
+The last placeholder is gone. Kyle photographed the printed card in the cart (the resort still
+publishes no Bone Valley PDF); migration `20260909120000_seed_bone_valley_card.sql` seeds it and
+publishes it.
+
+- **Par 72 (36/36), four par 3s (3, 7, 12, 16)**, men's stroke index `5 7 13 9 1 17 15 3 11 /
+  6 12 18 2 14 16 10 4 8`. Seven tees — Green 74.7/134/7190, Black 72.0/128/6600, Silver
+  69.4/120/6075, Gold 63.3/105/4855, and the combos Green/Black 73.2/131/6875, Black/Silver
+  70.6/125/6320, Silver/Gold 66.3/110/5430 — each with all 18 yardages. `year_opened` → 2026
+  ("Established 2026" on the card).
+- **The combos come off the card's ▲/▼ row exactly as on the 2021 cards** (▲ = back tee of the
+  pair): `▼▼▲▲▼▼▲▼▲ / ▼▲▲▼▲▲▲▼▼`. All three combo totals reconcile to the printed figures, which
+  is also what settled two illegible Black cells (16 = 185, 17 = 365): the only reading under
+  which Black In = 3190 *and* every combo sums right.
+- **The seed flips `data_is_placeholder` itself**, in a `do` block that re-runs the publish
+  RPC's checks (18 pars, 1–18 SI permutation, rating+slope on every tee, a yardage on every
+  hole×tee, seven tees) and raises otherwise — a seed can't hold a session, and a printed card
+  is the same trust level as the other three seeds. The RPC remains the only *app* path.
+- **The tee/yardage upserts `DO UPDATE` on conflict**, not `DO NOTHING`: the placeholder Green
+  tee and its 18 null-yardage rows already existed, and any hand-typed admin edits on the hosted
+  DB are superseded by the card. Stable UUIDs `bbbb0004-…-000T`, T = 1..7 in the usual order.
+- Tests that needed an empty placeholder course (`write_path.sql` hard block, `admin_path.sql`
+  §7/§10) now **re-open Bone Valley inside their transaction** (flag on, pars nulled) instead of
+  assuming it. `seed_integrity.sql` asserts the published card (plan 23 → 25).
+  `scripts/verify-card-data.py` carries the Bone Valley transcription (all 7 tees) → 0 problems.
+  `scripts/verify-admin-path.sh` §4 demonstrates the empty-card refusal on a throwaway course.
+- `supabase test db` → **234**. `vitest run` → 184 (no `src/` change). **Pushed to the hosted
+  project by Kyle 2026-09-09** (`supabase db push`, single migration) and read back over PostgREST:
+  published, 7 tees, par 3s 3/7/12/16. Production now scores Round 4.

@@ -6,7 +6,7 @@
 
 begin;
 
-select plan(23);
+select plan(25);
 
 create extension if not exists pgtap with schema extensions;
 
@@ -36,10 +36,12 @@ select is(
 select is((select stroke_index from public.holes where course_id = 'c0000000-0000-4000-8000-000000000003' and hole_number = 17), 13, 'Black hole 17 SI = 13 (printed card)');
 select is((select stroke_index from public.holes where course_id = 'c0000000-0000-4000-8000-000000000003' and hole_number = 18), 5,  'Black hole 18 SI = 5 (printed card)');
 
--- ── Bone Valley placeholder posture ──────────────────────────────────────────
-select is((select count(*)::int from public.holes where course_id = 'c0000000-0000-4000-8000-000000000004' and par is null), 18, 'Bone Valley: all 18 hole pars null');
-select is((select count(*)::int from public.holes where course_id = 'c0000000-0000-4000-8000-000000000004' and stroke_index is null), 18, 'Bone Valley: all 18 stroke indexes null');
-select ok((select data_is_placeholder from public.courses where id = 'c0000000-0000-4000-8000-000000000004'), 'Bone Valley data_is_placeholder = true');
+-- ── Bone Valley: the real card is seeded and published (2026-09-09) ─────────
+select is((select sum(par)::int from public.holes where course_id = 'c0000000-0000-4000-8000-000000000004'), 72, 'Bone Valley: par 72 (36/36)');
+select is((select count(*)::int from public.holes where course_id = 'c0000000-0000-4000-8000-000000000004' and par = 3), 4, 'Bone Valley: four par 3s (3, 7, 12, 16)');
+select is((select count(distinct stroke_index)::int from public.holes where course_id = 'c0000000-0000-4000-8000-000000000004' and stroke_index between 1 and 18), 18, 'Bone Valley: stroke indexes are a 1–18 permutation');
+select is((select count(*)::int from public.tees where course_id = 'c0000000-0000-4000-8000-000000000004'), 7, 'Bone Valley: seven tees (four base + three combos)');
+select ok((select not data_is_placeholder from public.courses where id = 'c0000000-0000-4000-8000-000000000004'), 'Bone Valley data_is_placeholder = false (published)');
 select ok((select not data_is_placeholder from public.courses where id = 'c0000000-0000-4000-8000-000000000001'), 'Red data_is_placeholder = false');
 
 -- ── Row counts ───────────────────────────────────────────────────────────────
