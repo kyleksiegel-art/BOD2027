@@ -899,3 +899,14 @@ These are the final acceptance criteria. Every line needs verification evidence 
 | Tests | `supabase test db` → **234** (seed_integrity plan 23 → 25; write_path/admin_path re-open the placeholder inside their transaction). `python3 scripts/verify-card-data.py` → 0 problems across all four cards. `vitest run` → 184 |
 | Hosted | Kyle ran `supabase db push` 2026-09-09 (only this migration pending). Read back with the anon key: `data_is_placeholder=false`, `year_opened=2026`, 7 tees with the printed rating/slope/total, par 3s on 3/7/12/16 |
 | Not yet done | Commit + merge `bone-valley-card`; on-device look at `/info/courses/…0004` and Round 4 on the phone |
+
+## Annual Report — trip capstone (2026-09-10, branch `annual-report`)
+
+| Item | Evidence |
+|---|---|
+| Appears only when the season is complete | `buildAnnualReport` returns null while any round is `upcoming` or a counting round's recap `act !== 'final'`; `annualReport.test.ts` asserts null for in-progress-with-holes-left and upcoming, and non-null once all scores are in |
+| Champion, standings and money never disagree with the rest of the app | Composes `buildStandings` / `buildMoney` / `resolveRoundWinnerIds` / `buildOverallTiebreak` (holes-won reuses the standings tiebreak tally); `annualReport.test.ts` checks champion 74/$400, standings ranking, round winners, and a balanced $600 pot |
+| Every player is named once in the letter | The `named()` last-name check → a "rest of the field" line; test asserts all of Aronson/Denove/Hersh appear and the low-round/roughest facts read with full names |
+| Reconciliation honesty | The money card's ✓/✗ line and the letter's "every dollar accounted for" clause both key off `reconciliation.balanced`; verified live — a forced abandoned round correctly shows "DOES NOT RECONCILE" and the letter drops the claim |
+| Renders on the phone-width board | Verified at 375px against a complete-season Dexie state (dead-backend method): champion block, 2-col numbers grid, colored round-winner rails, money block, full letter — no horizontal overflow, `vitest run` **207**, `tsc -b` + build clean |
+| Not yet done | Commit + merge `annual-report`; on-device look at trip's end (needs all four rounds final) |
