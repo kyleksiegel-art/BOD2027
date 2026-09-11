@@ -3,6 +3,8 @@
 // directly — so the data-layering rule stays enforceable by grep.
 import { buildRoundReport } from './report'
 import type { ReportVM } from './report'
+import { buildAnnualReport } from './annualReport'
+import type { AnnualReportVM } from './annualReport'
 import { buildFieldReport } from './wire'
 import type { WireVM } from './wire'
 import { buildPlayerForm } from './form'
@@ -104,6 +106,12 @@ export function useRoundRecap(roundNumber: number): RoundRecapVM | null {
 export function useRoundReport(roundNumber: number): ReportVM | null {
   const data = useDbData()
   return useMemo(() => (data ? buildRoundReport(roundNumber, data) : null), [data, roundNumber])
+}
+
+/** The Annual Report — the trip's capstone; null until every counting round is done. */
+export function useAnnualReport(): AnnualReportVM | null {
+  const data = useDbData()
+  return useMemo(() => (data ? buildAnnualReport(data) : null), [data])
 }
 
 /** The Field Report wire — the live round's events, else the latest counting round's. */

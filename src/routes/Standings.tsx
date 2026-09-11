@@ -3,7 +3,8 @@ import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { Movement } from '@/components/Movement'
 import { FieldReportStrip } from '@/components/FieldReportStrip'
-import { useStandings, useFieldReport } from '@/lib/data/selectors'
+import { AnnualReport } from '@/components/AnnualReport'
+import { useStandings, useFieldReport, useAnnualReport } from '@/lib/data/selectors'
 import type { StandingsLiveRound } from '@/lib/data/compute'
 import { formatStandingBack, formatPosition, formatLiveLine } from '@/lib/format'
 
@@ -42,6 +43,7 @@ function LiveStatus({ live }: { live: StandingsLiveRound }) {
 export default function Standings() {
   const standings = useStandings()
   const wire = useFieldReport()
+  const annual = useAnnualReport()
 
   if (!standings) return <LoadingStandings />
 
@@ -56,6 +58,9 @@ export default function Standings() {
         title="Standings"
         meta="Net Stableford · Cumulative Championship"
       />
+
+      {/* The Annual Report — the trip's capstone, only once every counting round is done. */}
+      {annual && <div className="mt-6"><AnnualReport vm={annual} /></div>}
 
       {live && <LiveStatus live={liveRound} />}
 

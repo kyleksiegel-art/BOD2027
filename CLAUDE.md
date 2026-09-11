@@ -776,3 +776,46 @@ pre-trip + fix copy; keep final-round lock + Reopen; CTP "par or better"; money 
 - Tests: `roundSetup` (2), `authexpiry` (3), `recap-winner` (3), `audit-p2` (3),
   `deletion-superseded` (5). Full `vitest run` → **201**; `supabase test db` → **241**;
   `tsc -b` + `npm run build` clean.
+
+## Annual Report (2026-09-10, branch `annual-report`) — the shape to reuse
+
+The trip's capstone, at the **top of Standings** once the season is complete. **No new tables,
+no schema change, no scoring change** — it composes the existing builders. Mocked first on a
+design canvas, then de-jargoned to plain copy (the seal + Fraunces carry the annual-report idea).
+
+- **`src/lib/data/annualReport.ts` `buildAnnualReport(db) → AnnualReportVM | null`** — pure, same
+  rule as every builder. **Null until the season is done:** no `upcoming` round remains and every
+  counting round's `buildRoundRecap(...).act === 'final'` (official finalize OR all scores in — the
+  same gate the round report uses). Then it assembles: champion + `winningsDetail` off `buildMoney`;
+  final standings off `buildStandings` (competition ties → `T{n}`); each round's winner off
+  `resolveRoundWinnerIds` (with `onCountback`); a settled-money block off `buildMoney`
+  (`reconciliation.balanced` drives the ✓/✗ line **and** whether the letter claims "every dollar
+  accounted for"); and a 4-paragraph **letter**.
+- **Superlatives** (`buildSuperlatives`, the four Kyle picked): low round (best single-round total),
+  longest scoring streak + net-birdies (via `buildPlayerForm` `bestRun` / counting `points>=3`),
+  holes won outright (**reuses `buildOverallTiebreak(...).ctx.holesWonById`** — the same tally the
+  standings tiebreak uses, so it can't disagree), roughest hole (max `netToPar`), and CTP count
+  (bragging, $0). Each tile carries `who` (first name, for the caption) **and `playerId`** — the
+  letter matches players by *last name*, so it must use full names via `playerId`, not `who`, or it
+  double-names someone.
+- **The letter** mirrors `report.ts` at trip scale: names only (no pronouns), `strong` marks derived
+  facts, **every player named once** (the `named()` last-name check → a "rest of the field" line with
+  place + a superlative hook). Running week-leaders are computed on the real tiebreak chain
+  (`buildOverallTiebreak` per prefix + `standingsThroughRound`), never a raw points sort — so "took
+  the lead for good on the Black" names the right player on a tie.
+- **`src/components/AnnualReport.tsx`** — collapsible (open by default; it's the capstone), the same
+  share-as-PNG path as the recap/round report (`renderRecapImage`, footer `data-share-exclude`,
+  button hidden where `navigator.share` is undefined). Uses the existing tokens: `leader-row`,
+  `.round[data-course]` + `.round-rail` on the round-winner cards, `fx-*`, `eyebrow`, `tnum`.
+- Selector `useAnnualReport()`; rendered at the top of `Standings.tsx` (above the live status), so
+  during the trip it's simply absent.
+- Tests: `annualReport.test.ts` (6, three-player two-round fixture asserted by hand — the gate, the
+  champion/standings/money, the six superlatives, and the everyone-named letter). Full `vitest run`
+  → **207**. `tsc -b` + `npm run build` clean.
+- **Verified live** by pointing the dev server at a dead backend (so hydrate can't revert) and
+  seeding a complete season in Dexie: the report renders correctly at 375px off real data — champion,
+  numbers grid, colored round-winner rails, the reconciliation tripwire (correctly firing on a forced
+  abandoned round), and the full letter naming all four players. *Gotcha for future live checks:* the
+  hosted DB's hydrate races any Dexie edit back, and a console `import('/src/lib/db')` is a **separate
+  module instance** from the running app's — the reliable path is to break `VITE_SUPABASE_URL` and
+  restart, so cached Dexie wins.
