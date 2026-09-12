@@ -784,9 +784,12 @@ no schema change, no scoring change** — it composes the existing builders. Moc
 design canvas, then de-jargoned to plain copy (the seal + Fraunces carry the annual-report idea).
 
 - **`src/lib/data/annualReport.ts` `buildAnnualReport(db) → AnnualReportVM | null`** — pure, same
-  rule as every builder. **Null until the season is done:** no `upcoming` round remains and every
-  counting round's `buildRoundRecap(...).act === 'final'` (official finalize OR all scores in — the
-  same gate the round report uses). Then it assembles: champion + `winningsDetail` off `buildMoney`;
+  rule as every builder. **Gated on the FINALIZE, not "all scores in"** (Kyle 2026-09-11, "show up
+  automatically after round 4 is finalized"): null while any round is still `upcoming` or
+  `in_progress` — even one with all 18 scores in — and renders only once every round is `final` (or
+  `abandoned`) with ≥1 `final` round. Finalize flips `rounds.status`, so the admin's hydrate refetch
+  (and the Realtime `rounds` event on the other phones) updates Dexie and the board re-renders with
+  the report automatically — no manual step. Then it assembles: champion + `winningsDetail` off `buildMoney`;
   final standings off `buildStandings` (competition ties → `T{n}`); each round's winner off
   `resolveRoundWinnerIds` (with `onCountback`); a settled-money block off `buildMoney`
   (`reconciliation.balanced` drives the ✓/✗ line **and** whether the letter claims "every dollar
@@ -809,9 +812,10 @@ design canvas, then de-jargoned to plain copy (the seal + Fraunces carry the ann
   `.round[data-course]` + `.round-rail` on the round-winner cards, `fx-*`, `eyebrow`, `tnum`.
 - Selector `useAnnualReport()`; rendered at the top of `Standings.tsx` (above the live status), so
   during the trip it's simply absent.
-- Tests: `annualReport.test.ts` (6, three-player two-round fixture asserted by hand — the gate, the
-  champion/standings/money, the six superlatives, and the everyone-named letter). Full `vitest run`
-  → **207**. `tsc -b` + `npm run build` clean.
+- Tests: `annualReport.test.ts` (7, three-player two-round fixture asserted by hand — the finalize
+  gate incl. all-scores-in-but-in-progress stays hidden, the champion/standings/money, the six
+  superlatives, and the everyone-named letter). Full `vitest run` → **208**. `tsc -b` +
+  `npm run build` clean.
 - **Verified live** by pointing the dev server at a dead backend (so hydrate can't revert) and
   seeding a complete season in Dexie: the report renders correctly at 375px off real data — champion,
   numbers grid, colored round-winner rails, the reconciliation tripwire (correctly firing on a forced
