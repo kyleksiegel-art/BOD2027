@@ -12,7 +12,6 @@ import {
   buildChampionships,
   buildOverallTiebreak,
   buildRoundDetail,
-  buildRoundRecap,
   buildStandings,
   resolveRoundWinnerIds,
   type Db,
@@ -139,16 +138,17 @@ function seasonDateLabel(dates: string[]): string {
 
 export function buildAnnualReport(dbData: Db): AnnualReportVM | null {
   const orderedRounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
-  const countingRounds = orderedRounds.filter((r) => r.status === 'final' || r.status === 'in_progress')
-  if (countingRounds.length === 0) return null
 
-  // The season is complete when nothing is still to be played (no upcoming round) and every
-  // counting round is done — official finalize OR all scores in, the same gate the round report
-  // uses. That is the capstone moment; before it, the report does not exist.
-  const anyUpcoming = orderedRounds.some((r) => r.status === 'upcoming')
-  if (anyUpcoming) return null
-  const allDone = countingRounds.every((r) => buildRoundRecap(r.round_number, dbData)?.act === 'final')
-  if (!allDone) return null
+  // The capstone appears only after the season is FINALIZED — tied to the deliberate finalize,
+  // not merely "all scores in" (Kyle 2026-09-11: "show up automatically after round 4 is
+  // finalized"). So it stays hidden while any round is still `upcoming` or `in_progress`; once
+  // every round is `final` (or `abandoned`) with at least one `final` round, it renders. Finalize
+  // flips `rounds.status` → the hydrate refetch (and the Realtime `rounds` event on other phones)
+  // updates Dexie → the board re-renders with the report, no manual step.
+  const pending = orderedRounds.some((r) => r.status === 'upcoming' || r.status === 'in_progress')
+  if (pending) return null
+  const countingRounds = orderedRounds.filter((r) => r.status === 'final')
+  if (countingRounds.length === 0) return null
 
   const countingRoundNumbers = countingRounds.map((r) => r.round_number)
   const detailByRound = new Map<number, RoundDetailVM | null>()

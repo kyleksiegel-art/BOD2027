@@ -132,9 +132,14 @@ describe('buildAnnualReport', () => {
     expect(buildAnnualReport(makeDb('upcoming'))).toBeNull()
   })
 
-  it('returns the capstone once every counting round is done (in_progress with all scores in counts)', () => {
-    // A round that is technically in_progress but has all 18 scores in reads as done.
-    expect(buildAnnualReport(makeDb('in_progress', 18))).not.toBeNull()
+  it('stays hidden until the round is finalized — all scores in but still in progress is not enough', () => {
+    // Tied to the deliberate finalize, not "all scores in": an in_progress round with all 18
+    // scores does NOT surface the capstone (Kyle 2026-09-11).
+    expect(buildAnnualReport(makeDb('in_progress', 18))).toBeNull()
+  })
+
+  it('appears the moment the last round is finalized', () => {
+    expect(buildAnnualReport(makeDb('final'))).not.toBeNull()
   })
 
   it('names the champion, the standings and the money off the same builders', () => {
