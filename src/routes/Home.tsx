@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { COUNTDOWN_TARGET_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
-import { useRoundsList, useStandings, useRoundDetail } from '@/lib/data/selectors'
+import { useRoundsList, useStandings, useRoundDetail, useHasStrokesCards } from '@/lib/data/selectors'
 import { courseSlug, formatStandingBack, formatPosition, formatLiveLine } from '@/lib/format'
 import type { StandingsVM, StandingsLiveRound } from '@/lib/data/compute'
 import { useSyncSnapshot } from '@/lib/sync/engine'
@@ -147,6 +147,23 @@ function LiveLink({ to, children }: { to: string; children: React.ReactNode }) {
   )
 }
 
+/** The way in to the strokes cards on the Players tab — shown whenever a round is still to play. */
+function StrokesCardsLink() {
+  const has = useHasStrokesCards()
+  if (!has) return null
+  return (
+    <Link
+      to="/info/players"
+      className="tap mt-4 flex min-h-[44px] items-center justify-center gap-2 text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-gold"
+    >
+      Strokes cards for the next round
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M9 6l6 6-6 6" />
+      </svg>
+    </Link>
+  )
+}
+
 /** The one filled button on the page — the action the cart actually needs mid-round. */
 function PrimaryLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
@@ -234,6 +251,8 @@ function LivePanel({ standings }: { standings: StandingsVM | undefined }) {
           </>
         )}
       </div>
+
+      {mode !== 'done' && <StrokesCardsLink />}
 
       {standings.hasCountingRound && (
         <HomeBoard standings={standings} mode={mode} pending={pending} />
@@ -600,7 +619,14 @@ export default function Home() {
 
       <div className="mx-auto max-w-[720px] px-5 pb-4">
         {/* Before first tee: countdown. Once underway: the live board. */}
-        {showLive ? <LivePanel standings={standings} /> : <Countdown r={r} />}
+        {showLive ? (
+          <LivePanel standings={standings} />
+        ) : (
+          <>
+            <Countdown r={r} />
+            <StrokesCardsLink />
+          </>
+        )}
 
         {/* The Field — until a round has counted. Once the board is up, the names are on it,
             so the roster drops below the schedule. */}

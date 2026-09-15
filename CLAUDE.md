@@ -839,13 +839,17 @@ gets most of the value). **No new tables, no schema change, no scoring change.**
   is the first playing player (sort order) whose own strokes equal the field low; `isLowMan` says
   "plays scratch". `week` (position label / total / back label / the others' totals by last name)
   comes off `buildStandings` and is null before any round counts. `strokesCardFilename(vm, variant)`.
-- **`src/components/StrokesCard.tsx`**: `NextRoundBlock` (the in-row block: course, tee, strokes off
-  whom, the holes, Card + Lock screen buttons) and `StrokesCardImage` (the picture; `compact` for the
-  390px lock-screen frame). Shares through `renderRecapImage` like the recap/reports; both variants are
+- **`src/components/StrokesCard.tsx`**: `NextRoundBlock` — **the card itself, rendered live** in the
+  row (Kyle 2026-09-14: "you can't just look at it without creating an image") with Save card + Lock
+  screen buttons under it — and `StrokesCardImage` (the picture; `compact` is the 390px version used
+  both in the row and in the lock-screen frame). Shares through `renderRecapImage` like the recap/reports; both variants are
   **pre-rendered after `document.fonts.ready`** (iOS gesture rule). The two source frames are laid out
   **off-screen** (`fixed left-[-10000px]`, 540px and 390×844), never `display:none` — a hidden element
   has no layout and rasterises to nothing. Output: 1080×~1140 and 780×1688 PNGs, ~180 KB each. Buttons
   hidden where `navigator.share` is undefined (desktop).
+- **Ways in:** the Players tab (below), and Home's `StrokesCardsLink` ("Strokes cards for the next
+  round" → `/info/players`) under the countdown pre-trip and under the live panel's buttons between /
+  during rounds — gated on `useHasStrokesCards()` so it never points at an empty row.
 - **Entry point: the Players tab.** `PlayerCardVM.strokesCard` (selectors); `Players.tsx` renders
   `NextRoundBlock` at the top of a player's opened panel, above Form. A row is now **expandable when
   either form or a strokes card exists** — before the trip there is no form, and the card is the

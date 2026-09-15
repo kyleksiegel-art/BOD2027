@@ -4,8 +4,10 @@ import { strokesCardFilename } from '@/lib/data/strokesCard'
 import { canShareFiles, renderRecapImage } from '@/lib/share/recapImage'
 
 /**
- * The strokes card — "how many do I get tomorrow, and where" — as a picture for Photos or the
- * lock screen. Lives in a player's opened row on the Players tab while a round is upcoming.
+ * The strokes card — "how many do I get tomorrow, and where". Shown live in a player's opened row
+ * on the Players tab while a round is still to play (Kyle 2026-09-14: "you can't just look at it
+ * without creating an image"), with the same card saveable as a picture for Photos or the lock
+ * screen.
  *
  * The picture is rendered from real DOM (the same DOM → PNG path as the recap and reports), so
  * the two variants are laid out OFF-SCREEN, not hidden: `display:none` has no layout and
@@ -18,54 +20,26 @@ export function NextRoundBlock({ vm }: { vm: StrokesCardVM }) {
   const lockRef = useRef<HTMLDivElement>(null)
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 
-  const holesLine =
-    vm.strokeHoles.length === 0
-      ? null
-      : vm.strokeHoles.length <= 9
-        ? `holes ${[...new Set(vm.strokeHoles)].join(' · ')}`
-        : `${new Set(vm.strokeHoles).size} holes`
-
   return (
-    <div
-      className="round round-rail rounded border border-hair-strong bg-ground py-3.5 pl-4 pr-3.5"
-      data-course={vm.courseSlug ?? undefined}
-    >
-      <div className="flex items-baseline justify-between gap-3">
+    <div>
+      <div className="flex items-baseline justify-between gap-3 px-0.5">
         <span className="eyebrow block">Next round</span>
-        <span className="tnum shrink-0 text-[0.66rem] uppercase tracking-[0.1em] text-paper-faint">
-          {vm.dayLabel}
-          {vm.teeTime ? ` · ${vm.teeTime.replace(' ET', '')}` : ''}
-        </span>
+        <span className="text-[0.66rem] uppercase tracking-[0.1em] text-paper-faint">Strokes card</span>
       </div>
-      <div className="mt-2">
-        <div className="min-w-0">
-          <div className="fx-title font-display text-[1.3rem] leading-[1.15] text-paper">{vm.courseName}</div>
-          <div className="tnum mt-1 text-[0.8rem] text-paper-dim">
-            {vm.teeName} tees ·{' '}
-            {vm.isLowMan ? (
-              <>
-                <strong className="font-semibold text-paper">plays scratch</strong>, the low man today
-              </>
-            ) : (
-              <>
-                <strong className="font-semibold text-gold-bright">
-                  {vm.strokesToday} stroke{vm.strokesToday === 1 ? '' : 's'}
-                </strong>
-                {vm.lowMan ? `, off ${vm.lowMan.firstName}` : ''}
-                {holesLine ? ` · ${holesLine}` : ''}
-              </>
-            )}
-          </div>
+
+      {/* The card itself, live — the same picture the buttons share. */}
+      <div className="mt-2.5">
+        <StrokesCardImage vm={vm} compact />
+      </div>
+
+      {/* Two pictures of the same thing: one for Photos / the group chat, one shaped for the
+          phone's lock screen. Hidden where the share sheet doesn't exist (desktop). */}
+      {canShare && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <ShareCardButton vm={vm} targetRef={cardRef} variant="card" label="Save card" />
+          <ShareCardButton vm={vm} targetRef={lockRef} variant="lockscreen" label="Lock screen" />
         </div>
-        {/* Two pictures of the same thing: one for Photos / the group chat, one shaped for the
-            phone's lock screen. Hidden where the share sheet doesn't exist (desktop). */}
-        {canShare && (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <ShareCardButton vm={vm} targetRef={cardRef} variant="card" label="Card" />
-            <ShareCardButton vm={vm} targetRef={lockRef} variant="lockscreen" label="Lock screen" />
-          </div>
-        )}
-      </div>
+      )}
 
       {canShare && (
         <div aria-hidden className="pointer-events-none fixed left-[-10000px] top-0" style={{ width: 540 }}>
@@ -193,7 +167,7 @@ export function StrokesCardImage({ vm, compact = false }: { vm: StrokesCardVM; c
         <div className="mt-3 flex items-center gap-3.5">
           <Seal />
           <div className="min-w-0">
-            <h2 className="fx-head font-display text-[2rem] font-semibold leading-none text-paper">{vm.courseName}</h2>
+            <h2 className={`fx-head font-display font-semibold leading-none text-paper ${compact ? 'text-[1.7rem]' : 'text-[2rem]'}`}>{vm.courseName}</h2>
             <p className="tnum mt-1.5 text-[0.8rem] uppercase tracking-[0.12em] text-paper-dim">
               {vm.teeTime ? (
                 <>

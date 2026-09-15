@@ -152,6 +152,12 @@ export function usePlayers(): PlayerCardVM[] | undefined {
   }, [data])
 }
 
+/** Whether any strokes card exists (a round still to play with tees set) — Home's way in. */
+export function useHasStrokesCards(): boolean {
+  const data = useDbData()
+  return useMemo(() => (data ? buildStrokesCards(data).size > 0 : false), [data])
+}
+
 /** The public itinerary timeline. "Today" is decided in America/New_York inside compute. */
 export function useItinerary(): ItineraryVM | undefined {
   const data = useDbData()
