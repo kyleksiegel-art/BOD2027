@@ -11,6 +11,8 @@ import { buildPlayerForm } from './form'
 import type { PlayerFormVM } from './form'
 import { buildStrokesCards } from './strokesCard'
 import type { StrokesCardVM } from './strokesCard'
+import { buildPlayerWeek } from './playerWeek'
+import type { PlayerWeekVM } from './playerWeek'
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
@@ -126,6 +128,7 @@ export interface PlayerCardVM {
   player: PlayerRow
   championshipTotal: number
   courseHandicaps: PlayerCourseHandicapVM[]
+  week: PlayerWeekVM | null // place, total, gap and banked money; null until a round counts
   form: PlayerFormVM | null // null until the player has a completed hole on a counting round
   strokesCard: StrokesCardVM | null // the next round's strokes card; null once every round is final or the player sits out
 }
@@ -139,6 +142,7 @@ export function usePlayers(): PlayerCardVM[] | undefined {
     const handicapsByPlayer = buildPlayerCourseHandicaps(data)
     const formByPlayer = buildPlayerForm(data)
     const cardByPlayer = buildStrokesCards(data)
+    const weekByPlayer = buildPlayerWeek(data)
     return data.players
       .slice()
       .sort((a, b) => a.sort_order - b.sort_order)
@@ -146,6 +150,7 @@ export function usePlayers(): PlayerCardVM[] | undefined {
         player,
         championshipTotal: totalById.get(player.id) ?? 0,
         courseHandicaps: handicapsByPlayer.get(player.id) ?? [],
+        week: weekByPlayer.get(player.id) ?? null,
         form: formByPlayer.get(player.id) ?? null,
         strokesCard: cardByPlayer.get(player.id) ?? null,
       }))

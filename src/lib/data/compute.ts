@@ -47,7 +47,7 @@ import type {
   LodgingAssignmentRow,
   ItinCategory,
 } from './types'
-import { formatDay, formatDayLong, formatTeeTime, etDateString, courseShortName } from '@/lib/format'
+import { formatDay, formatDayLong, formatTeeTime, etDateString, courseShortName, ordinalOf } from '@/lib/format'
 
 // ── Shared lookups ───────────────────────────────────────────────────────────
 export interface Db {
@@ -1528,12 +1528,6 @@ export interface RecapFact {
 
 function firstName(name: string): string {
   return name.split(/\s+/)[0] || name
-}
-
-function ordinalOf(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
 }
 
 /** One line of voice, deterministic — picks the strongest hook the round currently offers. */

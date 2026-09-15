@@ -856,3 +856,35 @@ gets most of the value). **No new tables, no schema change, no scoring change.**
 - Tests: `strokesCard.test.ts` (7). Full `vitest run` → **215**. `tsc -b` + `npm run build` clean.
   Browser-verified at 375px with a polyfilled `navigator.share` capturing the files (the desktop
   preview has no share sheet); the real sheet is a pre-trip phone check like the recap's.
+
+## Player card (2026-09-14, branch `player-card`) — the shape to reuse
+
+Kyle on the opened Players row: "it doesn't add much." It showed how a player *scored* but not what
+it *meant*. Mocked on the `Player Card` canvas, then built. **No new tables, no schema change, no
+scoring change.** An opened row now reads: where he stands → what he gets tomorrow → how the
+rounds went.
+
+- **`src/lib/data/playerWeek.ts` `buildPlayerWeek(db) → Map<playerId, PlayerWeekVM>`** — place
+  (`T2` on a shared place, else ordinal), total, `backLabel` ("Leader" / "Level for the lead" /
+  "Level with Kyle" / "4 back of Kyle"), `throughLabel` ("R3 live" / "through R3"), and
+  **`wonCents` = round-winner money from FINAL rounds only** — a live round's provisional winner
+  and the 1st/2nd championship places are deliberately excluded, so "won so far" means won. Reads
+  `buildStandings` + `buildMoney`, so it can't disagree with either tab. Empty before a round counts.
+  Rendered by `WeekLine` in `Players.tsx`, above the strokes card.
+- **`form.ts` rewritten around three stats that start arguments.** `vsIndex` — points per 18
+  holes against 36 (net par pays 2), so "4 over the index a round" ≈ strokes; scaled per hole so a
+  half-played round doesn't drag it; `verdict` + `note` quote the low (or best) *complete* round by
+  course. `zeros`, `netBirdies` (3+). **`holesWon` reuses `buildOverallTiebreak(...).ctx.holesWonById`**
+  — the standings' own tally — so a pick-up hole is unwinnable here too. **Gone:** `worstStretch`,
+  `front`/`back`/`splitLean`/`splitNote` (a 27-hole nine is noise) and the per-row legend.
+  **Kept:** `bestRun` — the Annual Report's "Longest streak" superlative reads it; it just isn't
+  a tile any more (an 18-hole "run" is only "no blanks" in net Stableford).
+- **Every strip carries a result** (`FormStrip.result`): on a final round the winner is whoever
+  `resolveRoundWinnerIds` names (so it matches the recap and Money) → "Won" / "Shared"; a player
+  level on points who lost the countback is placed *behind* (`onCountback`). Live: "Leads" / "T1" /
+  a place. Strip headers use `courseShortName` + the `.round-swatch` dot so "17 pts thru 13 | T1"
+  fits at 375px.
+- **`FormLegend`** renders once under the list (only when someone has form). `ordinalOf` moved to
+  `format.ts` (was private in `compute.ts` and `annualReport.ts`).
+- Tests: `form.test.ts` (10 — form 7 + `buildPlayerWeek` 3). Full `vitest run` → **220**.
+  `tsc -b` + `npm run build` clean. Verified at 375px: week line, tiles, verdict, strips with results.

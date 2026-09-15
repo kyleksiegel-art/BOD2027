@@ -21,7 +21,7 @@ import { buildMoney } from './money'
 import { buildPlayerForm } from './form'
 import type { ReportSeg } from './report'
 import { standingsThroughRound } from '@/lib/scoring'
-import { courseShortName, courseSlug, formatMoney } from '@/lib/format'
+import { courseShortName, courseSlug, formatMoney, ordinalOf } from '@/lib/format'
 
 export interface AnnualStandingVM {
   playerId: string
@@ -98,11 +98,6 @@ function firstName(name: string): string {
 function lastName(name: string): string {
   const parts = name.split(/\s+/)
   return parts[parts.length - 1] || name
-}
-function ordinalOf(n: number): string {
-  const suf = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (suf[(v - 20) % 10] ?? suf[v] ?? suf[0])
 }
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`

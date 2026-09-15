@@ -1,11 +1,13 @@
-import { buildRoundDetail } from './compute'
-import type { Db, RoundDetailVM } from './compute'
+import { buildRoundDetail, buildChampionships, buildOverallTiebreak, resolveRoundWinnerIds } from './compute'
+import type { Db, RoundDetailVM, PlayerRoundVM } from './compute'
+import { courseShortName, ordinalOf } from '@/lib/format'
 
 /**
  * Player form — what the stored gross scores say about how each player has actually played the
- * trip: the longest run of scoring holes, the worst three-hole stretch, the front/back split,
- * and the latest round hole by hole. Pure and offline-identical, like every other builder: rows
- * in, view models out, every point via the same round detail the scorecard renders from.
+ * trip. Three figures that start arguments (how far off the index, blanks against net birdies,
+ * holes won outright against the field), then each round played hole by hole with its result.
+ * Pure and offline-identical, like every other builder: rows in, view models out, every point
+ * via the same round detail the scorecard renders from.
  *
  * Built for the whole field at once (one round detail per round, reused across players), the
  * same shape as buildPlayerCourseHandicaps.
@@ -30,16 +32,13 @@ export interface FormRun {
   points: number
 }
 
-export interface FormStretch {
-  points: number // total over the three holes
-  roundNumber: number
-  courseName: string
-  from: number // first hole of the three
-}
-
-export interface FormNine {
-  points: number
-  holes: number // completed holes counted into `points`
+/** How the round went for this player: "Won", "Shared", "Leads" (live), or a place. */
+export interface FormResult {
+  place: number // competition ranking on this round's points (a countback loser drops below the winner)
+  tie: boolean // shares the place
+  won: boolean // a final round, and this player is one of its resolved winners
+  onCountback: boolean // the place was decided by a countback (won or lost)
+  label: string // "Won" | "Shared" | "Leads" | "T1" | "2nd" | …
 }
 
 export interface FormStrip {
@@ -49,60 +48,78 @@ export interface FormStrip {
   thru: number
   holesCounted: number
   complete: boolean // through the counted window — the header drops the "thru N"
+  live: boolean // the round is still in progress
+  result: FormResult
   cells: FormCell[]
+}
+
+/**
+ * Points against the index. Net Stableford pays 2 a hole for a net par, so a player playing
+ * exactly to the index scores 36 over 18 holes; every point short is, near enough, a stroke over.
+ * Scaled per 18 holes so a half-played round doesn't drag the figure down.
+ */
+export interface FormVsIndex {
+  pointsPerRound: number // points per 18 holes played, one decimal
+  perRound: number // strokes over (positive) or under (negative) the index per round, one decimal
+  lean: 'over' | 'under' | 'level'
+  verdict: string // the strong opening — "4 over the index a round."
+  note: string // the rest — "36 points is level; the low round was 28 on the Red."
 }
 
 export interface PlayerFormVM {
   holesPlayed: number // completed holes across counting rounds
   points: number // points across those holes
-  throughLabel: string // "through R3, hole 12 · 48 holes"
-  bestRun: FormRun | null
-  worstStretch: FormStretch | null
-  front: FormNine
-  back: FormNine
-  // The nines compared honestly: raw totals are misleading (mid-round the front has more holes
-  // in it), so the sentence quotes points PER HOLE and the tile shows the hole counts.
-  splitNote: string | null // "1.4 points a hole on the front, 1.2 on the back" — null when too early
-  splitLean: 'front' | 'back' | 'even' | null
+  roundsPlayed: number // rounds with at least one hole in
+  throughLabel: string // "54 holes · 3 rounds"
+  bestRun: FormRun | null // longest run of scoring holes — read by the Annual Report's superlatives
+  vsIndex: FormVsIndex
+  zeros: number // holes with no points (including pick-ups)
+  netBirdies: number // holes at 3+ points
+  holesWon: number // holes won outright against everyone playing — the standings' own tally
   // One strip per round the player actually PLAYED (a DNP round is absent), newest first, so
   // two rounds of form are comparable without tapping (Kyle 2026-09-07, option A).
   strips: FormStrip[]
 }
 
-/** A nine needs this many holes before the split is worth a sentence. */
-const MIN_NINE_HOLES = 5
+/** Within this many strokes a round of the index reads as "playing to it". */
+const LEVEL_BAND = 0.5
 
 export function buildPlayerForm(dbData: Db): Map<string, PlayerFormVM> {
-  const rounds = dbData.rounds
-    .slice()
-    .filter((r) => r.status === 'final' || r.status === 'in_progress')
-    .sort((a, b) => a.round_number - b.round_number)
+  const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
+  const counts = (s: string) => s === 'final' || s === 'in_progress'
 
-  // One detail per round, shared by every player.
+  // One detail per round, shared by every player and by the holes-won tally.
+  const detailByRound = new Map<number, RoundDetailVM | null>()
+  for (const round of rounds) detailByRound.set(round.round_number, buildRoundDetail(round.round_number, dbData))
+
   const details: RoundDetailVM[] = []
   for (const round of rounds) {
-    const d = buildRoundDetail(round.round_number, dbData)
+    if (!counts(round.status)) continue
+    const d = detailByRound.get(round.round_number)
     if (d && d.holes && !d.course.data_is_placeholder) details.push(d)
   }
 
+  // Holes won outright, from the SAME tally the overall tiebreak uses, so the card can never
+  // disagree with the standings about who has beaten whom.
+  const countingRoundNumbers = rounds.filter((r) => counts(r.status)).map((r) => r.round_number)
+  const champs = buildChampionships(dbData, detailByRound)
+  const { ctx } = buildOverallTiebreak(champs, detailByRound, countingRoundNumbers)
+
   const out = new Map<string, PlayerFormVM>()
   for (const player of dbData.players) {
-    const vm = formFor(player.id, details)
+    const vm = formFor(player.id, details, ctx.holesWonById.get(player.id) ?? 0)
     if (vm) out.set(player.id, vm)
   }
   return out
 }
 
-function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | null {
+function formFor(playerId: string, details: RoundDetailVM[], holesWon: number): PlayerFormVM | null {
   let holesPlayed = 0
   let points = 0
-  const front: FormNine = { points: 0, holes: 0 }
-  const back: FormNine = { points: 0, holes: 0 }
+  let zeros = 0
+  let netBirdies = 0
   let bestRun: FormRun | null = null
-  let worstStretch: FormStretch | null = null
   const strips: FormStrip[] = []
-  let lastRoundNumber = 0
-  let lastThru = 0
 
   for (const d of details) {
     const p = d.players.find((x) => x.playerId === playerId)
@@ -112,10 +129,10 @@ function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | nul
 
     for (const h of played) {
       holesPlayed += 1
-      points += h.points ?? 0
-      const nine = h.holeNumber <= 9 ? front : back
-      nine.points += h.points ?? 0
-      nine.holes += 1
+      const pts = h.points ?? 0
+      points += pts
+      if (pts === 0) zeros += 1
+      if (pts >= 3) netBirdies += 1
     }
 
     // Longest run of consecutive holes with points, within this round. Ties go to the run worth
@@ -149,32 +166,7 @@ function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | nul
       }
     }
 
-    // Worst three consecutive COMPLETED holes. Ties go to the earliest (round, hole), so the
-    // number never jumps around as later rounds match it.
-    for (let from = 1; from + 2 <= d.holesCounted; from++) {
-      let sum = 0
-      let ok = true
-      for (let hole = from; hole <= from + 2; hole++) {
-        const hr = p.holeResults.find((h) => h.holeNumber === hole)
-        if (!hr?.completed) {
-          ok = false
-          break
-        }
-        sum += hr.points ?? 0
-      }
-      if (ok && (!worstStretch || sum < worstStretch.points)) {
-        worstStretch = {
-          points: sum,
-          roundNumber: d.round.round_number,
-          courseName: d.course.name,
-          from,
-        }
-      }
-    }
-
     // One strip per round played, in round order; reversed to newest-first below.
-    lastRoundNumber = d.round.round_number
-    lastThru = p.thru
     strips.push({
       roundNumber: d.round.round_number,
       courseName: d.course.name,
@@ -182,6 +174,8 @@ function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | nul
       thru: p.thru,
       holesCounted: d.holesCounted,
       complete: p.thru >= d.holesCounted,
+      live: d.round.status === 'in_progress',
+      result: resultFor(d, p),
       // Always 18 columns: a 15-hole round rendered 15-across would be wider per cell and
       // hole 8 would not sit above hole 8 of the next strip, which is the whole point of
       // stacking them. Holes past the cutoff are marked instead of dropped.
@@ -204,42 +198,72 @@ function formFor(playerId: string, details: RoundDetailVM[]): PlayerFormVM | nul
 
   if (holesPlayed === 0) return null
 
+  const roundsPlayed = strips.length
   return {
     holesPlayed,
     points,
-    throughLabel: `through R${lastRoundNumber}, hole ${lastThru} · ${holesPlayed} holes`,
+    roundsPlayed,
+    throughLabel: `${holesPlayed} holes · ${roundsPlayed} round${roundsPlayed === 1 ? '' : 's'}`,
     bestRun,
-    worstStretch,
-    front,
-    back,
-    splitNote: splitNoteFor(front, back),
-    splitLean: splitLeanFor(front, back),
+    vsIndex: vsIndexFor(holesPlayed, points, strips),
+    zeros,
+    netBirdies,
+    holesWon,
     strips: strips.reverse(),
   }
 }
 
-/** Points per hole on a nine, to one decimal. */
-function rate(nine: FormNine): number {
-  return nine.holes === 0 ? 0 : Math.round((nine.points / nine.holes) * 10) / 10
-}
-
-/** Which nine is actually the better one, per hole. Null until both nines have enough holes. */
-function splitLeanFor(front: FormNine, back: FormNine): 'front' | 'back' | 'even' | null {
-  if (front.holes < MIN_NINE_HOLES || back.holes < MIN_NINE_HOLES) return null
-  const diff = front.points / front.holes - back.points / back.holes
-  if (Math.abs(diff) < 0.25) return 'even'
-  return diff > 0 ? 'front' : 'back'
-}
-
 /**
- * The one-line read on the split — quotes the per-hole rate, because that is what the verdict is
- * based on and what makes unequal hole counts add up. No pronouns, same as the report and wire.
+ * The round's result for one player. On a final round the winner is whoever
+ * resolveRoundWinnerIds names (top points → countback → shared only if unbreakable), so the
+ * strip agrees with the recap and the money page; anyone level on points who lost the countback
+ * is placed behind. On a live round the leader "Leads" and everyone else has a provisional place.
  */
-function splitNoteFor(front: FormNine, back: FormNine): string | null {
-  const lean = splitLeanFor(front, back)
-  if (!lean) return null
-  const f = rate(front).toFixed(1)
-  const b = rate(back).toFixed(1)
-  if (lean === 'even') return `Even either way — ${f} points a hole on the front, ${b} on the back.`
-  return `${f} points a hole on the front, ${b} on the back.`
+function resultFor(d: RoundDetailVM, p: PlayerRoundVM): FormResult {
+  const lb = d.leaderboard
+  const ahead = lb.filter((x) => x.totalPoints > p.totalPoints).length
+  const level = lb.filter((x) => x.totalPoints === p.totalPoints).length
+  let place = ahead + 1
+  let tie = level > 1
+
+  if (d.round.status === 'final') {
+    const { ids, onCountback } = resolveRoundWinnerIds(d)
+    if (ids.includes(p.playerId)) {
+      return { place: 1, tie: ids.length > 1, won: true, onCountback, label: ids.length > 1 ? 'Shared' : 'Won' }
+    }
+    if (place === 1 && ids.length > 0) {
+      // Level with the winner on points, beaten on the countback.
+      place = ids.length + 1
+      tie = level - ids.length > 1
+      return { place, tie, won: false, onCountback: true, label: tie ? `T${place}` : ordinalOf(place) }
+    }
+    return { place, tie, won: false, onCountback: false, label: tie ? `T${place}` : ordinalOf(place) }
+  }
+
+  const label = place === 1 ? (tie ? 'T1' : 'Leads') : tie ? `T${place}` : ordinalOf(place)
+  return { place, tie, won: false, onCountback: false, label }
+}
+
+/** No pronouns (the templates never guess one), names of courses only. */
+function vsIndexFor(holesPlayed: number, points: number, strips: FormStrip[]): FormVsIndex {
+  const ppr = (points / holesPlayed) * 18
+  const over = 36 - ppr
+  const pointsPerRound = Math.round(ppr * 10) / 10
+  const perRound = Math.round(over * 10) / 10
+  const lean: FormVsIndex['lean'] = Math.abs(over) < LEVEL_BAND ? 'level' : over > 0 ? 'over' : 'under'
+
+  // Only a complete round is worth quoting — a live one is still moving.
+  const complete = strips.filter((s) => s.complete)
+  const low = complete.length ? complete.reduce((a, b) => (b.points < a.points ? b : a)) : null
+  const high = complete.length ? complete.reduce((a, b) => (b.points > a.points ? b : a)) : null
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
+
+  if (lean === 'level') {
+    return { pointsPerRound, perRound, lean, verdict: 'Playing to the index.', note: '36 points a round is level.' }
+  }
+  const verdict = `${fmt(Math.abs(perRound))} ${lean} the index a round.`
+  let note = '36 points is level'
+  if (lean === 'over' && low) note += `; the low round was ${low.points} on the ${courseShortName(low.courseName)}`
+  if (lean === 'under' && high) note += `; the best round was ${high.points} on the ${courseShortName(high.courseName)}`
+  return { pointsPerRound, perRound, lean, verdict, note: `${note}.` }
 }
