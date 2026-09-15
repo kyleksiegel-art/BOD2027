@@ -11,7 +11,7 @@
 
 begin;
 
-select plan(76);
+select plan(79);
 
 create extension if not exists pgtap with schema extensions;
 
@@ -451,6 +451,24 @@ select is(
   (select r.status::text || '/' || coalesce((select count(*)::text from public.round_money m where m.round_id = r.id), '0')
      from public.rounds r, t_r1 where r.id = t_r1.r1),
   'in_progress/0', 'reopening puts the round back in progress and removes the frozen money row');
+
+select throws_ok(
+  $$ select public.rpc_reset_round('nope', (select r1 from t_r1)) $$,
+  '28000', null, 'rpc_reset_round requires a session');
+
+select is(
+  (select public.rpc_reset_round('good-token', r1) ->> 'reset' from t_r1),
+  'true', 'a valid session can reset a round');
+
+select is(
+  (select r.status::text
+          || '/' || (select count(*)::text from public.scores s where s.round_id = r.id)
+          || '/' || (select count(*)::text from public.ctp_results c where c.round_id = r.id)
+          || '/' || (select count(*)::text from public.round_money m where m.round_id = r.id)
+          || '/' || (select count(*)::text from public.round_players rp where rp.round_id = r.id)
+     from public.rounds r, t_r1 where r.id = t_r1.r1),
+  'upcoming/0/0/0/' || (select count(*)::text from public.round_players rp, t_r1 where rp.round_id = t_r1.r1),
+  'reset puts the round back to upcoming with no scores, CTP or money, and keeps round_players');
 
 select ok(public.rpc_revoke_all_sessions('good-token') >= 1,
   'a valid session can revoke all sessions (changing the PIN must invalidate tokens)');

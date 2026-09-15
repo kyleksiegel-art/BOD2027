@@ -5,8 +5,8 @@
   risk is operational. Work through this in late January, on the actual phones:
   1. **Supabase awake, on a tier that won't pause** (free tier sleeps after 7 idle days). Open the app,
      confirm hydrate returns rows, confirm `pin-verify` still deploys and unlocks.
-  2. **Production data is real**: fake seed scores cleared (`rpc_clear_round_scores` per round), all four
-     rounds `upcoming`, real indexes entered, tees chosen, tee times set, money amounts confirmed.
+  2. **Production data is real**: every round **Reset to upcoming** (Rounds editor, new 2026-09-14 —
+     wipes scores/CTP/money, keeps tees), real indexes entered, tees chosen, tee times set, money amounts confirmed.
   3. **All four phones**: install the PWA over HTTPS, accept one SW update prompt, confirm storage persists.
   4. **Share once on-device**: recap card, round report, strokes card — iOS Safari will have moved since Sept.
   5. **Drive one real hole**: airplane mode on, save, airplane mode off; confirm the flush, the other phone's

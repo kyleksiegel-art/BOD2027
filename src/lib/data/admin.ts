@@ -282,6 +282,15 @@ export function clearRoundScores(roundId: string) {
 }
 
 /**
+ * Put a round back to upcoming as if it had never started: scores, CTP and frozen money are
+ * deleted, tees and handicaps kept. The pre-trip reset (Kyle, 2026-09-14) — clearRoundScores
+ * leaves a round in_progress on purpose, so testing had no way back to a clean slate.
+ */
+export function resetRound(roundId: string) {
+  return call<unknown>('rpc_reset_round', { p_round_id: roundId })
+}
+
+/**
  * Put a finalized round back in progress so a score can be corrected — the non-destructive
  * counterpart of finalize (scores and tees stay; the frozen money row goes, to be rewritten
  * when the round is finalized again). Added after the 2026-09-09 audit: a final round is
