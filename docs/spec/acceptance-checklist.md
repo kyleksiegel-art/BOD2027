@@ -910,3 +910,14 @@ These are the final acceptance criteria. Every line needs verification evidence 
 | Reconciliation honesty | The money card's ✓/✗ line and the letter's "every dollar accounted for" clause both key off `reconciliation.balanced`; verified live — a forced abandoned round correctly shows "DOES NOT RECONCILE" and the letter drops the claim |
 | Renders on the phone-width board | Verified at 375px against a complete-season Dexie state (dead-backend method): champion block, 2-col numbers grid, colored round-winner rails, money block, full letter — no horizontal overflow, `vitest run` **207**, `tsc -b` + build clean |
 | Not yet done | Commit + merge `annual-report`; on-device look at trip's end (needs all four rounds final) |
+
+## Strokes card (2026-09-14, branch `strokes-card`)
+
+| Item | Evidence |
+|---|---|
+| Follows the next round, nothing once all are final | `nextRoundNumber`: in_progress first, else lowest upcoming, null when every round is final; `strokesCard.test.ts` asserts all three and that the map is empty at season's end |
+| Strokes and holes match the scorecard exactly | Built from `buildRoundDetail`'s worksheet + `allocateStrokes` — the same allocation Enter/scorecard use; test: index 12 off a low of 8 → 4 strokes on SI 1–4, a DNP has no card and doesn't set the low, the low man plays scratch |
+| Picture renders through the existing share pipeline | Off-screen 540px and 390×844 frames rasterised with `renderRecapImage`; verified in the preview with a polyfilled `navigator.share`: 1080×1142 PNG (187 KB) and 780×1688 PNG (178 KB), lock-screen PNG inspected — fonts embedded, gold cells on the right holes |
+| Lives on the Players tab, no nested controls | `NextRoundBlock` inside the opened panel above Form; a row expands when form OR card exists; buttons hidden where `navigator.share` is undefined |
+| Suite and build | `vitest run` **215**, `tsc -b` + `npm run build` clean |
+| Not yet done | Commit + PR `strokes-card`; on an iPhone once tees are set: tap Card (share sheet → Save Image) and set the lock-screen PNG as wallpaper once |

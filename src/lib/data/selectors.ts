@@ -9,6 +9,8 @@ import { buildFieldReport } from './wire'
 import type { WireVM } from './wire'
 import { buildPlayerForm } from './form'
 import type { PlayerFormVM } from './form'
+import { buildStrokesCards } from './strokesCard'
+import type { StrokesCardVM } from './strokesCard'
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
@@ -125,6 +127,7 @@ export interface PlayerCardVM {
   championshipTotal: number
   courseHandicaps: PlayerCourseHandicapVM[]
   form: PlayerFormVM | null // null until the player has a completed hole on a counting round
+  strokesCard: StrokesCardVM | null // the next round's strokes card; null once every round is final or the player sits out
 }
 
 export function usePlayers(): PlayerCardVM[] | undefined {
@@ -135,6 +138,7 @@ export function usePlayers(): PlayerCardVM[] | undefined {
     const totalById = new Map(champs.map((c) => [c.playerId, totalPoints(c.byRound)]))
     const handicapsByPlayer = buildPlayerCourseHandicaps(data)
     const formByPlayer = buildPlayerForm(data)
+    const cardByPlayer = buildStrokesCards(data)
     return data.players
       .slice()
       .sort((a, b) => a.sort_order - b.sort_order)
@@ -143,6 +147,7 @@ export function usePlayers(): PlayerCardVM[] | undefined {
         championshipTotal: totalById.get(player.id) ?? 0,
         courseHandicaps: handicapsByPlayer.get(player.id) ?? [],
         form: formByPlayer.get(player.id) ?? null,
+        strokesCard: cardByPlayer.get(player.id) ?? null,
       }))
   }, [data])
 }
