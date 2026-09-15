@@ -1,17 +1,15 @@
-# Handoff — 2026-09-14 (Player card)
-
-- Kyle: the opened Players row "doesn't add much" → proposed a restructure, mocked it on the
-  `Player Card` canvas (https://claude.ai/artifact/GKqw2mGz2tAnJK16Kz8bn6), Kyle: "build it".
-  Branch `player-card` off `main` (post-#29).
-- **New:** `src/lib/data/playerWeek.ts` (`buildPlayerWeek` — place/total/gap-by-name/`wonCents`
-  from FINAL rounds only). **Rewritten:** `form.ts` (`vsIndex`, `zeros`, `netBirdies`, `holesWon`
-  off the standings tally, `FormStrip.result`; `worstStretch` + front/back gone, `bestRun` kept for
-  the Annual Report), `PlayerForm.tsx` (+ exported `FormLegend`). **Changed:** `selectors.ts`
-  (`PlayerCardVM.week`), `Players.tsx` (`WeekLine`, legend once at page bottom), `format.ts`
-  (`ordinalOf` consolidated from compute/annualReport).
-- Order in an opened row: week line → strokes card (unchanged) → form tiles + verdict → strips.
-- `vitest run` → **220**. `tsc -b` + `npm run build` clean. Verified at 375px on the local seed;
-  no console errors. CLAUDE.md §"Player card" added.
-- Kyle dropped the explanatory footnote under the list. **PR #30 merged to `main` 2026-09-14 and live** on
-  bod2027.netlify.app — verified on production at 375px after accepting the SW update prompt (Jon: 3rd, 96 pts,
-  27 back of Kyle, 4 over the index, 3 · 8, 1 of 54 holes won). The reachability HEAD probe's 401s are expected.
+# Handoff — 2026-09-14 (App complete; January pre-trip checklist)
+- State: PR #30 (player card) merged, live on bod2027.netlify.app. `main` clean, `vitest run` → 220,
+  `tsc -b` + `npm run build` clean. Kyle: "this all seems pretty perfect" — maintenance only until Feb 4–7 2027.
+- The logic is proven (220 vitest + 241 pgTAP); the system has never run under real conditions. Remaining
+  risk is operational. Work through this in late January, on the actual phones:
+  1. **Supabase awake, on a tier that won't pause** (free tier sleeps after 7 idle days). Open the app,
+     confirm hydrate returns rows, confirm `pin-verify` still deploys and unlocks.
+  2. **Production data is real**: fake seed scores cleared (`rpc_clear_round_scores` per round), all four
+     rounds `upcoming`, real indexes entered, tees chosen, tee times set, money amounts confirmed.
+  3. **All four phones**: install the PWA over HTTPS, accept one SW update prompt, confirm storage persists.
+  4. **Share once on-device**: recap card, round report, strokes card — iOS Safari will have moved since Sept.
+  5. **Drive one real hole**: airplane mode on, save, airplane mode off; confirm the flush, the other phone's
+     Realtime update, and an empty outbox in Diagnostics.
+  6. **Process rule, no mechanism**: never edit a handicap index on Players after Thursday's tee — the live
+     index re-derives finalized rounds' points (only money is frozen).
