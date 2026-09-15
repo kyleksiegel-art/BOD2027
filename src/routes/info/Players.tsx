@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { PlayerForm } from '@/components/PlayerForm'
+import { NextRoundBlock } from '@/components/StrokesCard'
 import { usePlayers } from '@/lib/data/selectors'
 import { courseShortName } from '@/lib/format'
 import type { PlayerCardVM } from '@/lib/data/selectors'
@@ -32,7 +33,8 @@ export default function Players() {
           </ul>
           <p className="mt-4 text-[0.72rem] leading-relaxed text-paper-faint">
             Numbers under each name are that player’s course handicap at each course. Tap a player for
-            form — every figure derives from the saved scores, on-device.
+            form and, while a round is still to play, his strokes card — every figure derives from the saved
+            scores, on-device.
           </p>
         </>
       )}
@@ -47,8 +49,11 @@ export default function Players() {
  * sits outside the button, so no panel is nested inside a control.
  */
 function PlayerRow({ card }: { card: PlayerCardVM }) {
-  const { player, courseHandicaps, form } = card
+  const { player, courseHandicaps, form, strokesCard } = card
   const [open, setOpen] = useState(false)
+  // Expandable when there is anything to show inside: form once a hole is saved, or the next
+  // round's strokes card while a round is still to be played (so it works before the trip too).
+  const expandable = form !== null || strokesCard !== null
 
   const collapsed = (
     <>
@@ -70,7 +75,7 @@ function PlayerRow({ card }: { card: PlayerCardVM }) {
           </span>
           <span className="text-[0.62rem] uppercase tracking-[0.12em] text-paper-faint">Index</span>
         </span>
-        {form && (
+        {expandable && (
           <svg
             width="18"
             height="18"
@@ -107,7 +112,7 @@ function PlayerRow({ card }: { card: PlayerCardVM }) {
 
   return (
     <li className={`border-b border-hair first:border-t first:border-t-hair-strong ${open ? 'bg-ground-2' : ''}`}>
-      {form ? (
+      {expandable ? (
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -121,9 +126,11 @@ function PlayerRow({ card }: { card: PlayerCardVM }) {
         <div className="py-4">{collapsed}</div>
       )}
 
-      {form && open && (
-        <div id={`form-${player.id}`} className="pb-4">
-          <PlayerForm vm={form} />
+      {expandable && open && (
+        <div id={`form-${player.id}`} className="flex flex-col gap-4 pb-4">
+          {/* Next round first — on the eve of a round it's the thing being looked up. */}
+          {strokesCard && <NextRoundBlock vm={strokesCard} />}
+          {form && <PlayerForm vm={form} />}
         </div>
       )}
     </li>

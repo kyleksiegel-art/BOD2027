@@ -823,3 +823,36 @@ design canvas, then de-jargoned to plain copy (the seal + Fraunces carry the ann
   hosted DB's hydrate races any Dexie edit back, and a console `import('/src/lib/db')` is a **separate
   module instance** from the running app's — the reliable path is to break `VITE_SUPABASE_URL` and
   restart, so cached Dexie wins.
+
+## Strokes card (2026-09-14, branch `strokes-card`) — the shape to reuse
+
+"How many do I get tomorrow, and on which holes" as a picture — for Photos, the group chat, or the
+lock screen. Kyle's pick after a Wallet-pass discussion (no Apple developer account; the picture
+gets most of the value). **No new tables, no schema change, no scoring change.**
+
+- **`src/lib/data/strokesCard.ts` `buildStrokesCards(db) → Map<playerId, StrokesCardVM>`** — pure.
+  Follows the **next round**: the lowest `in_progress` round, else the lowest `upcoming`
+  (`nextRoundNumber`); empty once every round is final. One card per *playing* player of that round
+  (a DNP has none and doesn't set the low). Strokes and the hole allocation come from
+  `buildRoundDetail`'s worksheet + `allocateStrokes(strokesReceivedFinal, holes)`, so they are exactly
+  what the scorecard will use — own playing handicap minus the low man, then by stroke index. `lowMan`
+  is the first playing player (sort order) whose own strokes equal the field low; `isLowMan` says
+  "plays scratch". `week` (position label / total / back label / the others' totals by last name)
+  comes off `buildStandings` and is null before any round counts. `strokesCardFilename(vm, variant)`.
+- **`src/components/StrokesCard.tsx`**: `NextRoundBlock` — **the card itself, rendered live** in the
+  row (Kyle 2026-09-14: "you can't just look at it without creating an image") with Save card + Lock
+  screen buttons under it — and `StrokesCardImage` (the picture; `compact` is the 390px version used
+  both in the row and in the lock-screen frame). Shares through `renderRecapImage` like the recap/reports; both variants are
+  **pre-rendered after `document.fonts.ready`** (iOS gesture rule). The two source frames are laid out
+  **off-screen** (`fixed left-[-10000px]`, 540px and 390×844), never `display:none` — a hidden element
+  has no layout and rasterises to nothing. Output: 1080×~1140 and 780×1688 PNGs, ~180 KB each. Buttons
+  hidden where `navigator.share` is undefined (desktop).
+- **The Players tab is the only way in** (Kyle 2026-09-14: "I don't need the strokes link" — a Home
+  link was built and removed the same day; don't re-add one).
+- **Entry point: the Players tab.** `PlayerCardVM.strokesCard` (selectors); `Players.tsx` renders
+  `NextRoundBlock` at the top of a player's opened panel, above Form. A row is now **expandable when
+  either form or a strokes card exists** — before the trip there is no form, and the card is the
+  reason to open a row. The buttons live inside the panel, not the row (the row is the toggle button).
+- Tests: `strokesCard.test.ts` (7). Full `vitest run` → **215**. `tsc -b` + `npm run build` clean.
+  Browser-verified at 375px with a polyfilled `navigator.share` capturing the files (the desktop
+  preview has no share sheet); the real sheet is a pre-trip phone check like the recap's.
