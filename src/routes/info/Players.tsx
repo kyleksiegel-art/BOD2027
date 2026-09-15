@@ -33,11 +33,6 @@ export default function Players() {
             ))}
           </ul>
           {players.some((c) => c.form !== null) && <FormLegend />}
-          <p className="mt-4 text-[0.72rem] leading-relaxed text-paper-faint">
-            Numbers under each name are that player’s course handicap at each course. Tap a player for where he
-            stands, his strokes for the next round, and how each round went — every figure derives from the
-            saved scores, on-device.
-          </p>
         </>
       )}
     </Page>
