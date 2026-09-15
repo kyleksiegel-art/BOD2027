@@ -1,13 +1,22 @@
 import type { FormCell, PlayerFormVM } from '@/lib/data/form'
+import { courseShortName, courseSlug } from '@/lib/format'
 
 /**
- * Form — what the stored scores say about a player: the longest run of scoring holes, the worst
- * three-hole stretch, the front/back split, and the latest round hole by hole. Expanded from a
- * row on the Players page; everything derives on-device, so it works offline like the rest.
+ * Form — what the stored scores say about a player: how far off the index, blanks against net
+ * birdies, holes won outright, then each round hole by hole with its result. Expanded from a row
+ * on the Players page; everything derives on-device, so it works offline like the rest.
+ *
+ * The legend is NOT here — it renders once for the whole page (`FormLegend`), under the list.
  */
 export function PlayerForm({ vm }: { vm: PlayerFormVM }) {
+  const vs = vm.vsIndex
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
+  const vsFigure = vs.lean === 'level' ? 'Level' : fmt(Math.abs(vs.perRound))
+  const vsUnit = vs.lean === 'level' ? undefined : vs.lean
+  const vsColor = vs.lean === 'over' ? 'text-red' : vs.lean === 'under' ? 'text-olive' : 'text-paper-faint'
+
   return (
-    <div className="mt-4">
+    <div className="mt-1">
       <div className="flex items-baseline gap-2">
         <span className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">Form</span>
         <span className="tnum ml-auto text-[0.72rem] text-paper-dim">{vm.throughLabel}</span>
@@ -15,69 +24,54 @@ export function PlayerForm({ vm }: { vm: PlayerFormVM }) {
 
       <div className="mt-2.5 grid grid-cols-3 gap-2">
         <Tile
-          label="Best run"
-          labelClass="text-olive"
-          figure={vm.bestRun ? String(vm.bestRun.holes) : '—'}
-          unit={vm.bestRun ? (vm.bestRun.holes === 1 ? 'hole' : 'holes') : undefined}
-          note={
-            vm.bestRun
-              ? `R${vm.bestRun.roundNumber} · H${vm.bestRun.from}–${vm.bestRun.to} · ${vm.bestRun.points} pts`
-              : 'no scoring holes yet'
-          }
+          label="Vs index"
+          labelClass={vsColor}
+          figure={vsFigure}
+          unit={vsUnit}
+          note={`${fmt(vs.pointsPerRound)} pts a round`}
         />
         <Tile
-          label="Worst 3"
-          labelClass="text-red"
-          figure={vm.worstStretch ? String(vm.worstStretch.points) : '—'}
-          unit={vm.worstStretch ? (vm.worstStretch.points === 1 ? 'pt' : 'pts') : undefined}
-          note={
-            vm.worstStretch
-              ? `R${vm.worstStretch.roundNumber} · H${vm.worstStretch.from}–${vm.worstStretch.from + 2}`
-              : 'fewer than three holes in'
-          }
-        />
-        <Tile
-          label="Front · Back"
+          label="Zeros · Birdies"
           labelClass="text-paper-faint"
-          figure={`${vm.front.points}`}
-          figureTail={`${vm.back.points}`}
-          note={`${vm.front.holes} · ${vm.back.holes} holes`}
+          figure={String(vm.zeros)}
+          figureTail={String(vm.netBirdies)}
+          note="blanks · net birdies"
+        />
+        <Tile
+          label="Holes won"
+          labelClass="text-olive"
+          figure={String(vm.holesWon)}
+          unit={`of ${vm.holesPlayed}`}
+          note="outright"
         />
       </div>
 
-      {/* The verdict gets a full-width line: it quotes a per-hole rate, which needs the room. */}
-      {vm.splitNote && (
-        <p className="tnum mt-2 text-[0.72rem] leading-snug text-paper-dim">
-          {vm.splitLean === 'front' || vm.splitLean === 'back' ? (
-            <>
-              <strong className="font-semibold text-paper">
-                Stronger on the {vm.splitLean}.
-              </strong>{' '}
-              {vm.splitNote}
-            </>
-          ) : (
-            vm.splitNote
-          )}
-        </p>
-      )}
+      <p className="tnum mt-2 text-[0.72rem] leading-snug text-paper-dim">
+        <strong className="font-semibold text-paper">{vs.verdict}</strong> {vs.note}
+      </p>
 
-      {/* One strip per round played, newest first, so two rounds of form read side by side
-          without tapping. The legend is shared — it renders once, under the last strip. */}
+      {/* One strip per round played, newest first, each with its result, so two rounds of form
+          read side by side without tapping. */}
       {vm.strips.map((st, i) => (
-        <div key={st.roundNumber} className={i === 0 ? 'mt-3.5' : 'mt-3'}>
-          <div className="flex items-baseline gap-2">
+        <div key={st.roundNumber} className={`round ${i === 0 ? 'mt-3.5' : 'mt-3'}`} data-course={courseSlug(st.courseName) ?? undefined}>
+          <div className="flex items-center gap-2">
+            <span className="round-swatch inline-block h-[7px] w-[7px] flex-none rounded-full" aria-hidden />
             <span className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
-              Round {st.roundNumber} · {st.courseName}
+              Round {st.roundNumber} · {courseShortName(st.courseName)}
             </span>
-            <span className="tnum ml-auto text-[0.72rem] text-paper-dim">
+            <span className="tnum ml-auto whitespace-nowrap text-[0.72rem] text-paper-dim">
               {st.points} pts{st.complete ? '' : ` thru ${st.thru}`}
+              <span className="mx-1.5 text-hair-strong" aria-hidden>
+                |
+              </span>
+              <strong className={`font-semibold ${st.result.won ? 'text-gold-bright' : 'text-paper'}`}>{st.result.label}</strong>
             </span>
           </div>
           <div
             className="mt-1.5 grid h-[22px] gap-[2px]"
             style={{ gridTemplateColumns: `repeat(${st.cells.length}, minmax(0, 1fr))` }}
             role="img"
-            aria-label={`Round ${st.roundNumber} at ${st.courseName} — ${stripLabel(st.cells)}`}
+            aria-label={`Round ${st.roundNumber} at ${st.courseName}, ${st.result.label} — ${stripLabel(st.cells)}`}
           >
             {st.cells.map((c) => (
               <Cell key={c.holeNumber} cell={c} />
@@ -85,16 +79,19 @@ export function PlayerForm({ vm }: { vm: PlayerFormVM }) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
 
-      {vm.strips.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.66rem] text-paper-dim">
-          <Key swatch={BANDS.zero} label="zero" />
-          <Key swatch={BANDS.one} label="1 pt" />
-          <Key swatch={BANDS.par} label="2 (par)" />
-          <Key swatch={BANDS.good} label="3+" />
-          <Key ring label="net eagle" />
-        </div>
-      )}
+/** The strips' key, once per page. */
+export function FormLegend() {
+  return (
+    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[0.66rem] text-paper-dim">
+      <Key swatch={BANDS.zero} label="zero" />
+      <Key swatch={BANDS.one} label="1 pt" />
+      <Key swatch={BANDS.par} label="2 (par)" />
+      <Key swatch={BANDS.good} label="3+" />
+      <Key ring label="net eagle" />
     </div>
   )
 }

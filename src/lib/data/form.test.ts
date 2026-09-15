@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildPlayerForm } from './form'
+import { buildPlayerWeek } from './playerWeek'
 import type { Db } from './compute'
 import type { PlayerRow, CourseRow, TeeRow, HoleRow, RoundRow, RoundPlayerRow, ScoreRow } from './types'
 
@@ -120,7 +121,8 @@ describe('buildPlayerForm', () => {
     const form = buildPlayerForm(makeDb()).get(P1)!
     // R1's 18 + R2's 5. Round 3 is upcoming and must not appear.
     expect(form.holesPlayed).toBe(23)
-    expect(form.throughLabel).toBe('through R2, hole 5 · 23 holes')
+    expect(form.roundsPlayed).toBe(2)
+    expect(form.throughLabel).toBe('23 holes · 2 rounds')
   })
 
   it('finds the longest run of scoring holes, tie broken by points then the later round', () => {
@@ -138,32 +140,55 @@ describe('buildPlayerForm', () => {
     expect(buildPlayerForm(makeDb()).get(P2)!.bestRun!.holes).toBe(18)
   })
 
-  it('finds the worst three-hole stretch across rounds, earliest on a tie', () => {
-    const form = buildPlayerForm(makeDb()).get(P1)!
-    // R2 H1–3 is 2 + 0 + 0 = 2, worse than anything in R1.
-    expect(form.worstStretch).toEqual({ points: 2, roundNumber: 2, courseName: 'Streamsong Red', from: 1 })
-    // P2 never blanked in R1 and picked up on R2's 5th: H3–5 = 2 + 2 + 0 = 4.
-    expect(buildPlayerForm(makeDb()).get(P2)!.worstStretch!.points).toBe(4)
+  it('counts zeros, net birdies and holes won outright off the standings tally', () => {
+    const forms = buildPlayerForm(makeDb())
+    const p1 = forms.get(P1)!
+    // Doubles on R1's 4 and 12, R2's 2 and 3; the one birdie on R1's 18.
+    expect(p1.zeros).toBe(4)
+    expect(p1.netBirdies).toBe(1)
+    // P1 beat P2 outright only on R1's 18th. R2's 5th, where P2 picked up, is unwinnable — a
+    // pick-up has no net, so the hole never has two eligible scores.
+    expect(p1.holesWon).toBe(1)
+    // P2: R1's 4th and 12th, R2's 2nd and 3rd.
+    expect(forms.get(P2)!.holesWon).toBe(4)
   })
 
-  it('splits the nines by points per hole, and stays quiet until both nines have holes', () => {
-    const form = buildPlayerForm(makeDb()).get(P1)!
-    // Front: R1 holes 1–9 (2,2,2,0,2,2,2,2,2 = 16) + R2 holes 1–5 (2,0,0,2,2 = 6) = 22 over 14.
-    // Back: R1 holes 10–18 (2,2,0,2,2,2,2,2,3 = 17) over 9.
-    expect(form.front).toEqual({ points: 22, holes: 14 })
-    expect(form.back).toEqual({ points: 17, holes: 9 })
-    // 1.571/hole front vs 1.889/hole back → the back is the better nine.
-    expect(form.splitLean).toBe('back')
-    expect(form.splitNote).toBe('1.6 points a hole on the front, 1.9 on the back.')
+  it('scores the index as points per 18 holes against 36, quoting the low complete round', () => {
+    const p1 = buildPlayerForm(makeDb()).get(P1)!
+    // 39 points over 23 holes → 30.5 a round → 5.5 over the index. R2 is live, so only R1 (33) is quotable.
+    expect(p1.vsIndex).toEqual({
+      pointsPerRound: 30.5,
+      perRound: 5.5,
+      lean: 'over',
+      verdict: '5.5 over the index a round.',
+      note: '36 points is level; the low round was 33 on the Red.',
+    })
+    // Level par all round is playing to the index exactly.
+    const p2 = buildPlayerForm(makeDb({ p2SitsOutR2: true })).get(P2)!
+    expect(p2.vsIndex.lean).toBe('level')
+    expect(p2.vsIndex.verdict).toBe('Playing to the index.')
+  })
 
-    // A player with only front-nine holes in gets no note at all — the split needs both nines.
-    const early = makeDb({ p2SitsOutR2: true })
-    early.scores = early.scores.filter((sc) => !(sc.round_id === R1 && sc.player_id === P2 && sc.hole_number > 6))
-    const p2 = buildPlayerForm(early).get(P2)!
-    expect(p2.front).toEqual({ points: 12, holes: 6 })
-    expect(p2.back).toEqual({ points: 0, holes: 0 })
-    expect(p2.splitNote).toBeNull()
-    expect(p2.splitLean).toBeNull()
+  it('gives each strip its result: Won / a place on a final round, Leads / a place on a live one', () => {
+    const forms = buildPlayerForm(makeDb())
+    const p1 = forms.get(P1)!
+    const p2 = forms.get(P2)!
+    // R1 final: P2 36 beat P1 33.
+    expect(p2.strips[1].result).toMatchObject({ place: 1, won: true, onCountback: false, label: 'Won' })
+    expect(p1.strips[1].result).toMatchObject({ place: 2, tie: false, won: false, label: '2nd' })
+    // R2 live: P2 8 leads P1 6.
+    expect(p2.strips[0]).toMatchObject({ live: true, result: { place: 1, won: false, label: 'Leads' } })
+    expect(p1.strips[0].result.label).toBe('2nd')
+  })
+
+  it('places a countback loser behind the winner, and says so', () => {
+    const db = makeDb()
+    // Level at 36 in R1: P1 swaps the two doubles for one bogey on 4 and keeps the birdie on 18.
+    // Back nine 19–18 → P1 takes the round on countback.
+    db.scores = [...db.scores.filter((sc) => !(sc.round_id === R1 && sc.player_id === P1)), ...scoresFor(P1, R1, 18, { 4: 1, 18: -1 })]
+    const forms = buildPlayerForm(db)
+    expect(forms.get(P1)!.strips[1].result).toMatchObject({ place: 1, won: true, onCountback: true, label: 'Won' })
+    expect(forms.get(P2)!.strips[1].result).toMatchObject({ place: 2, tie: false, won: false, onCountback: true, label: '2nd' })
   })
 
   it('gives one strip per round played, newest first, flagging eagles and pick-ups', () => {
@@ -200,5 +225,41 @@ describe('buildPlayerForm', () => {
     expect(r1.cells.slice(0, 15).every((c) => c.counted)).toBe(true)
     // Every strip is the same width, whatever each round's cutoff.
     expect(new Set(form.strips.map((st) => st.cells.length))).toEqual(new Set([18]))
+  })
+})
+
+describe('buildPlayerWeek', () => {
+  const purse = { key: 'purse_amounts', value: { buy_in_per_player_cents: 25000, champ_first_cents: 60000, champ_second_cents: 20000, round_winner_cents: 5000 } }
+
+  it('has nothing to say before a round counts', () => {
+    const db = makeDb()
+    db.rounds = db.rounds.map((r) => ({ ...r, status: 'upcoming' as const }))
+    expect(buildPlayerWeek(db).size).toBe(0)
+  })
+
+  it('places each player with the gap by name, and banks only final-round winnings', () => {
+    const db = makeDb()
+    db.settings = [purse]
+    const week = buildPlayerWeek(db)
+    // P2 44 (36 + 8 live) leads P1 39 (33 + 6 live).
+    expect(week.get(P2)).toEqual({
+      position: 1,
+      tie: false,
+      positionLabel: '1st',
+      total: 44,
+      gap: 0,
+      backLabel: 'Leader',
+      throughLabel: 'R2 live',
+      // R1's $50, and NOT the live R2 lead — that is not won yet.
+      wonCents: 5000,
+    })
+    expect(week.get(P1)).toMatchObject({ positionLabel: '2nd', total: 39, gap: 5, backLabel: '5 back of Chris', wonCents: 0 })
+  })
+
+  it('reads "through R1" once nothing is live', () => {
+    const db = makeDb()
+    db.rounds = db.rounds.map((r) => (r.round_number === 2 ? { ...r, status: 'upcoming' as const } : r))
+    db.scores = db.scores.filter((sc) => sc.round_id !== R2)
+    expect(buildPlayerWeek(db).get(P1)!.throughLabel).toBe('through R1')
   })
 })

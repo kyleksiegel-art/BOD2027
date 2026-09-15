@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
-import { PlayerForm } from '@/components/PlayerForm'
+import { FormLegend, PlayerForm } from '@/components/PlayerForm'
 import { NextRoundBlock } from '@/components/StrokesCard'
 import { usePlayers } from '@/lib/data/selectors'
-import { courseShortName } from '@/lib/format'
+import { courseShortName, formatMoney } from '@/lib/format'
 import type { PlayerCardVM } from '@/lib/data/selectors'
+import type { PlayerWeekVM } from '@/lib/data/playerWeek'
 
 const initials = (name: string) =>
   name
@@ -31,11 +32,7 @@ export default function Players() {
               <PlayerRow key={card.player.id} card={card} />
             ))}
           </ul>
-          <p className="mt-4 text-[0.72rem] leading-relaxed text-paper-faint">
-            Numbers under each name are that player’s course handicap at each course. Tap a player for
-            form and, while a round is still to play, his strokes card — every figure derives from the saved
-            scores, on-device.
-          </p>
+          {players.some((c) => c.form !== null) && <FormLegend />}
         </>
       )}
     </Page>
@@ -49,11 +46,11 @@ export default function Players() {
  * sits outside the button, so no panel is nested inside a control.
  */
 function PlayerRow({ card }: { card: PlayerCardVM }) {
-  const { player, courseHandicaps, form, strokesCard } = card
+  const { player, courseHandicaps, week, form, strokesCard } = card
   const [open, setOpen] = useState(false)
-  // Expandable when there is anything to show inside: form once a hole is saved, or the next
-  // round's strokes card while a round is still to be played (so it works before the trip too).
-  const expandable = form !== null || strokesCard !== null
+  // Expandable when there is anything to show inside: the week and form once a hole is saved, or
+  // the next round's strokes card while a round is still to be played (so it works before the trip too).
+  const expandable = week !== null || form !== null || strokesCard !== null
 
   const collapsed = (
     <>
@@ -128,11 +125,41 @@ function PlayerRow({ card }: { card: PlayerCardVM }) {
 
       {expandable && open && (
         <div id={`form-${player.id}`} className="flex flex-col gap-4 pb-4">
-          {/* Next round first — on the eve of a round it's the thing being looked up. */}
+          {/* Where he stands, then what he gets tomorrow, then how each round went. */}
+          {week && <WeekLine vm={week} />}
           {strokesCard && <NextRoundBlock vm={strokesCard} />}
           {form && <PlayerForm vm={form} />}
         </div>
       )}
     </li>
+  )
+}
+
+/**
+ * The week in one line: place, total and the gap by name, with the money already banked on the
+ * right. Round-winner money from final rounds only — a live round's provisional winner and the
+ * championship places stay off it, so "won so far" always means won.
+ */
+function WeekLine({ vm }: { vm: PlayerWeekVM }) {
+  return (
+    <div className="flex items-center gap-3 rounded border border-hair bg-ground px-3 py-2.5">
+      <span className="tnum fx-title font-display text-[1.6rem] font-semibold leading-none text-paper">
+        {vm.positionLabel}
+      </span>
+      <span className="flex flex-1 flex-col gap-[3px]">
+        <span className="tnum text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-paper-faint">
+          The week · {vm.throughLabel}
+        </span>
+        <span className="tnum text-[0.8rem] text-paper-dim">
+          <strong className="font-semibold text-paper">{vm.total} pts</strong> · {vm.backLabel}
+        </span>
+      </span>
+      <span className="flex flex-col items-end gap-[3px]">
+        <span className="tnum font-display text-[1.15rem] font-semibold leading-none text-gold-bright">
+          {formatMoney(vm.wonCents).replace(/\.00$/, '')}
+        </span>
+        <span className="text-[0.58rem] uppercase tracking-[0.14em] text-paper-faint">won so far</span>
+      </span>
+    </div>
   )
 }

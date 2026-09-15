@@ -107,6 +107,13 @@ export function formatStandingBack(position: number, gap: number): string {
   return gap === 0 ? 'LEVEL' : `${gap} BACK`
 }
 
+/** 1 → "1st", 2 → "2nd", 11 → "11th", 22 → "22nd". */
+export function ordinalOf(n: number): string {
+  const suf = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (suf[(v - 20) % 10] ?? suf[v] ?? suf[0])
+}
+
 /** The position label, "T1" for a genuinely shared position (competition ranking). */
 export function formatPosition(position: number, tie: boolean): string {
   return tie ? `T${position}` : String(position)
