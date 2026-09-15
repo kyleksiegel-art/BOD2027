@@ -847,9 +847,8 @@ gets most of the value). **No new tables, no schema change, no scoring change.**
   **off-screen** (`fixed left-[-10000px]`, 540px and 390×844), never `display:none` — a hidden element
   has no layout and rasterises to nothing. Output: 1080×~1140 and 780×1688 PNGs, ~180 KB each. Buttons
   hidden where `navigator.share` is undefined (desktop).
-- **Ways in:** the Players tab (below), and Home's `StrokesCardsLink` ("Strokes cards for the next
-  round" → `/info/players`) under the countdown pre-trip and under the live panel's buttons between /
-  during rounds — gated on `useHasStrokesCards()` so it never points at an empty row.
+- **The Players tab is the only way in** (Kyle 2026-09-14: "I don't need the strokes link" — a Home
+  link was built and removed the same day; don't re-add one).
 - **Entry point: the Players tab.** `PlayerCardVM.strokesCard` (selectors); `Players.tsx` renders
   `NextRoundBlock` at the top of a player's opened panel, above Form. A row is now **expandable when
   either form or a strokes card exists** — before the trip there is no form, and the card is the

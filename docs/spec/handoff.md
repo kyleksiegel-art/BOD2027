@@ -4,11 +4,11 @@
   conversation (no Apple developer account → a picture instead). Branch `strokes-card` off `main`.
 - **New:** `src/lib/data/strokesCard.ts` (`buildStrokesCards`, `nextRoundNumber`, `strokesCardFilename`),
   `src/components/StrokesCard.tsx` (`NextRoundBlock`, `StrokesCardImage`), `strokesCard.test.ts` (7).
-- **Changed:** `selectors.ts` (`PlayerCardVM.strokesCard`, `useHasStrokesCards`), `routes/info/Players.tsx`
+- **Changed:** `selectors.ts` (`PlayerCardVM.strokesCard`), `routes/info/Players.tsx`
   (the card rendered LIVE at the top of an opened row, share buttons under it; rows expandable when
-  form OR card exists), `routes/Home.tsx` (`StrokesCardsLink` → `/info/players`), CLAUDE.md §"Strokes card".
+  form OR card exists); CLAUDE.md §"Strokes card".
 - Kyle's second-pass feedback ("can't look at it without creating an image; can't go anywhere") →
-  the card is on screen, not just a file, and Home links to it.
+  the card is on screen, not just a file. A Home link was added then removed on Kyle's call — Players is the only way in.
 - Follows the next round (in_progress first, else upcoming); one card per playing player; strokes and
   holes off `buildRoundDetail`'s worksheet + `allocateStrokes`. Two PNGs: Photos (1080 wide) and a
   390×844 lock-screen frame with the clock area left as ground.
