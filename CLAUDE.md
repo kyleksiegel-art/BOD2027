@@ -736,6 +736,10 @@ these are their fixes. No scoring math changed.
 - Tests: `roundSetup.test.ts` (2), `authexpiry.test.ts` (3), `recap-winner.test.ts` (3). Full
   `vitest run` → **192**. `supabase test db` → **241** (`write_path.sql` plan 76 — final-round
   refusals + reopen; `admin_path.sql` plan 108 — reopen grant + gate).
+- **Reset to upcoming** (2026-09-14, `20260914120000_reset_round.sql`): `rpc_reset_round` wipes scores,
+  CTP and `round_money` and sets `upcoming` (keeps `round_players`) — the pre-trip undo for testing.
+  `rpc_clear_round_scores` deliberately stays `in_progress` (mid-round re-entry). Button sits under
+  Clear scores in the Rounds editor. pgTAP → **246**.
 - Things that will bite: a Dexie mirror keeps rows the server deleted (F-014, unfixed) — after a
   `db reset` or "Clear scores", clear IndexedDB on the test browser or the merge keeps the
   newer-stamped ghosts and they *win* over the re-seeded rows.

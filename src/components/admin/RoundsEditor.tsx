@@ -3,6 +3,7 @@ import {
   clearRoundScores,
   finalizeRound,
   reopenRound,
+  resetRound,
   saveRound,
   saveRoundPlayersQueued,
   startRound,
@@ -87,6 +88,7 @@ function RoundPanel({
   )
   const [holesCounted, setHolesCounted] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
   const [confirmReopen, setConfirmReopen] = useState(false)
 
   const unassigned = vm.participants.filter((p) => p.row === null)
@@ -379,6 +381,34 @@ function RoundPanel({
             <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
               Deletes every score and CTP result for this round and puts it back in progress so
               it can be re-entered. Tees and handicaps are kept. This cannot be undone.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {confirmReset ? (
+                <>
+                  <Button
+                    tone="danger"
+                    disabled={disabled || life.busy}
+                    onClick={() => {
+                      setConfirmReset(false)
+                      void life.run('Round reset — back to upcoming, nothing played.', () =>
+                        resetRound(vm.round.id),
+                      )
+                    }}
+                  >
+                    Yes, reset to upcoming
+                  </Button>
+                  <Button onClick={() => setConfirmReset(false)}>Cancel</Button>
+                </>
+              ) : (
+                <Button tone="danger" disabled={disabled} onClick={() => setConfirmReset(true)}>
+                  Reset to upcoming
+                </Button>
+              )}
+            </div>
+            <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
+              Deletes every score, CTP result and frozen money for this round and puts it back to
+              Upcoming, as if it had never started. Tees and handicaps are kept. Use this to undo
+              testing before the trip. This cannot be undone.
             </p>
           </div>
         ) : null}
