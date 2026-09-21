@@ -892,3 +892,35 @@ rounds went.
   `format.ts` (was private in `compute.ts` and `annualReport.ts`).
 - Tests: `form.test.ts` (10 — form 7 + `buildPlayerWeek` 3). Full `vitest run` → **220**.
   `tsc -b` + `npm run build` clean. Verified at 375px: week line, tiles, verdict, strips with results.
+
+## What it takes (2026-09-20, branch `what-it-takes`) — the shape to reuse
+
+One line under each Standings row while a round is live: the gap as an instruction. Chosen off
+a two-board mockup on the `BOD27 Rebrand Ideas` canvas (Kyle also saw and rejected a Week/Today
+toggle and a "race line" chart — don't re-pitch either). **No new tables, no schema change, no
+scoring change.**
+
+- **`StandingVM.chase: StandingChase | null`** (`compute.ts`, built inside `buildStandings` off the
+  same `liveDetail`/`ranked` the rows use). Kinds: `leads` (sole leader: `by`, `holesLeft`),
+  `clinched`, `level` (shares the lead on points, `withName`), `needs` (`leaderName`, `by`,
+  `holesLeft`), `out_today` (`roundsToCome`, `nextCourse`), `out`. Null when no round is live or
+  the player isn't in it. Words live in **`formatChaseLine`** (`format.ts`); names only, first
+  names (matches `tiebreakNote`), never a pronoun.
+- **`by` is always gap + 1** — the margin to lead *outright*. Level goes to the tiebreak, which is
+  not a promise to make on a tee box.
+- **"Out of reach" is arithmetic, not vibes:** `by > maxPerHole × holesLeft`, where `maxPerHole`
+  is the max of the live points table (so a custom table moves it) and holes left is the
+  player's own (`holesCounted − thru`; a DNP has 0). `out` uses the week's remaining holes
+  (today + `holes_counted ?? 18` per `upcoming` round after the live one); `out_today` only
+  today's. `clinched` = every other player in the round is `out`. Points only ever add, so this
+  holds whatever the leader does.
+- **Copy is one line at 375px** beside the position / arrow / total columns: "Outscore Jon by 6
+  over 16 holes", "Out of reach today · Bone Valley left", "Leads by 5 · 15 to play" (the tail
+  drops at 0 holes left), "Level with Kyle", "Clinched", "Out of reach". "Needs to outscore…"
+  wrapped — don't lengthen it.
+- Tests: `chase.test.ts` (7, two-player three-round fixture). Full `vitest run` → **227**.
+  `npm run build` clean. Verified at 375px against the cached Phase 4 seed with round 3 forced
+  live in Dexie. **Gotcha:** the LAN dev Supabase (`.env.local`) was up, so hydrate reverted the
+  Dexie edit on reload; a gitignored `.env.development.local` with a dead `VITE_SUPABASE_URL`
+  (removed afterwards) is the clean way to freeze cached data for a live check.
+

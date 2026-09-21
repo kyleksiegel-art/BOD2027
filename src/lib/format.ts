@@ -134,6 +134,42 @@ export function formatLiveLine(live: {
 }
 
 /**
+ * "What it takes" — the words for `StandingChase`. Names only, never a pronoun. Numbers stay
+ * numerals so the line reads at a glance in the cart. `holesLeft` 0 drops the tail rather
+ * than saying "0 to play". Kept to one line at 375px beside the position, arrow and total
+ * columns — "Outscore", not "Needs to outscore".
+ */
+export function formatChaseLine(chase: {
+  kind: 'leads' | 'clinched' | 'level' | 'needs' | 'out_today' | 'out'
+  by?: number
+  holesLeft?: number
+  withName?: string
+  leaderName?: string
+  roundsToCome?: number
+  nextCourse?: string | null
+}): string {
+  const holes = (n: number) => `${n} hole${n === 1 ? '' : 's'}`
+  const tail = (n: number | undefined) => (n && n > 0 ? ` · ${n} to play` : '')
+  switch (chase.kind) {
+    case 'leads':
+      return `Leads by ${chase.by}${tail(chase.holesLeft)}`
+    case 'clinched':
+      return 'Clinched'
+    case 'level':
+      return `Level with ${chase.withName}${tail(chase.holesLeft)}`
+    case 'needs':
+      return `Outscore ${chase.leaderName} by ${chase.by} over ${holes(chase.holesLeft ?? 0)}`
+    case 'out_today': {
+      const n = chase.roundsToCome ?? 0
+      if (n === 1 && chase.nextCourse) return `Out of reach today · ${courseShortName(chase.nextCourse)} left`
+      return `Out of reach today · ${n} round${n === 1 ? '' : 's'} left`
+    }
+    case 'out':
+      return 'Out of reach'
+  }
+}
+
+/**
  * Round identity for the `.round[data-course]` accent system (index.css) — Red / Black /
  * Blue / Bone Valley get a distinct rail color so R1–R4 read at a glance. Matched on the
  * course name substring so it works whether the caller has `courses.name` ("Streamsong Red")

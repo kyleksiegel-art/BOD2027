@@ -299,12 +299,30 @@ export interface StandingLive {
   complete: boolean // through the round's counted window
 }
 
+/**
+ * "What it takes" — the one line under a standings row while a round is live. Structured so
+ * `formatChaseLine` (format.ts) owns the words; the arithmetic lives here, off the same
+ * numbers as the board. `by` is always the margin needed to lead OUTRIGHT (gap + 1) — a
+ * level finish goes to the tiebreak, which is not something to promise on a tee box.
+ * "Out of reach" means it: even the maximum points on every remaining hole (this round's
+ * counted window, plus 18 per upcoming round for the week) cannot pass the leader, whatever
+ * the leader does — points only ever add.
+ */
+export type StandingChase =
+  | { kind: 'leads'; by: number; holesLeft: number } // sole leader
+  | { kind: 'clinched' } // sole leader nobody can catch this week
+  | { kind: 'level'; withName: string; holesLeft: number } // shares the lead on points
+  | { kind: 'needs'; leaderName: string; by: number; holesLeft: number }
+  | { kind: 'out_today'; roundsToCome: number; nextCourse: string | null } // gone today, week alive
+  | { kind: 'out' } // the week is gone
+
 export interface StandingVM extends StandingRow {
   name: string
   sortOrder: number
   byRound: RoundPointsEntry[] // per-round points, aligned to StandingsVM.roundColumns
   live: StandingLive | null // the in-progress round, per player; null when nothing is live
   tie: boolean // shares its position with another player (a genuinely unbreakable tie) → render "T{position}"
+  chase: StandingChase | null // "what it takes" while a round is live; null otherwise / not in the round
 }
 
 export interface RoundColumn {
@@ -510,6 +528,43 @@ export function buildStandings(dbData: Db): StandingsVM {
   const positionCount = new Map<number, number>()
   for (const r of ranked) positionCount.set(r.position, (positionCount.get(r.position) ?? 0) + 1)
 
+  // ── "What it takes" ── computed only while a round is live, for players in that round.
+  // Holes left today = the counted window minus holes completed (a DNP has none). The week's
+  // remaining holes add 18 (or holes_counted) per upcoming round. Max points per hole comes
+  // from the same points table the scoring uses, so a custom table changes the arithmetic.
+  const firstName = (id: string) => (nameById.get(id)?.name ?? 'Player').split(/\s+/)[0]
+  const maxPerHole = liveDetail ? Math.max(...Object.values(pointsTableOf(dbData.settings))) : 0
+  const upcoming = liveDetail
+    ? orderedRounds.filter((rr) => rr.status === 'upcoming' && rr.round_number > liveDetail.round.round_number)
+    : []
+  const upcomingHoles = upcoming.reduce((n, rr) => n + (rr.holes_counted ?? 18), 0)
+  const nextCourse = upcoming.length > 0 ? dbData.courses.find((c) => c.id === upcoming[0].course_id)?.name ?? null : null
+  const holesLeftToday = (id: string): number => {
+    const pr = liveByPlayer.get(id)
+    if (!pr || !liveDetail || pr.status !== 'playing') return 0
+    return Math.max(0, liveDetail.holesCounted - pr.thru)
+  }
+  const leader = ranked[0]
+  const chaserChase = (r: StandingRow): StandingChase => {
+    const by = r.gapToLeader + 1
+    const today = holesLeftToday(r.playerId)
+    if (by > maxPerHole * (today + upcomingHoles)) return { kind: 'out' }
+    if (by > maxPerHole * today) return { kind: 'out_today', roundsToCome: upcoming.length, nextCourse }
+    return { kind: 'needs', leaderName: firstName(leader.playerId), by, holesLeft: today }
+  }
+  const chaseFor = (r: StandingRow): StandingChase | null => {
+    if (!liveDetail || !liveByPlayer.has(r.playerId) || ranked.length < 2) return null
+    const today = holesLeftToday(r.playerId)
+    if (r.position === 1) {
+      const other = ranked.find((o) => o.playerId !== r.playerId)!
+      if (other.total === r.total) return { kind: 'level', withName: firstName(other.playerId), holesLeft: today }
+      const others = ranked.filter((o) => o.playerId !== r.playerId && liveByPlayer.has(o.playerId))
+      if (others.length > 0 && others.every((o) => chaserChase(o).kind === 'out')) return { kind: 'clinched' }
+      return { kind: 'leads', by: r.total - other.total, holesLeft: today }
+    }
+    return chaserChase(r)
+  }
+
   const rows: StandingVM[] = ranked.map((r) => {
     const p = nameById.get(r.playerId)
     const pr = liveDetail ? liveByPlayer.get(r.playerId) : undefined
@@ -528,6 +583,7 @@ export function buildStandings(dbData: Db): StandingsVM {
       byRound: byRoundByPlayer.get(r.playerId) ?? [],
       live,
       tie: (positionCount.get(r.position) ?? 1) > 1,
+      chase: chaseFor(r),
     }
   })
 
@@ -537,7 +593,6 @@ export function buildStandings(dbData: Db): StandingsVM {
   if (ranked.length >= 2 && ranked[0].total === ranked[1].total) {
     const a = ranked[0]
     const b = ranked[1]
-    const firstName = (id: string) => (nameById.get(id)?.name ?? 'Player').split(/\s+/)[0]
     if (a.position === b.position) {
       tiebreakNote = `${firstName(a.playerId)} and ${firstName(b.playerId)} are level after every tiebreaker.`
     } else {

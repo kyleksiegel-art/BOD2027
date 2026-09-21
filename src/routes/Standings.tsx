@@ -6,7 +6,7 @@ import { FieldReportStrip } from '@/components/FieldReportStrip'
 import { AnnualReport } from '@/components/AnnualReport'
 import { useStandings, useFieldReport, useAnnualReport } from '@/lib/data/selectors'
 import type { StandingsLiveRound } from '@/lib/data/compute'
-import { formatStandingBack, formatPosition, formatLiveLine } from '@/lib/format'
+import { formatStandingBack, formatPosition, formatLiveLine, formatChaseLine } from '@/lib/format'
 
 /**
  * The live-round status line ("● ROUND 3 LIVE · SCORES THROUGH HOLE 12"). Renders only while
@@ -104,6 +104,10 @@ export default function Standings() {
                       >
                         {liveLine}
                       </span>
+                    )}
+                    {r.chase && (
+                      // "What it takes": the gap as an instruction, while the round is live.
+                      <span className="tnum text-[0.72rem] text-paper-dim">{formatChaseLine(r.chase)}</span>
                     )}
                   </span>
                   <span className="flex flex-col items-end gap-0.5 text-right">

@@ -1,15 +1,14 @@
-# Handoff — 2026-09-14 (App complete; January pre-trip checklist)
-- State: PR #30 (player card) merged, live on bod2027.netlify.app. `main` clean, `vitest run` → 220,
-  `tsc -b` + `npm run build` clean. Kyle: "this all seems pretty perfect" — maintenance only until Feb 4–7 2027.
-- The logic is proven (220 vitest + 241 pgTAP); the system has never run under real conditions. Remaining
-  risk is operational. Work through this in late January, on the actual phones:
-  1. **Supabase awake, on a tier that won't pause** (free tier sleeps after 7 idle days). Open the app,
-     confirm hydrate returns rows, confirm `pin-verify` still deploys and unlocks.
-  2. **Production data is real**: every round **Reset to upcoming** (Rounds editor, new 2026-09-14 —
-     wipes scores/CTP/money, keeps tees), real indexes entered, tees chosen, tee times set, money amounts confirmed.
-  3. **All four phones**: install the PWA over HTTPS, accept one SW update prompt, confirm storage persists.
-  4. **Share once on-device**: recap card, round report, strokes card — iOS Safari will have moved since Sept.
-  5. **Drive one real hole**: airplane mode on, save, airplane mode off; confirm the flush, the other phone's
-     Realtime update, and an empty outbox in Diagnostics.
-  6. **Process rule, no mechanism**: never edit a handicap index on Players after Thursday's tee — the live
-     index re-derives finalized rounds' points (only money is frozen).
+# Handoff — 2026-09-20 (branch `what-it-takes`, uncommitted)
+
+- Built the "what it takes" line on Standings: `StandingVM.chase` in `compute.ts`, words in
+  `formatChaseLine` (`format.ts`), rendered under the live line in `Standings.tsx`.
+- Kinds: leads / clinched / level / needs / out_today / out. `by` = gap + 1. "Out of reach" is
+  max-points × holes-left arithmetic off the live points table; the week adds 18 per upcoming round.
+- Tests: `chase.test.ts` (7). `vitest run` → 227. `npm run build` clean.
+- Browser-verified at 375px with the Phase 4 seed's round 3 forced live in Dexie; all six copy
+  variants fit on one line.
+- Not committed — Kyle to sign off. Then: commit, PR `what-it-takes` → `main`, Netlify preview.
+- Design canvas `BOD27 Rebrand Ideas` holds the session's mockups (rebrands, offshoots, Field
+  Report, Enter, Standings). Kyle rejected the rebrands, the offshoots, the Week/Today toggle and
+  the race line; only this line was picked.
+- CLAUDE.md has a new "What it takes" section, including the dead-URL env trick for live checks.
