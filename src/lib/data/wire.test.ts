@@ -132,7 +132,7 @@ describe('buildFieldReport', () => {
     const lines = h4.events.map(text)
     // Cumulative after 4: Denove 9, Aronson 7, Hersh 6 — Denove takes it, Aronson drops, Hersh slips.
     expect(lines[0]).toBe('Denove birdies the 4th. Takes the lead by 2.')
-    expect(lines[1]).toBe('Aronson doubles the 4th. Drops to 2nd, 2 back of Denove. First zero of the round.')
+    expect(lines[1]).toBe('Aronson blanks the 4th. Drops to 2nd, 2 back of Denove. First zero of the round.')
     expect(lines[2]).toBe('Hersh picks up on the 4th. Slips to 3rd, 3 back of Denove. First zero of the round.')
     expect(h4.events[2].meta).toBe('picked up · 0 pts · position change')
     // The strip reads the top of the newest hole.

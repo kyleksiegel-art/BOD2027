@@ -205,9 +205,9 @@ export function buildAnnualReport(dbData: Db): AnnualReportVM | null {
   const moneyVM: AnnualMoneyVM = {
     totalPot: formatMoney(money.totalPotCents),
     lines: [
-      { label: `1st overall — ${firstName(champName)}`, amount: formatMoney(money.champFirstCents) },
-      ...(secondRow ? [{ label: `2nd overall — ${firstName(nameOf(secondRow.playerId))}`, amount: formatMoney(money.champSecondCents) }] : []),
-      { label: `Round winners — ${plural(roundWinners.length, 'round')} × ${formatMoney(money.rounds.find((r) => r.counts)?.roundPurseCents ?? 0)}`, amount: formatMoney(money.roundWinnersTotalCents) },
+      { label: `1st overall · ${firstName(champName)}`, amount: formatMoney(money.champFirstCents) },
+      ...(secondRow ? [{ label: `2nd overall · ${firstName(nameOf(secondRow.playerId))}`, amount: formatMoney(money.champSecondCents) }] : []),
+      { label: `Round winners · ${plural(roundWinners.length, 'round')} × ${formatMoney(money.rounds.find((r) => r.counts)?.roundPurseCents ?? 0)}`, amount: formatMoney(money.roundWinnersTotalCents) },
     ],
     balanced: money.reconciliation.balanced,
     balanceLabel: formatMoney(money.reconciliation.awardedCents + money.reconciliation.pendingCents),
@@ -471,7 +471,7 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
     const gap = rows[0].total - r.total
     pField.push(s(nameOf(r.playerId)), t(` finished ${ordinalOf(r.position)} at ${r.total}${gap > 0 ? `, ${gap} back` : ''}`))
     const hook = hookFor(r.playerId)
-    pField.push(t(hook ? ` — ${hook}.` : `.`))
+    pField.push(t(hook ? `, with ${hook}.` : `.`))
   }
 
   // ── Paragraph 4: the money + close ──

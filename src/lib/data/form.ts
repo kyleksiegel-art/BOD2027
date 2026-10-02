@@ -54,15 +54,17 @@ export interface FormStrip {
 }
 
 /**
- * Points against the index. Net Stableford pays 2 a hole for a net par, so a player playing
- * exactly to the index scores 36 over 18 holes; every point short is, near enough, a stroke over.
+ * Points against net par. Net Stableford pays 2 a hole for a net par, so 36 over 18 holes is net
+ * par off the strokes the player actually got; every point short is, near enough, a stroke over.
+ * NOT "the index": strokes come off the low man, so nobody plays off their own index and 36 pts
+ * would overstate it for everyone but a scratch low man. (Field name kept for its readers.)
  * Scaled per 18 holes so a half-played round doesn't drag the figure down.
  */
 export interface FormVsIndex {
   pointsPerRound: number // points per 18 holes played, one decimal
   perRound: number // strokes over (positive) or under (negative) the index per round, one decimal
   lean: 'over' | 'under' | 'level'
-  verdict: string // the strong opening — "4 over the index a round."
+  verdict: string // the strong opening — "4 over net par a round."
   note: string // the rest — "36 points is level; the low round was 28 on the Red."
 }
 
@@ -259,10 +261,10 @@ function vsIndexFor(holesPlayed: number, points: number, strips: FormStrip[]): F
   const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
 
   if (lean === 'level') {
-    return { pointsPerRound, perRound, lean, verdict: 'Playing to the index.', note: '36 points a round is level.' }
+    return { pointsPerRound, perRound, lean, verdict: 'Level with net par.', note: '36 points a round is net par.' }
   }
-  const verdict = `${fmt(Math.abs(perRound))} ${lean} the index a round.`
-  let note = '36 points is level'
+  const verdict = `${fmt(Math.abs(perRound))} ${lean} net par a round.`
+  let note = '36 points is net par'
   if (lean === 'over' && low) note += `; the low round was ${low.points} on the ${courseShortName(low.courseName)}`
   if (lean === 'under' && high) note += `; the best round was ${high.points} on the ${courseShortName(high.courseName)}`
   return { pointsPerRound, perRound, lean, verdict, note: `${note}.` }

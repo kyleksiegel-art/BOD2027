@@ -69,9 +69,6 @@ export default function FieldReport() {
             </section>
           ))}
 
-          <p className="mt-6 text-[0.72rem] leading-relaxed text-paper-faint">
-            Every line is written by the app from the scores saved on the Enter screen. Nothing here is typed.
-          </p>
         </>
       )}
     </Page>

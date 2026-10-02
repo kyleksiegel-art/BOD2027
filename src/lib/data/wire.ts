@@ -73,15 +73,25 @@ function ordinalOf(n: number): string {
 const t = (text: string): WireSeg => ({ text })
 const s = (text: string): WireSeg => ({ text, strong: true })
 
-/** "birdies the 12th" — the verb phrase for a hole's points. */
-function scoreVerb(points: number, pickedUp: boolean, hole: string): string {
+const NET_NAME: Record<number, string> = { 5: 'net albatross', 4: 'net eagle', 3: 'net birdie', 2: 'net par', 1: 'net bogey' }
+const GROSS_VERB: Record<number, string> = { [-3]: 'makes an albatross on', [-2]: 'eagles', [-1]: 'birdies', 0: 'pars', 1: 'bogeys' }
+
+/**
+ * The verb phrase for one player's hole. Net achievements say "net" in the sentence itself:
+ * nearly every birdie in a net game is a net birdie, and the big line must not read as a real
+ * one. Plain golf verbs ("birdies") are kept for what the gross score actually was: a hole with
+ * no stroke on it (gross is net), or a real gross birdie or better ("birdies the 7th for a net eagle").
+ */
+export function scoreVerb(points: number, pickedUp: boolean, hole: string, grossToPar: number | null, stroked: boolean): string {
   if (pickedUp) return `picks up on the ${hole}`
-  if (points >= 5) return `makes a net albatross on the ${hole}`
-  if (points === 4) return `eagles the ${hole}`
-  if (points === 3) return `birdies the ${hole}`
-  if (points === 2) return `pars the ${hole}`
-  if (points === 1) return `bogeys the ${hole}`
-  return `doubles the ${hole}`
+  if (points === 0) return `blanks the ${hole}`
+  const gross = grossToPar === null ? null : Math.max(-3, grossToPar)
+  if (gross !== null && gross < 0) {
+    const verb = GROSS_VERB[gross]
+    return stroked ? `${verb} the ${hole} for a ${NET_NAME[Math.min(5, points)]}` : `${verb} the ${hole}`
+  }
+  if (!stroked && gross !== null && gross <= 1) return `${GROSS_VERB[gross]} the ${hole}`
+  return `makes a ${NET_NAME[Math.min(5, points)]} on the ${hole}`
 }
 /** "net birdie" — the points label for the meta line. */
 function scoreLabel(points: number, pickedUp: boolean): string {
@@ -93,11 +103,18 @@ function scoreLabel(points: number, pickedUp: boolean): string {
   if (points === 1) return 'net bogey'
   return 'net double or worse'
 }
-function verbForField(points: number): string {
-  if (points >= 3) return 'birdies'
-  if (points === 2) return 'pars'
-  if (points === 1) return 'bogeys'
-  return 'blanks'
+/** "Everyone makes a net par on the 11th." — the field-collapse line, net in the sentence. */
+function fieldLine(points: number, hole: string, plainGross: number | null): string {
+  if (plainGross !== null) return `Field ${GROSS_VERB[plainGross]} the ${hole}.` // no strokes, same gross: say what it was
+  if (points === 0) return `Everyone blanks the ${hole}.`
+  return `Everyone makes a ${NET_NAME[Math.min(5, points)]} on the ${hole}.`
+}
+
+/** The shared gross-to-par when nobody got a stroke and all made the same score (par/bogey range), else null. */
+function plainFieldGross(done: { grossToPar: number | null; stroked: boolean }[]): number | null {
+  const g = done[0]?.grossToPar ?? null
+  if (g === null || g < -3 || g > 1) return null
+  return done.every((d) => !d.stroked && d.grossToPar === g) ? g : null
 }
 
 /** Competition rank (ties share the higher place) by cumulative points, desc. */
@@ -176,12 +193,18 @@ export function buildFieldReport(dbData: Db): WireVM | null {
 
     // Apply the hole.
     const runBefore = new Map(streak)
-    const done: { p: PlayerRoundVM; points: number; pickedUp: boolean }[] = []
+    const done: { p: PlayerRoundVM; points: number; pickedUp: boolean; grossToPar: number | null; stroked: boolean }[] = []
     for (const p of playing) {
       const hr = p.holeResults.find((h) => h.holeNumber === hole)
       if (!hr?.completed) continue
       const points = hr.points ?? 0
-      done.push({ p, points, pickedUp: hr.pickedUp })
+      done.push({
+        p,
+        points,
+        pickedUp: hr.pickedUp,
+        grossToPar: hr.grossStrokes === null ? null : hr.grossStrokes - hr.par,
+        stroked: hr.strokesReceived !== 0,
+      })
       cum.set(p.playerId, (cum.get(p.playerId) ?? 0) + points)
       if (points === 0) zeros.set(p.playerId, (zeros.get(p.playerId) ?? 0) + 1)
       const run = points > 0 ? (streak.get(p.playerId) ?? 0) + 1 : 0
@@ -207,20 +230,20 @@ export function buildFieldReport(dbData: Db): WireVM | null {
         kind: 'field',
         playerId: null,
         colorIndex: null,
-        segs: [t(`Field ${verbForField(done[0].points)} the ${nth}. No movement.`)],
+        segs: [t(`${fieldLine(done[0].points, nth, plainFieldGross(done))} No movement.`)],
         meta: `${done[0].points} ${done[0].points === 1 ? 'pt' : 'pts'} each`,
         emphasis: false,
         notability: 1,
       })
     } else {
-      for (const { p, points, pickedUp } of done) {
+      for (const { p, points, pickedUp, grossToPar, stroked } of done) {
         const last = lastName(p.name)
         const before = rankBefore.get(p.playerId) ?? 1
         const after = rankAfter.get(p.playerId) ?? 1
         const wasLeader = leadersBefore.includes(p.playerId)
         const isLeader = leadersAfter.includes(p.playerId)
         const gap = topAfter - (cum.get(p.playerId) ?? 0)
-        const segs: WireSeg[] = [s(last), t(` ${scoreVerb(points, pickedUp, nth)}.`)]
+        const segs: WireSeg[] = [s(last), t(` ${scoreVerb(points, pickedUp, nth, grossToPar, stroked)}.`)]
         const metaBits = [scoreLabel(points, pickedUp), `${points} ${points === 1 ? 'pt' : 'pts'}`]
         let kind: WireKind = points === 0 ? 'zero' : 'score'
         let notability = points >= 4 ? 4 : points === 3 ? 2 : points === 0 ? 2 : 1
@@ -251,7 +274,7 @@ export function buildFieldReport(dbData: Db): WireVM | null {
           } else if (tiedBefore && soleAfter) {
             lead(`Breaks the tie, leads by ${margin}.`, 6)
           } else if (soleBefore && isLeader && !soleAfter) {
-            lead('Caught — tied for the lead.')
+            lead('Caught. Tied for the lead.')
           } else if (soleBefore && !isLeader) {
             lead(`Drops to ${where}.`)
           } else if (after !== before) {

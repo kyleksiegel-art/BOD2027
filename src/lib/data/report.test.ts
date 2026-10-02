@@ -132,7 +132,7 @@ describe('buildRoundReport', () => {
     expect(vm.headline).toBe('Chris takes the Blue and the week.')
     const body = text(vm)
     expect(body).toContain(
-      'Chris Denove won the Blue with 37 points, 1 clear of the field. Denove was behind at the turn — the first round this week won from there.',
+      'Chris Denove won the Blue with 37 points, 1 clear of the field. Denove was behind at the turn, the first round this week won from there.',
     )
     expect(body).toContain('It turned on the 15th: Denove made a net birdie there while Jon Aronson, the leader through 14, made a zero.')
     expect(body).toContain('Chris Denove posted 37, 1 better than at Blue, the biggest jump of the day.')

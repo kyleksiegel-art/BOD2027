@@ -60,7 +60,7 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
               vm.official ? 'border-gold text-gold' : 'border-hair-strong text-paper-faint'
             }`}
           >
-            {vm.official ? 'Official' : vm.live ? `Thru ${vm.roundThru}` : 'Final'}
+            {vm.official ? 'Official' : vm.live ? `Thru ${vm.roundThru}` : 'Scores in'}
           </span>
         </div>
         <h2 className="fx-display relative mt-2 font-display text-[2rem] font-semibold leading-none text-paper">
@@ -170,7 +170,7 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
       {/* footer — actions, not content: left out of the shared image */}
       <div className="flex items-center gap-2.5 border-t border-hair bg-ground px-4 py-2.5" {...{ [SHARE_EXCLUDE_ATTR]: '' }}>
         <span className="tnum text-[0.72rem] text-paper-faint">
-          {vm.live ? `Live · thru ${vm.roundThru} · updating` : 'Final · derived on-device'}
+          {vm.live ? `Live · thru ${vm.roundThru} · updating` : vm.pending ? 'Scores in · awaiting sign-off' : 'Final'}
         </span>
         <Link
           to="/standings"
@@ -269,14 +269,16 @@ function ActFacts({ vm }: { vm: RoundRecapVM }) {
     if (vm.parThreeCount > 0) rows.push({ k: 'Closest to pin', v: <CtpChips vm={vm} /> })
   } else if (vm.act === 'final') {
     rows.push({
-      k: vm.roundWinnerCents ? 'Winner · pays' : 'Winner',
+      // Before sign-off nobody has won anything yet: "Top", and the payout is conditional.
+      k: vm.pending ? 'Top of the card' : vm.roundWinnerCents ? 'Winner · pays' : 'Winner',
       v: (
         <>
           {vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')}
-          {vm.roundWinnerCents ? ` · ${formatMoney(vm.roundWinnerCents)}` : ''}{' '}
+          {!vm.pending && vm.roundWinnerCents ? ` · ${formatMoney(vm.roundWinnerCents)}` : ''}{' '}
           <Small>
             {vm.winners[0]?.points} pts
-            {vm.margin > 0 ? `, by ${vm.margin}` : vm.onCountback ? ', on countback' : vm.winners.length > 1 ? ', shared' : ''}
+            {vm.margin > 0 ? `, by ${vm.margin}` : vm.onCountback ? ', on countback' : vm.winners.length > 1 ? ', level' : ''}
+            {vm.pending && vm.roundWinnerCents ? ` · ${formatMoney(vm.roundWinnerCents)} on sign-off` : ''}
           </Small>
         </>
       ),
@@ -404,7 +406,7 @@ function ShareButton({ vm, cardRef }: { vm: RoundRecapVM; cardRef: RefObject<HTM
 
   if (!canShare) return null
 
-  const title = vm.live ? `${vm.course.name} — thru ${vm.roundThru}` : `${vm.course.name} recap`
+  const title = vm.live ? `${vm.course.name}, thru ${vm.roundThru}` : `${vm.course.name} recap`
 
   const shareText = () => {
     const lines: string[] = []
@@ -412,7 +414,7 @@ function ShareButton({ vm, cardRef }: { vm: RoundRecapVM; cardRef: RefObject<HTM
       const lead = vm.standing[0]
       lines.push(
         lead
-          ? `${vm.course.name}, thru ${vm.roundThru} — ${lead.name.split(/\s+/)[0]} ${
+          ? `${vm.course.name}, thru ${vm.roundThru}: ${lead.name.split(/\s+/)[0]} ${
               vm.margin > 0 ? `leads by ${vm.margin}` : 'tied for the lead'
             } (${lead.points} pts).`
           : `${vm.course.name}, thru ${vm.roundThru}.`,
@@ -420,9 +422,9 @@ function ShareButton({ vm, cardRef }: { vm: RoundRecapVM; cardRef: RefObject<HTM
     } else {
       const winnerNames = vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')
       lines.push(
-        `${vm.course.name} — ${winnerNames} ${vm.winners.length > 1 ? 'share it' : 'takes it'} (${
-          vm.winners[0]?.points ?? 0
-        } pts${vm.margin > 0 ? `, by ${vm.margin}` : ''}).`,
+        `${vm.course.name}: ${winnerNames} ${
+          vm.pending ? (vm.winners.length > 1 ? 'finish level' : 'finishes top') : vm.winners.length > 1 ? 'share it' : 'takes it'
+        } (${vm.winners[0]?.points ?? 0} pts${vm.margin > 0 ? `, by ${vm.margin}` : ''})${vm.pending ? ', awaiting sign-off' : ''}.`,
       )
     }
     if (vm.week) lines.push(vm.week.line)

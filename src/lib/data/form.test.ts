@@ -153,20 +153,20 @@ describe('buildPlayerForm', () => {
     expect(forms.get(P2)!.holesWon).toBe(4)
   })
 
-  it('scores the index as points per 18 holes against 36, quoting the low complete round', () => {
+  it('scores net par as points per 18 holes against 36, quoting the low complete round', () => {
     const p1 = buildPlayerForm(makeDb()).get(P1)!
-    // 39 points over 23 holes → 30.5 a round → 5.5 over the index. R2 is live, so only R1 (33) is quotable.
+    // 39 points over 23 holes → 30.5 a round → 5.5 over net par. R2 is live, so only R1 (33) is quotable.
     expect(p1.vsIndex).toEqual({
       pointsPerRound: 30.5,
       perRound: 5.5,
       lean: 'over',
-      verdict: '5.5 over the index a round.',
-      note: '36 points is level; the low round was 33 on the Red.',
+      verdict: '5.5 over net par a round.',
+      note: '36 points is net par; the low round was 33 on the Red.',
     })
-    // Level par all round is playing to the index exactly.
+    // Level par all round is level with net par exactly.
     const p2 = buildPlayerForm(makeDb({ p2SitsOutR2: true })).get(P2)!
     expect(p2.vsIndex.lean).toBe('level')
-    expect(p2.vsIndex.verdict).toBe('Playing to the index.')
+    expect(p2.vsIndex.verdict).toBe('Level with net par.')
   })
 
   it('gives each strip its result: Won / a place on a final round, Leads / a place on a live one', () => {

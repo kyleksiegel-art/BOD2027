@@ -7,7 +7,7 @@ import { courseShortName, formatDay, formatDayLong } from '@/lib/format'
  * The round report — the round's story in four short, plain paragraphs, once the round is
  * final. Pure and offline-identical, like every other builder: rows in, a view model out, all
  * facts from the same recap/detail/championship builders the rest of the round page uses.
- * Nothing is typed; every sentence is derived.
+ * Every sentence is derived from stored scores.
  *
  * Plain language (CLAUDE.md conventions): no boardroom voice — the visual treatment carries the
  * annual-report idea, the copy does not. Names only, never pronouns, so a template never has
@@ -29,6 +29,8 @@ export interface ReportVM {
   paragraphs: ReportSeg[][]
   dateline: string // "Streamsong Black · Fri, Feb 5"
   latest: boolean // the most recent counting round — the report opens by default only then
+  /** Scores are all in but the round isn't finalized: the copy is provisional ("finished top of"). */
+  pending: boolean
 }
 
 const COUNT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
@@ -84,6 +86,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   const multi = recap.winners.length > 1
   const winnerLabel = multi ? recap.winners.map((w) => lastName(w.name)).join(' and ') : winner.name
   const theShort = theShortOf(detail.course.name)
+  const pending = recap.pending
 
   // Counting rounds so far, and the trip race through this one.
   const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
@@ -119,14 +122,14 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   // ── Paragraph 1: the result ──
   const p1: ReportSeg[] = []
   if (multi) {
-    p1.push(s(winnerLabel), t(` shared ${theShort} at `), s(`${winner.totalPoints} points`), t(`.`))
+    p1.push(s(winnerLabel), t(pending ? ` finished level on ${theShort} at ` : ` shared ${theShort} at `), s(`${winner.totalPoints} points`), t(`.`))
   } else {
-    p1.push(s(winner.name), t(` won ${theShort} with `), s(`${winner.totalPoints} points`))
+    p1.push(s(winner.name), t(pending ? ` finished top of ${theShort} with ` : ` won ${theShort} with `), s(`${winner.totalPoints} points`))
     p1.push(t(recap.margin > 0 ? `, ${recap.margin} clear of the field.` : `.`))
     const turn = recap.holeLeaders[8]
     if (turn?.inPlay && turn.order[0] !== winner.playerId) {
       const nth = nthFromBehind(dbData, roundNumber)
-      p1.push(t(` ${lastName(winner.name)} was behind at the turn${nth === 1 ? ' — the first round this week won from there' : ''}.`))
+      p1.push(t(` ${lastName(winner.name)} was behind at the turn${nth === 1 ? ', the first round this week won from there' : ''}.`))
     }
   }
 
@@ -244,7 +247,10 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   if (champLeader) {
     const secondName = champSecond ? nameOf.get(champSecond.playerId) ?? playerName(dbData, champSecond.playerId) : null
     const gapText = secondName ? (champGap > 0 ? `, ${champGap} clear of ${lastName(secondName)}` : `, level with ${lastName(secondName)}`) : ''
-    if (remainingRounds === 0) {
+    if (remainingRounds === 0 && pending) {
+      p4.push(s(champLeaderName), t(` leads the week at `), s(String(champLeader.total)), t(`${gapText}. `))
+      p4.push(t('The week is decided once this round is signed off.'))
+    } else if (remainingRounds === 0) {
       p4.push(s(champLeaderName), t(` wins the week at `), s(String(champLeader.total)), t(`${gapText}.`))
     } else {
       p4.push(s(champLeaderName), t(` leads the week at `), s(String(champLeader.total)), t(`${gapText}. `))
@@ -254,15 +260,18 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
 
   // ── Headline ──
   const winFirst = multi ? recap.winners.map((w) => firstName(w.name)).join(' and ') : firstName(winner.name)
-  const roundClause = `${winFirst} ${multi ? 'share' : 'takes'} ${theShort}`
+  const roundClause = pending
+    ? `${winFirst} ${multi ? 'finish level on' : 'tops'} ${theShort}`
+    : `${winFirst} ${multi ? 'share' : 'takes'} ${theShort}`
   let head = `${roundClause}.`
   if (champLeader) {
     const lf = firstName(champLeaderName)
     let verb: string, tail: string
-    if (remainingRounds === 0) { verb = 'takes'; tail = 'the week' }
+    if (remainingRounds === 0 && pending) { verb = 'leads'; tail = 'the week' }
+    else if (remainingRounds === 0) { verb = 'takes'; tail = 'the week' }
     else if (roundNumber === 1) { verb = 'leads'; tail = 'the week' }
     else if (leaderBefore === champLeader.playerId) { verb = 'keeps'; tail = 'the week' }
-    else { verb = 'takes'; tail = 'the week lead' }
+    else { verb = pending ? 'moves into' : 'takes'; tail = 'the week lead' }
     // The round winner is usually the week leader too. Folding the two into one sentence
     // avoids repeating the name back-to-back ("Jon takes the Red. Jon leads the week."), and
     // a shared "takes" collapses to "… and the week" rather than saying it twice.
@@ -282,6 +291,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
     paragraphs: [p1, p2, p3, pField, p4].filter((p) => p.length > 0),
     dateline: `${detail.course.name} · ${formatDay(detail.round.date)}`,
     latest,
+    pending,
   }
 }
 
