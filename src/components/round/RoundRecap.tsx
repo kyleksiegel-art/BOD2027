@@ -43,7 +43,9 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
       : 'tied'
   const heroCaption = vm.live
     ? `pts · ${leadPhrase}${leader?.projection !== null ? ` · proj ${leader.projection}` : ''}`
-    : `pts · ${shared ? 'shared' : vm.margin > 0 ? `won by ${vm.margin}` : 'shared'}`
+    : vm.pending
+      ? `pts · ${shared ? 'level at the top' : vm.margin > 0 ? `top by ${vm.margin}` : 'top on countback'} · awaiting sign-off`
+      : `pts · ${shared ? 'shared' : vm.margin > 0 ? `won by ${vm.margin}` : 'won on countback'}`
 
   return (
     <section ref={cardRef} className="round recap-card mt-6 overflow-hidden rounded-lg" data-course={slug}>

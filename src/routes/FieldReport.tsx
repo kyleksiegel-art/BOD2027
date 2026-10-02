@@ -46,7 +46,11 @@ export default function FieldReport() {
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${vm.live ? 'live-dot' : 'bg-paper-faint'}`} aria-hidden />
-            {vm.live ? `Live · thru ${vm.roundThru} · written from saved holes` : `Round ${vm.roundNumber} final`}
+            {!vm.live
+              ? `Round ${vm.roundNumber} final`
+              : vm.complete
+                ? 'Scores in · awaiting sign-off'
+                : `Live · thru ${vm.roundThru}`}
           </div>
 
           {vm.holes.map((h) => (

@@ -49,6 +49,7 @@ export interface WireVM {
   dateIso: string
   live: boolean
   roundThru: number // furthest hole any playing player has completed
+  complete: boolean // every playing player is through the counted window (scores in, maybe not signed off)
   holes: WireHole[] // newest first; only holes with at least one completed score
   latest: WireEvent | null // the top event of the newest hole — the Standings strip
   latestHole: number | null
@@ -351,6 +352,7 @@ export function buildFieldReport(dbData: Db): WireVM | null {
     dateIso: detail.round.date,
     live,
     roundThru,
+    complete: playing.every((p) => p.thru >= detail.holesCounted),
     holes,
     latest: newest?.events[0] ?? null,
     latestHole: newest?.holeNumber ?? null,

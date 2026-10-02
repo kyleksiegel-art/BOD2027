@@ -1551,7 +1551,9 @@ function pickDispatch(x: {
     return pending
       ? `${leadLabel} is in line for the round and the week.`
       : `${leadLabel} came for the round and left with the week.`
-  if (late && !multi && margin >= 6) return `${leadLabel} turned it into a procession.`
+  // Before sign-off the result isn't a result yet: no past tense ("turned it into…") on a pending card.
+  if (final && pending) return 'Scores are in. Awaiting sign-off.'
+  if (late && !multi && margin >= 6) return `${leadLabel} ${final ? 'turned' : 'is turning'} it into a procession.`
   if (late && margin <= 1)
     return final ? 'It went to the very last holes.' : 'Nothing to separate them down the stretch.'
   switch (act) {
@@ -1562,7 +1564,6 @@ function pickDispatch(x: {
     case 'closing':
       return `${remaining} to play${margin > 0 ? `, ${margin} in hand` : ', all square'}.`
     default:
-      if (pending) return 'Scores are in. Awaiting sign-off.'
       return multi ? `Honours shared on ${theShort}.` : `${leadLabel} closes out ${theShort}.`
   }
 }

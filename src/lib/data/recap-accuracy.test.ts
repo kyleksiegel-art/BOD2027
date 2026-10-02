@@ -86,6 +86,23 @@ describe('provisional vs final wording', () => {
     expect(all).not.toMatch(/\bwon\b|\bwins\b/)
   })
 
+  it('a runaway margin on a pending card stays in the present: no "turned it into a procession"', () => {
+    const db = makeDb('in_progress')
+    // Kyle birdies 3–5 too, Jon bogeys 15–17: 40 v 32, by 8.
+    db.scores = db.scores.map((sc) =>
+      sc.player_id === B && sc.hole_number >= 3 && sc.hole_number <= 5
+        ? { ...sc, gross_strokes: 3 }
+        : sc.player_id === A && sc.hole_number >= 15 && sc.hole_number <= 17
+          ? { ...sc, gross_strokes: 5 }
+          : sc,
+    )
+    const pending = buildRoundRecap(1, db)!
+    expect(pending.margin).toBe(8)
+    expect(pending.dispatch).toBe('Scores are in. Awaiting sign-off.')
+    db.rounds = db.rounds.map((r) => ({ ...r, status: 'final' as const }))
+    expect(buildRoundRecap(1, db)!.dispatch).toBe('Kyle turned it into a procession.')
+  })
+
   it('no em dashes in generated recap or report copy', () => {
     for (const status of ['final', 'in_progress'] as const) {
       const recap = buildRoundRecap(1, makeDb(status))!
