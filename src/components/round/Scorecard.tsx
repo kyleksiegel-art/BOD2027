@@ -3,9 +3,11 @@ import type { RoundDetailVM, PlayerRoundVM } from '@/lib/data/compute'
 import type { HoleResult, HoleInfo } from '@/lib/scoring'
 
 /**
- * The scorecard grid. Rows are par / stroke-index / one per player; columns are the 18
- * holes with OUT / IN / TOT subtotals. Horizontally scrolls (a scorecard is wide by
- * nature); the label column is sticky so names stay visible.
+ * The scorecard grid, as two stacked tables — front nine over back nine — so all 18 holes
+ * fit a phone without scrolling sideways (Kyle 2026-10-02). Rows are par / stroke-index /
+ * one per player; the front carries OUT, the back IN and TOT. Both share one column layout
+ * (the front's TOT column is left empty) so hole 3 sits above hole 12. Names are short
+ * (`shortName`) — a full name can't fit beside nine columns at 375px.
  *
  * Two views: net Stableford POINTS (default — the game's currency, and the total that
  * matches the leaderboard) and raw GROSS. Cells carry golf-standard net-to-par shapes
@@ -16,9 +18,9 @@ export function Scorecard({ vm, pending }: { vm: RoundDetailVM; pending?: Set<st
   const [mode, setMode] = useState<'points' | 'gross'>('points')
   const pendingCells = pending ?? EMPTY_PENDING
   if (!vm.holes) return null
-  const holes = vm.holes
-  const front = holes.filter((h) => h.holeNumber <= 9)
-  const back = holes.filter((h) => h.holeNumber >= 10)
+  const holesAll = vm.holes
+  const front = holesAll.filter((h) => h.holeNumber <= 9)
+  const back = holesAll.filter((h) => h.holeNumber >= 10)
 
   const resultsByPlayer = new Map<string, Map<number, HoleResult>>()
   for (const p of vm.players) {
@@ -32,20 +34,28 @@ export function Scorecard({ vm, pending }: { vm: RoundDetailVM; pending?: Set<st
         <ModeToggle mode={mode} setMode={setMode} />
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="border-collapse text-[0.82rem]">
+      {([['Out', front], ['In', back]] as const).map(([label, holes]) => (
+        <table key={label} className="mt-4 w-full table-fixed border-collapse text-[0.82rem]">
+          <colgroup>
+            <col className="w-[3.5rem]" />
+            {holes.map((h) => (
+              <col key={h.holeNumber} />
+            ))}
+            <col className="w-8" />
+            <col className="w-8" />
+          </colgroup>
           <thead>
-            <HeaderRow front={front} back={back} />
-            <ParRow front={front} back={back} />
-            <SiRow front={front} back={back} />
+            <HeaderRow holes={holes} label={label} />
+            <ParRow holes={holes} label={label} totalPar={sum(holesAll, (h) => h.par)} />
+            <SiRow holes={holes} />
           </thead>
           <tbody>
             {vm.players.map((p) => (
               <PlayerRow
                 key={p.playerId}
                 player={p}
-                front={front}
-                back={back}
+                holes={holes}
+                label={label}
                 results={resultsByPlayer.get(p.playerId)!}
                 cutoff={vm.holesCounted}
                 mode={mode}
@@ -54,7 +64,7 @@ export function Scorecard({ vm, pending }: { vm: RoundDetailVM; pending?: Set<st
             ))}
           </tbody>
         </table>
-      </div>
+      ))}
 
       <Legend />
     </section>
@@ -62,9 +72,15 @@ export function Scorecard({ vm, pending }: { vm: RoundDetailVM; pending?: Set<st
 }
 
 const EMPTY_PENDING: Set<string> = new Set()
-const CELL = 'w-8 min-w-8 px-0 py-1.5 text-center tnum'
-const LABEL = 'sticky left-0 z-10 bg-ground pr-3 text-left whitespace-nowrap'
-const SUB = 'w-9 min-w-9 px-0 py-1.5 text-center tnum text-paper-faint bg-ground-2/40'
+const CELL = 'px-0 py-1.5 text-center tnum'
+const LABEL = 'pr-1 text-left whitespace-nowrap overflow-hidden text-ellipsis'
+const SUB = 'px-0 py-1.5 text-center tnum text-paper-faint bg-ground-2/40'
+
+type Nine = 'Out' | 'In'
+// What the group calls each other (Kyle 2026-10-02): first names, except these two go by
+// last name. Keyed on the full player name; anyone not listed gets their first name.
+const GOES_BY: Record<string, string> = { 'Adam Hersh': 'Hersh', 'Chris Denove': 'Denove' }
+const shortName = (name: string) => GOES_BY[name] ?? (name.split(/\s+/)[0] || name)
 
 function ModeToggle({
   mode,
@@ -91,63 +107,45 @@ function ModeToggle({
   )
 }
 
-function HeaderRow({ front, back }: { front: HoleInfo[]; back: HoleInfo[] }) {
+function HeaderRow({ holes, label }: { holes: HoleInfo[]; label: Nine }) {
   return (
     <tr className="text-[0.62rem] uppercase tracking-[0.08em] text-paper-faint">
       <th className={`${LABEL} py-1.5 font-medium`}>Hole</th>
-      {front.map((h) => (
+      {holes.map((h) => (
         <th key={h.holeNumber} className={`${CELL} font-medium`}>
           {h.holeNumber}
         </th>
       ))}
-      <th className={`${SUB} font-semibold`}>Out</th>
-      {back.map((h) => (
-        <th key={h.holeNumber} className={`${CELL} font-medium`}>
-          {h.holeNumber}
-        </th>
-      ))}
-      <th className={`${SUB} font-semibold`}>In</th>
-      <th className={`${SUB} font-semibold text-paper-dim`}>Tot</th>
+      <th className={`${SUB} font-semibold`}>{label}</th>
+      <th className={`${SUB} font-semibold text-paper-dim`}>{label === 'In' ? 'Tot' : ''}</th>
     </tr>
   )
 }
 
 const sum = (hs: HoleInfo[], f: (h: HoleInfo) => number) => hs.reduce((s, h) => s + f(h), 0)
 
-function ParRow({ front, back }: { front: HoleInfo[]; back: HoleInfo[] }) {
+function ParRow({ holes, label, totalPar }: { holes: HoleInfo[]; label: Nine; totalPar: number }) {
   return (
     <tr className="border-b border-hair text-paper-dim">
       <th className={`${LABEL} py-1.5 text-[0.62rem] font-medium uppercase tracking-[0.08em]`}>Par</th>
-      {front.map((h) => (
+      {holes.map((h) => (
         <td key={h.holeNumber} className={CELL}>
           {h.par}
         </td>
       ))}
-      <td className={`${SUB} text-paper-dim`}>{sum(front, (h) => h.par)}</td>
-      {back.map((h) => (
-        <td key={h.holeNumber} className={CELL}>
-          {h.par}
-        </td>
-      ))}
-      <td className={`${SUB} text-paper-dim`}>{sum(back, (h) => h.par)}</td>
-      <td className={`${SUB} text-paper-dim`}>{sum([...front, ...back], (h) => h.par)}</td>
+      <td className={`${SUB} text-paper-dim`}>{sum(holes, (h) => h.par)}</td>
+      <td className={`${SUB} text-paper-dim`}>{label === 'In' ? totalPar : ''}</td>
     </tr>
   )
 }
 
-function SiRow({ front, back }: { front: HoleInfo[]; back: HoleInfo[] }) {
+function SiRow({ holes }: { holes: HoleInfo[] }) {
   return (
     <tr className="border-b border-hair-strong text-[0.68rem] text-paper-faint">
       <th className={`${LABEL} py-1.5 text-[0.62rem] font-medium uppercase tracking-[0.08em]`}>
         S.I.
       </th>
-      {front.map((h) => (
-        <td key={h.holeNumber} className={CELL}>
-          {h.strokeIndex}
-        </td>
-      ))}
-      <td className={SUB} />
-      {back.map((h) => (
+      {holes.map((h) => (
         <td key={h.holeNumber} className={CELL}>
           {h.strokeIndex}
         </td>
@@ -160,51 +158,44 @@ function SiRow({ front, back }: { front: HoleInfo[]; back: HoleInfo[] }) {
 
 function PlayerRow({
   player,
-  front,
-  back,
+  holes,
+  label,
   results,
   cutoff,
   mode,
   pending,
 }: {
   player: PlayerRoundVM
-  front: HoleInfo[]
-  back: HoleInfo[]
+  holes: HoleInfo[]
+  label: Nine
   results: Map<number, HoleResult>
   cutoff: number
   mode: 'points' | 'gross'
   pending: Set<string>
 }) {
+  const name = shortName(player.name)
   if (player.status === 'did_not_play') {
     return (
       <tr className="border-b border-hair">
-        <th className={`${LABEL} py-2.5 font-medium text-paper-dim`}>{player.name}</th>
-        <td colSpan={front.length + back.length + 3} className="py-2.5 pl-2 text-left text-[0.78rem] text-paper-faint">
+        <th className={`${LABEL} py-2.5 font-medium text-paper-dim`}>{name}</th>
+        <td colSpan={holes.length + 2} className="py-2.5 pl-2 text-left text-[0.78rem] text-paper-faint">
           Did not play
         </td>
       </tr>
     )
   }
 
-  const ninePoints = (hs: HoleInfo[]) =>
-    hs.reduce((s, h) => {
-      const r = results.get(h.holeNumber)
-      return s + (r?.points ?? 0)
-    }, 0)
-  const nineGross = (hs: HoleInfo[]) =>
-    hs.reduce((s, h) => {
-      const r = results.get(h.holeNumber)
-      return s + (r?.grossStrokes ?? 0)
-    }, 0)
-
-  const outVal = mode === 'points' ? ninePoints(front) : nineGross(front)
-  const inVal = mode === 'points' ? ninePoints(back) : nineGross(back)
-  const totVal = mode === 'points' ? player.totalPoints : nineGross(front) + nineGross(back)
+  const nineVal = holes.reduce((s, h) => {
+    const r = results.get(h.holeNumber)
+    return s + ((mode === 'points' ? r?.points : r?.grossStrokes) ?? 0)
+  }, 0)
+  const grossTotal = [...results.values()].reduce((s, r) => s + (r.grossStrokes ?? 0), 0)
+  const totVal = label === 'Out' ? '' : mode === 'points' ? player.totalPoints : grossTotal
 
   return (
     <tr className="border-b border-hair">
-      <th className={`${LABEL} py-2.5 font-medium text-paper`}>{player.name}</th>
-      {front.map((h) => (
+      <th className={`${LABEL} py-2.5 font-medium text-paper`}>{name}</th>
+      {holes.map((h) => (
         <ScoreCell
           key={h.holeNumber}
           hole={h}
@@ -214,18 +205,7 @@ function PlayerRow({
           unsynced={pending.has(`${player.playerId}|${h.holeNumber}`)}
         />
       ))}
-      <td className={`${SUB} font-semibold text-paper-dim`}>{outVal}</td>
-      {back.map((h) => (
-        <ScoreCell
-          key={h.holeNumber}
-          hole={h}
-          result={results.get(h.holeNumber)}
-          cutoff={cutoff}
-          mode={mode}
-          unsynced={pending.has(`${player.playerId}|${h.holeNumber}`)}
-        />
-      ))}
-      <td className={`${SUB} font-semibold text-paper-dim`}>{inVal}</td>
+      <td className={`${SUB} font-semibold text-paper-dim`}>{nineVal}</td>
       <td className={`${SUB} font-display text-[0.95rem] font-semibold text-gold-bright`}>{totVal}</td>
     </tr>
   )
@@ -234,11 +214,11 @@ function PlayerRow({
 /** net-to-par → golf-standard mark. Circle = under, square = over. */
 function shapeClass(netToPar: number | null): string {
   if (netToPar === null) return ''
-  if (netToPar <= -2) return 'rounded-full border-2 border-olive outline outline-2 outline-offset-2 outline-olive'
+  if (netToPar <= -2) return 'rounded-full border-2 border-olive outline outline-1 outline-offset-1 outline-olive'
   if (netToPar === -1) return 'rounded-full border-2 border-olive'
   if (netToPar === 0) return ''
   if (netToPar === 1) return 'border-2 border-gold'
-  return 'border-2 border-gold outline outline-2 outline-offset-2 outline-gold'
+  return 'border-2 border-gold outline outline-1 outline-offset-1 outline-gold'
 }
 
 function ScoreCell({
@@ -295,7 +275,7 @@ function ScoreCell({
           </span>
         )}
         <span
-          className={`inline-flex h-6 w-6 items-center justify-center text-[0.82rem] text-paper ${shapeClass(result.netToPar)}`}
+          className={`inline-flex h-[1.35rem] w-[1.35rem] items-center justify-center text-[0.82rem] text-paper ${shapeClass(result.netToPar)}`}
         >
           {value}
         </span>
