@@ -77,7 +77,7 @@ export function RoundReport({ vm }: { vm: ReportVM }) {
 
           {/* The share button mounts only while open, so its pre-render sees the whole card. */}
           <div className="mt-3 flex items-center gap-2.5 border-t border-hair bg-ground px-[18px] py-2.5" {...{ [SHARE_EXCLUDE_ATTR]: '' }}>
-            <span className="tnum text-[0.72rem] text-paper-faint">Written on-device from the round's scores</span>
+            <span className="tnum text-[0.72rem] text-paper-faint">{vm.pending ? 'Scores in · awaiting sign-off' : 'Final'}</span>
             <ShareReportButton vm={vm} cardRef={ref} />
           </div>
         </div>

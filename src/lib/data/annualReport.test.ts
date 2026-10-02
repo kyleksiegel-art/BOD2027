@@ -181,12 +181,12 @@ describe('buildAnnualReport', () => {
 
   it('writes a letter that names every player once', () => {
     const body = letterText(buildAnnualReport(makeDb('final'))!)
-    expect(body).toContain('Jon Aronson takes the season with 74 points, 1 clear of Denove.')
-    expect(body).toContain('Aronson led from Thursday and was never caught.')
-    expect(body).toContain('Chris Denove pushed hardest')
-    expect(body).toContain('Adam Hersh found the roughest hole, +2 net on the Blue 5th.')
+    expect(body).toContain('Jon takes the season with 74 points, 1 clear of Chris.')
+    expect(body).toContain('Jon led from Thursday and was never caught.')
+    expect(body).toContain('Chris pushed hardest')
+    expect(body).toContain('Adam found the roughest hole, +2 net on the Blue 5th.')
     expect(body).toContain('goes home with $400.00')
     expect(body).toContain('$600.00 in, every dollar accounted for. Same time next year.')
-    for (const last of ['Aronson', 'Denove', 'Hersh']) expect(body).toContain(last)
+    for (const last of ['Jon', 'Chris', 'Adam']) expect(body).toContain(last)
   })
 })

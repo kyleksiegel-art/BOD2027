@@ -61,7 +61,7 @@ export function AnnualReport({ vm }: { vm: AnnualReportVM }) {
               </div>
               <div className="mt-2.5 flex items-center gap-2 border-t border-hair pt-2.5">
                 <span className="tnum font-display text-[1.05rem] font-semibold text-gold">{vm.champion.winnings}</span>
-                <span className="text-[0.78rem] text-paper-dim">— {vm.champion.winningsDetail}</span>
+                <span className="text-[0.78rem] text-paper-dim">{vm.champion.winningsDetail}</span>
               </div>
             </div>
 
@@ -147,7 +147,7 @@ export function AnnualReport({ vm }: { vm: AnnualReportVM }) {
                 ))}
                 <div className="mt-1 flex items-center justify-between border-t border-hair-strong py-2.5">
                   <span className="text-[0.76rem] font-semibold uppercase tracking-[0.04em] text-gold">
-                    {vm.money.balanced ? '✓ Balanced — every dollar home' : 'Does not reconcile — check the purse'}
+                    {vm.money.balanced ? '✓ Balanced. Every dollar home.' : 'Does not reconcile. Check the purse.'}
                   </span>
                   <span className="tnum font-display text-[0.95rem] font-semibold text-gold">{vm.money.balanceLabel}</span>
                 </div>
@@ -183,7 +183,7 @@ export function AnnualReport({ vm }: { vm: AnnualReportVM }) {
 
           {/* The share button mounts only while open, so its pre-render sees the whole card. */}
           <div className="mt-5 flex items-center gap-2.5 border-t border-hair bg-ground px-[18px] py-2.5" {...{ [SHARE_EXCLUDE_ATTR]: '' }}>
-            <span className="tnum text-[0.72rem] text-paper-faint">{vm.seasonLabel} · written on-device</span>
+            <span className="tnum text-[0.72rem] text-paper-faint">{vm.seasonLabel}</span>
             <ShareAnnualButton vm={vm} cardRef={ref} />
           </div>
         </div>

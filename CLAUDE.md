@@ -892,3 +892,20 @@ rounds went.
   `format.ts` (was private in `compute.ts` and `annualReport.ts`).
 - Tests: `form.test.ts` (10 — form 7 + `buildPlayerWeek` 3). Full `vitest run` → **220**.
   `tsc -b` + `npm run build` clean. Verified at 375px: week line, tiles, verdict, strips with results.
+
+## Recap accuracy (2026-10-02, branch `recap-accuracy`) — don't regress
+
+- **"Scores in" vs "final" is a STATUS, not a voice.** `RoundRecapVM.pending` / `ReportVM.pending`
+  = every score in but `round.status !== 'final'`. The story reads as a result either way ("Chris
+  takes the Red", "won by 8"); only the badge ("Scores in"), the footer ("Scores in · awaiting
+  sign-off") and the payout ("$50 on sign-off", label "Winner" not "Winner · pays") wait for
+  Finalize. **Kyle 2026-10-02: a provisional "tops the Red" read as weird — don't bring it back.**
+- **Generated prose uses first names only** (round report + Annual Report letter; Kyle: "we know who
+  we are"). The every-player-named check matches first names. The wire keeps surnames.
+- **Field Report says "net" in the sentence** (`wire.ts scoreVerb`). Plain golf verbs only for what
+  the gross score was: no stroke on the hole (gross == net) or a real gross birdie+ ("birdies the 7th
+  for a net eagle"). Zeros read "blanks", never "doubles".
+- **Form compares to net par, not "the index"** — strokes come off the low man, so 36 pts is net par
+  off the strokes received, not the player's index. Field is still named `vsIndex`.
+- No em dashes and no implementation copy ("derived on-device", "nothing is typed") in generated text.
+- Tests: `recap-accuracy.test.ts` (5). Full `vitest run` → **225**.

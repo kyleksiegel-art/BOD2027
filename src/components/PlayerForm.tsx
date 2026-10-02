@@ -2,7 +2,7 @@ import type { FormCell, PlayerFormVM } from '@/lib/data/form'
 import { courseShortName, courseSlug } from '@/lib/format'
 
 /**
- * Form — what the stored scores say about a player: how far off the index, blanks against net
+ * Form — what the stored scores say about a player: how far off net par, blanks against net
  * birdies, holes won outright, then each round hole by hole with its result. Expanded from a row
  * on the Players page; everything derives on-device, so it works offline like the rest.
  *
@@ -24,7 +24,7 @@ export function PlayerForm({ vm }: { vm: PlayerFormVM }) {
 
       <div className="mt-2.5 grid grid-cols-3 gap-2">
         <Tile
-          label="Vs index"
+          label="Vs net par"
           labelClass={vsColor}
           figure={vsFigure}
           unit={vsUnit}

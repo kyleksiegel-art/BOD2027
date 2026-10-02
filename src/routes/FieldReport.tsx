@@ -46,7 +46,11 @@ export default function FieldReport() {
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${vm.live ? 'live-dot' : 'bg-paper-faint'}`} aria-hidden />
-            {vm.live ? `Live · thru ${vm.roundThru} · written from saved holes` : `Round ${vm.roundNumber} final`}
+            {!vm.live
+              ? `Round ${vm.roundNumber} final`
+              : vm.complete
+                ? 'Scores in · awaiting sign-off'
+                : `Live · thru ${vm.roundThru}`}
           </div>
 
           {vm.holes.map((h) => (
@@ -69,9 +73,6 @@ export default function FieldReport() {
             </section>
           ))}
 
-          <p className="mt-6 text-[0.72rem] leading-relaxed text-paper-faint">
-            Every line is written by the app from the scores saved on the Enter screen. Nothing here is typed.
-          </p>
         </>
       )}
     </Page>

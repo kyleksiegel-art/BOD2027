@@ -1479,6 +1479,9 @@ export interface RoundRecapVM {
   act: RecapAct
   complete: boolean // every playing player thru the counted window
   official: boolean // round.status === 'final'
+  /** Every score is in but nobody has finalized the round. The story reads as a result (Kyle
+   *  2026-10-02: "top" was weird); only the badge, footer and payout row say awaiting sign-off. */
+  pending: boolean
   live: boolean // still in progress (drives the pulse dot / present tense)
   roundThru: number // furthest any playing player has reached
   remaining: number // counted holes still to play
@@ -1545,12 +1548,12 @@ function pickDispatch(x: {
   const final = act === 'final'
   const late = final || act === 'closing'
   if (final && winnerTookWeek) return `${leadLabel} came for the round and left with the week.`
-  if (late && !multi && margin >= 6) return `${leadLabel} turned it into a procession.`
+  if (late && !multi && margin >= 6) return `${leadLabel} ${final ? 'turned' : 'is turning'} it into a procession.`
   if (late && margin <= 1)
     return final ? 'It went to the very last holes.' : 'Nothing to separate them down the stretch.'
   switch (act) {
     case 'opening':
-      return `${leadLabel} away first — a long way to go on ${theShort}.`
+      return `${leadLabel} away first. A long way to go on ${theShort}.`
     case 'moving':
       return multi ? 'Still everything to play for.' : `${leadLabel} edging clear.`
     case 'closing':
@@ -1748,6 +1751,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
   const complete = playing.every((p) => p.thru === holesCounted)
   const official = round.status === 'final'
   const live = !official && !complete
+  const pending = complete && !official
   const roundThru = Math.max(...playing.map((p) => p.thru))
   const remaining = Math.max(0, holesCounted - roundThru)
 
@@ -1957,17 +1961,17 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     default: // final
       headline = [
         { text: leadLabel, gold: true },
-        { text: multi ? ` share ${theShort}.` : onCountback ? ` takes ${theShort} on countback.` : ` takes ${theShort}.` },
+        { text: multi ? ` share ${theShort}.` : ` takes ${theShort}${onCountback ? ' on countback' : ''}.` },
       ]
   }
 
   const marginPhrase =
     margin > 0
-      ? ` — ${margin} clear of ${runnerFirst}`
+      ? `, ${margin} clear of ${runnerFirst}`
       : multi
-        ? ' — level at the top'
+        ? ', level at the top'
         : onCountback && runnerFirst
-          ? ` — level with ${runnerFirst}, decided on countback`
+          ? `, level with ${runnerFirst}, decided on countback`
           : ''
   let narrative: string
   switch (act) {
@@ -1986,7 +1990,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
               nextPar3 ? `; the par-3 ${ordinalOf(nextPar3)} still to come` : ''
             }.`
           : `Nothing between them with ${remaining} to play${
-              nextPar3 ? ` — the par-3 ${ordinalOf(nextPar3)} could decide it` : ''
+              nextPar3 ? `; the par-3 ${ordinalOf(nextPar3)} could decide it` : ''
             }.`
       break
     default: {
@@ -1997,9 +2001,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
             biggestMove.to,
           )} overall.`
         : ''
-      narrative = `${leadLabel} ${multi ? 'share' : 'takes'} ${theShort}${
-        margin > 0 ? ` by ${margin}` : ''
-      } — a round of ${winPoints}.${moverClause}`
+      narrative = `${leadLabel} ${multi ? 'share' : 'takes'} ${theShort}${margin > 0 ? ` by ${margin}` : ''} with ${winPoints} pts.${moverClause}`
     }
   }
 
@@ -2018,6 +2020,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     act,
     complete,
     official,
+    pending,
     live,
     roundThru,
     remaining,

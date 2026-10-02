@@ -95,10 +95,6 @@ const s = (text: string): ReportSeg => ({ text, strong: true })
 function firstName(name: string): string {
   return name.split(/\s+/)[0] || name
 }
-function lastName(name: string): string {
-  const parts = name.split(/\s+/)
-  return parts[parts.length - 1] || name
-}
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }
@@ -205,9 +201,9 @@ export function buildAnnualReport(dbData: Db): AnnualReportVM | null {
   const moneyVM: AnnualMoneyVM = {
     totalPot: formatMoney(money.totalPotCents),
     lines: [
-      { label: `1st overall — ${firstName(champName)}`, amount: formatMoney(money.champFirstCents) },
-      ...(secondRow ? [{ label: `2nd overall — ${firstName(nameOf(secondRow.playerId))}`, amount: formatMoney(money.champSecondCents) }] : []),
-      { label: `Round winners — ${plural(roundWinners.length, 'round')} × ${formatMoney(money.rounds.find((r) => r.counts)?.roundPurseCents ?? 0)}`, amount: formatMoney(money.roundWinnersTotalCents) },
+      { label: `1st overall · ${firstName(champName)}`, amount: formatMoney(money.champFirstCents) },
+      ...(secondRow ? [{ label: `2nd overall · ${firstName(nameOf(secondRow.playerId))}`, amount: formatMoney(money.champSecondCents) }] : []),
+      { label: `Round winners · ${plural(roundWinners.length, 'round')} × ${formatMoney(money.rounds.find((r) => r.counts)?.roundPurseCents ?? 0)}`, amount: formatMoney(money.roundWinnersTotalCents) },
     ],
     balanced: money.reconciliation.balanced,
     balanceLabel: formatMoney(money.reconciliation.awardedCents + money.reconciliation.pendingCents),
@@ -373,7 +369,7 @@ interface LetterInput {
 function buildLetter(input: LetterInput): ReportSeg[][] {
   const { dbData, champs, detailByRound, countingRoundNumbers, standings, superlatives, champId, secondRow, nameOf } = input
   const rows = standings.rows
-  const champName = nameOf(champId)
+  const champName = firstName(nameOf(champId)) // the letter uses first names; the group knows who it is
   const champTotal = rows[0].total
 
   // Running week leader through each counting round, ties broken on the real chain (as the
@@ -396,14 +392,14 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
   // ── Paragraph 1: the result + when it was decided ──
   const p1: ReportSeg[] = []
   if (input.sharedChamp && secondRow) {
-    p1.push(s(`${lastName(champName)} and ${lastName(nameOf(secondRow.playerId))}`), t(` shared the season at `), s(`${champTotal} points`), t(`.`))
+    p1.push(s(`${firstName(champName)} and ${firstName(nameOf(secondRow.playerId))}`), t(` shared the season at `), s(`${champTotal} points`), t(`.`))
   } else {
     p1.push(s(champName), t(` takes the season with `), s(`${champTotal} points`))
     if (secondRow) {
       const gap = champTotal - secondRow.total
       p1.push(gap > 0 ? t(`, `) : t(`, `))
-      if (gap > 0) p1.push(s(`${gap} clear`), t(` of ${lastName(nameOf(secondRow.playerId))}.`))
-      else p1.push(t(`level on points with ${lastName(nameOf(secondRow.playerId))} but ahead on the tiebreak.`))
+      if (gap > 0) p1.push(s(`${gap} clear`), t(` of ${firstName(nameOf(secondRow.playerId))}.`))
+      else p1.push(t(`level on points with ${firstName(nameOf(secondRow.playerId))} but ahead on the tiebreak.`))
     } else {
       p1.push(t(`.`))
     }
@@ -411,21 +407,21 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
     const firstLeader = leaders[0]?.leader
     if (firstLeader === champId) {
       const firstRound = detailByRound.get(countingRoundNumbers[0])
-      if (firstRound) p1.push(t(` ${lastName(champName)} led from ${weekdayOf(firstRound.round.date)} and was never caught.`))
+      if (firstRound) p1.push(t(` ${firstName(champName)} led from ${weekdayOf(firstRound.round.date)} and was never caught.`))
     } else {
       // The last round after which the running leader was not yet the champion.
       let tookAfterIdx = -1
       for (let i = 0; i < leaders.length; i++) if (leaders[i].leader !== champId) tookAfterIdx = i
       const takeRoundNum = leaders[tookAfterIdx + 1]?.n
       const d = takeRoundNum !== undefined ? detailByRound.get(takeRoundNum) : null
-      if (d) p1.push(t(` ${lastName(champName)} took the lead for good on ${theShortOf(d.course.name)}.`))
+      if (d) p1.push(t(` ${firstName(champName)} took the lead for good on ${theShortOf(d.course.name)}.`))
     }
   }
 
   // ── Paragraph 2: the chase ──
   const p2: ReportSeg[] = []
   if (secondRow && !input.sharedChamp) {
-    const secondName = nameOf(secondRow.playerId)
+    const secondName = firstName(nameOf(secondRow.playerId))
     p2.push(s(secondName), t(` pushed hardest`))
     // Did second ever lead the week?
     const ledRounds = leaders.filter((l) => l.leader === secondRow.playerId)
@@ -443,16 +439,16 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
   const low = superlatives.find((x) => x.key === 'low-round')
   const rough = superlatives.find((x) => x.key === 'roughest')
   if (low) {
-    p3.push(t(`The low round of the week was `), s(`${low.value} at ${low.detail.split(' · ')[0]}`), t(`, `), s(nameOf(low.playerId)), t(`.`))
+    p3.push(t(`The low round of the week was `), s(`${low.value} at ${low.detail.split(' · ')[0]}`), t(`, `), s(firstName(nameOf(low.playerId))), t(`.`))
   }
   if (rough) {
     if (p3.length) p3.push(t(` `))
-    p3.push(s(nameOf(rough.playerId)), t(` found the roughest hole, `), s(`${rough.value} net`), t(` on the ${rough.detail.split('· ')[1] ?? rough.detail}.`))
+    p3.push(s(firstName(nameOf(rough.playerId))), t(` found the roughest hole, `), s(`${rough.value} net`), t(` on the ${rough.detail.split('· ')[1] ?? rough.detail}.`))
   }
 
   // ── The rest of the field: every player named once, with a place and a hook. ──
   const named = (id: string) => {
-    const last = lastName(nameOf(id))
+    const last = firstName(nameOf(id))
     return [p1, p2, p3].some((para) => para.some((seg) => seg.text.includes(last)))
   }
   const hookFor = (id: string): string | null => {
@@ -469,9 +465,9 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
     if (named(r.playerId)) continue
     if (pField.length) pField.push(t(` `))
     const gap = rows[0].total - r.total
-    pField.push(s(nameOf(r.playerId)), t(` finished ${ordinalOf(r.position)} at ${r.total}${gap > 0 ? `, ${gap} back` : ''}`))
+    pField.push(s(firstName(nameOf(r.playerId))), t(` finished ${ordinalOf(r.position)} at ${r.total}${gap > 0 ? `, ${gap} back` : ''}`))
     const hook = hookFor(r.playerId)
-    pField.push(t(hook ? ` — ${hook}.` : `.`))
+    pField.push(t(hook ? `, with ${hook}.` : `.`))
   }
 
   // ── Paragraph 4: the money + close ──
@@ -479,7 +475,7 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
   const money = buildMoney(dbData)
   const champMoney = money.players.find((p) => p.playerId === champId)
   if (champMoney && champMoney.winningsCents > 0) {
-    p4.push(s(firstName(champName)), t(` goes home with `), s(formatMoney(champMoney.winningsCents)), t(`. `))
+    p4.push(s(champName), t(` goes home with `), s(formatMoney(champMoney.winningsCents)), t(`. `))
   }
   // Only claim "every dollar accounted for" when the purse actually reconciles; an abandoned
   // round or a misconfigured amount genuinely won't, and the money card says so above.
