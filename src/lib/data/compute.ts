@@ -1479,7 +1479,8 @@ export interface RoundRecapVM {
   act: RecapAct
   complete: boolean // every playing player thru the counted window
   official: boolean // round.status === 'final'
-  /** Every score is in but nobody has finalized the round: provisional wording, no payout claim. */
+  /** Every score is in but nobody has finalized the round. The story reads as a result (Kyle
+   *  2026-10-02: "top" was weird); only the badge, footer and payout row say awaiting sign-off. */
   pending: boolean
   live: boolean // still in progress (drives the pulse dot / present tense)
   roundThru: number // furthest any playing player has reached
@@ -1535,7 +1536,6 @@ function firstName(name: string): string {
 /** One line of voice, deterministic — picks the strongest hook the round currently offers. */
 function pickDispatch(x: {
   act: RecapAct
-  pending: boolean
   leadLabel: string
   multi: boolean
   margin: number
@@ -1544,15 +1544,10 @@ function pickDispatch(x: {
   biggestMove: RecapMover | null
   winnerTookWeek: boolean
 }): string {
-  const { act, pending, leadLabel, multi, margin, remaining, theShort, winnerTookWeek } = x
+  const { act, leadLabel, multi, margin, remaining, theShort, winnerTookWeek } = x
   const final = act === 'final'
   const late = final || act === 'closing'
-  if (final && winnerTookWeek)
-    return pending
-      ? `${leadLabel} is in line for the round and the week.`
-      : `${leadLabel} came for the round and left with the week.`
-  // Before sign-off the result isn't a result yet: no past tense ("turned it into…") on a pending card.
-  if (final && pending) return 'Scores are in. Awaiting sign-off.'
+  if (final && winnerTookWeek) return `${leadLabel} came for the round and left with the week.`
   if (late && !multi && margin >= 6) return `${leadLabel} ${final ? 'turned' : 'is turning'} it into a procession.`
   if (late && margin <= 1)
     return final ? 'It went to the very last holes.' : 'Nothing to separate them down the stretch.'
@@ -1862,7 +1857,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     const line = weekShared
       ? `${firstName(wl.name)} and ${firstName(weekRows[1].name)} share the week lead.`
       : wl.change > 0
-        ? `${firstName(wl.name)} ${official ? 'takes the week lead' : 'moves into the week lead'}${gap2 > 0 ? ` by ${gap2}` : ''}.`
+        ? `${firstName(wl.name)} ${live ? 'moves into the week lead' : 'takes the week lead'}${gap2 > 0 ? ` by ${gap2}` : ''}.`
         : `${firstName(wl.name)} holds the week lead${gap2 > 0 ? ` by ${gap2}` : ''}.`
     const winnerId = winnerIds.size === 1 ? [...winnerIds][0] : null
     winnerTookWeek =
@@ -1964,16 +1959,9 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
           : [{ text: `All square, ${remaining} to play.` }]
       break
     default: // final
-      // Provisional until the round is finalized: "tops", not "takes".
       headline = [
         { text: leadLabel, gold: true },
-        {
-          text: multi
-            ? pending
-              ? ` level atop ${theShort}.`
-              : ` share ${theShort}.`
-            : `${pending ? ' tops' : ' takes'} ${theShort}${onCountback ? ' on countback' : ''}.`,
-        },
+        { text: multi ? ` share ${theShort}.` : ` takes ${theShort}${onCountback ? ' on countback' : ''}.` },
       ]
   }
 
@@ -2013,10 +2001,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
             biggestMove.to,
           )} overall.`
         : ''
-      const verb = pending ? (multi ? 'finish level on' : 'finishes top of') : multi ? 'share' : 'takes'
-      narrative = `${leadLabel} ${verb} ${theShort}${margin > 0 ? ` by ${margin}` : ''} with ${winPoints} pts.${moverClause}${
-        pending ? ' Awaiting sign-off.' : ''
-      }`
+      narrative = `${leadLabel} ${multi ? 'share' : 'takes'} ${theShort}${margin > 0 ? ` by ${margin}` : ''} with ${winPoints} pts.${moverClause}`
     }
   }
 
@@ -2025,7 +2010,7 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
   const highlights = buildHighlights({ playing, holesCounted, holeLeaders, act, winPoints, priorBestRound })
 
   // ── Dispatch: one line of editorial voice, chosen by the strongest hook available ──
-  const dispatch = pickDispatch({ act, pending, leadLabel, multi, margin, remaining, theShort, biggestMove, winnerTookWeek })
+  const dispatch = pickDispatch({ act, leadLabel, multi, margin, remaining, theShort, biggestMove, winnerTookWeek })
 
   return {
     week,

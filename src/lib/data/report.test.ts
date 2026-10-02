@@ -113,14 +113,14 @@ describe('buildRoundReport', () => {
     const vm = buildRoundReport(1, makeDb('final'))!
     expect(vm.headline).toBe('Jon takes the Blue and leads the week.')
     const body = text(vm)
-    expect(body).toContain('Jon Aronson won the Blue with 37 points, 1 clear of the field.')
-    expect(body).toContain('Aronson led from the 1st and was never caught.')
+    expect(body).toContain('Jon won the Blue with 37 points, 1 clear of the field.')
+    expect(body).toContain('Jon led from the 1st and was never caught.')
     expect(body).toContain('Nobody had a three-hole stretch worse than 6 points.')
     // Denove and Hersh tie for 2nd; whoever the week line does not name gets a field line.
-    expect(body).toMatch(/(Chris Denove|Adam Hersh) finished 2nd with 36 points, 1 back\./)
-    expect(body).toMatch(/Jon Aronson leads the week at 37, 1 clear of (Denove|Hersh)\. One round to go\./)
+    expect(body).toMatch(/(Chris|Adam) finished 2nd with 36 points, 1 back\./)
+    expect(body).toMatch(/Jon leads the week at 37, 1 clear of (Chris|Adam)\. One round to go\./)
     expect(body).not.toContain('biggest jump') // no prior round to improve on
-    for (const last of ['Aronson', 'Denove', 'Hersh']) expect(body).toContain(last)
+    for (const last of ['Jon', 'Chris', 'Adam']) expect(body).toContain(last)
     expect(vm.dateline).toBe('Streamsong Blue · Thu, Feb 4')
     expect(vm.latest).toBe(false) // round 2 has been played — this report opens collapsed
   })
@@ -132,20 +132,20 @@ describe('buildRoundReport', () => {
     expect(vm.headline).toBe('Chris takes the Blue and the week.')
     const body = text(vm)
     expect(body).toContain(
-      'Chris Denove won the Blue with 37 points, 1 clear of the field. Denove was behind at the turn, the first round this week won from there.',
+      'Chris won the Blue with 37 points, 1 clear of the field, after trailing at the turn. First round this week won from behind at the turn.',
     )
-    expect(body).toContain('It turned on the 15th: Denove made a net birdie there while Jon Aronson, the leader through 14, made a zero.')
-    expect(body).toContain('Chris Denove posted 37, 1 better than at Blue, the biggest jump of the day.')
-    expect(body).toContain('Worst stretch of the day: Jon Aronson, 2 points across the 15th through 17th. Aronson is 3rd overall, 3 back.')
-    expect(body).toContain('Adam Hersh finished 2nd with 36 points, 1 back.')
-    expect(body).toContain('Chris Denove wins the week at 73, 1 clear of Hersh.')
+    expect(body).toContain('It turned on the 15th: Chris made a net birdie there while Jon, the leader through 14, made a zero.')
+    expect(body).toContain('Chris posted 37, 1 better than at Blue, the biggest jump of the day.')
+    expect(body).toContain('Worst stretch of the day: Jon, 2 points across the 15th through 17th. Jon is 3rd overall, 3 back.')
+    expect(body).toContain('Adam finished 2nd with 36 points, 1 back.')
+    expect(body).toContain('Chris wins the week at 73, 1 clear of Adam.')
     expect(vm.dayLabel).toBe('Day 2 of 2')
     expect(vm.latest).toBe(true)
   })
 
   it('names a player who sat out', () => {
     const body = text(buildRoundReport(2, makeDb('final', 18, true))!)
-    expect(body).toContain('Adam Hersh sat out.')
-    expect(body).not.toContain('Adam Hersh finished')
+    expect(body).toContain('Adam sat out.')
+    expect(body).not.toContain('Adam finished')
   })
 })

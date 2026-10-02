@@ -29,7 +29,7 @@ export interface ReportVM {
   paragraphs: ReportSeg[][]
   dateline: string // "Streamsong Black · Fri, Feb 5"
   latest: boolean // the most recent counting round — the report opens by default only then
-  /** Scores are all in but the round isn't finalized: the copy is provisional ("finished top of"). */
+  /** Scores are all in but the round isn't finalized: only the footer says so; the copy reads as a result. */
   pending: boolean
 }
 
@@ -37,10 +37,6 @@ const COUNT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seve
 
 function firstName(name: string): string {
   return name.split(/\s+/)[0] || name
-}
-function lastName(name: string): string {
-  const parts = name.split(/\s+/)
-  return parts[parts.length - 1] || name
 }
 function ordinalOf(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
@@ -84,7 +80,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
 
   const winner = playing[0]
   const multi = recap.winners.length > 1
-  const winnerLabel = multi ? recap.winners.map((w) => lastName(w.name)).join(' and ') : winner.name
+  const winnerLabel = multi ? recap.winners.map((w) => firstName(w.name)).join(' and ') : firstName(winner.name)
   const theShort = theShortOf(detail.course.name)
   const pending = recap.pending
 
@@ -117,19 +113,21 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   const champSecond = overall.find((r) => r.position > 1) ?? null
   const champGap = champLeader && champSecond ? champLeader.total - champSecond.total : 0
   const leaderBefore = before[0]?.playerId ?? null
-  const champLeaderName = champLeader ? nameOf.get(champLeader.playerId) ?? playerName(dbData, champLeader.playerId) : ''
+  const champLeaderName = champLeader ? firstName(nameOf.get(champLeader.playerId) ?? playerName(dbData, champLeader.playerId)) : ''
 
   // ── Paragraph 1: the result ──
   const p1: ReportSeg[] = []
   if (multi) {
-    p1.push(s(winnerLabel), t(pending ? ` finished level on ${theShort} at ` : ` shared ${theShort} at `), s(`${winner.totalPoints} points`), t(`.`))
+    p1.push(s(winnerLabel), t(` shared ${theShort} at `), s(`${winner.totalPoints} points`), t(`.`))
   } else {
-    p1.push(s(winner.name), t(pending ? ` finished top of ${theShort} with ` : ` won ${theShort} with `), s(`${winner.totalPoints} points`))
-    p1.push(t(recap.margin > 0 ? `, ${recap.margin} clear of the field.` : `.`))
+    p1.push(s(firstName(winner.name)), t(` won ${theShort} with `), s(`${winner.totalPoints} points`))
+    p1.push(t(recap.margin > 0 ? `, ${recap.margin} clear of the field` : ``))
     const turn = recap.holeLeaders[8]
     if (turn?.inPlay && turn.order[0] !== winner.playerId) {
       const nth = nthFromBehind(dbData, roundNumber)
-      p1.push(t(` ${lastName(winner.name)} was behind at the turn${nth === 1 ? ', the first round this week won from there' : ''}.`))
+      p1.push(t(`, after trailing at the turn.${nth === 1 ? ' First round this week won from behind at the turn.' : ''}`))
+    } else {
+      p1.push(t('.'))
     }
   }
 
@@ -138,7 +136,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   if (multi) {
     p2.push(t(`The lead changed hands ${plural(recap.leadChangeCount, 'time')} and nobody got clear.`))
   } else if (recap.leadChangeCount === 0) {
-    p2.push(s(lastName(winner.name)), t(` led from the 1st and was never caught.`))
+    p2.push(s(firstName(winner.name)), t(` led from the 1st and was never caught.`))
   } else {
     // The last hole on which the leader changed is where it was decided.
     let prev: string | null = null
@@ -152,12 +150,12 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
       const wHole = winner.holeResults.find((h) => h.holeNumber === decided!.hole)
       const displaced = decided.displaced ? playing.find((p) => p.playerId === decided!.displaced) : null
       const dHole = displaced?.holeResults.find((h) => h.holeNumber === decided!.hole)
-      p2.push(t(`It turned on the `), s(ordinalOf(decided.hole)), t(`: `), s(lastName(winner.name)))
+      p2.push(t(`It turned on the `), s(ordinalOf(decided.hole)), t(`: `), s(firstName(winner.name)))
       p2.push(t(` made ${pointsPhrase(wHole?.points ?? 0)} there`))
       if (displaced && dHole) {
         p2.push(
           t(` while `),
-          s(displaced.name),
+          s(firstName(displaced.name)),
           t(`, the leader through ${decided.hole - 1}, made ${pointsPhrase(dHole.points ?? 0)}.`),
         )
       } else {
@@ -178,7 +176,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
       const prevPts = c?.byRound.find((r) => r.roundNumber === prevRound.round_number && r.counts)?.points
       if (prevPts === undefined) continue
       const delta = p.totalPoints - prevPts
-      if (delta > 0 && (!best || delta > best.delta)) best = { name: p.name, pts: p.totalPoints, delta }
+      if (delta > 0 && (!best || delta > best.delta)) best = { name: firstName(p.name), pts: p.totalPoints, delta }
     }
     if (best) {
       const prevCourse = dbData.courses.find((c) => c.id === prevRound.course_id)
@@ -197,7 +195,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   const p3: ReportSeg[] = []
   const worst = worstStretch(playing, detail.holesCounted)
   if (worst) {
-    const who = nameOf.get(worst.playerId) ?? ''
+    const who = firstName(nameOf.get(worst.playerId) ?? '')
     if (worst.points <= 2) {
       p3.push(
         t(`Worst stretch of the day: `),
@@ -208,7 +206,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
       )
       const row = overall.find((r) => r.playerId === worst.playerId)
       if (row && champLeader && row.playerId !== champLeader.playerId) {
-        p3.push(t(` ${lastName(who)} is ${ordinalOf(row.position)} overall, ${champLeader.total - row.total} back.`))
+        p3.push(t(` ${firstName(who)} is ${ordinalOf(row.position)} overall, ${champLeader.total - row.total} back.`))
       }
     } else {
       p3.push(t(`Nobody had a three-hole stretch worse than ${plural(worst.points, 'point')}.`))
@@ -218,7 +216,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   // ── The rest of the field: every player is named, once. Anyone the story above skipped
   //    gets a line with a place and a hook; anyone who sat out is named as such. ──
   const named = (id: string) => {
-    const last = lastName(nameOf.get(id) ?? playerName(dbData, id))
+    const last = firstName(nameOf.get(id) ?? playerName(dbData, id))
     return [p1, p2, p3].some((para) => para.some((seg) => seg.text.includes(last)))
   }
   const pField: ReportSeg[] = []
@@ -228,7 +226,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
     const place = playing.findIndex((q) => q.totalPoints === p.totalPoints) + 1
     const gap = winner.totalPoints - p.totalPoints
     if (pField.length) pField.push(t(' '))
-    pField.push(s(p.name), t(` finished ${ordinalOf(place)} with ${p.totalPoints} points${gap > 0 ? `, ${gap} back` : ''}`))
+    pField.push(s(firstName(p.name)), t(` finished ${ordinalOf(place)} with ${p.totalPoints} points${gap > 0 ? `, ${gap} back` : ''}`))
     const done = p.holeResults.filter((h) => h.completed)
     const best = done.reduce<(typeof done)[number] | null>((b, h) => ((h.points ?? 0) >= 3 && (h.points ?? 0) > (b?.points ?? 0) ? h : b), null)
     const blanks = done.filter((h) => (h.points ?? 0) === 0).length
@@ -239,18 +237,15 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
   for (const p of detail.players) {
     if (p.status !== 'did_not_play') continue
     if (pField.length) pField.push(t(' '))
-    pField.push(s(p.name), t(' sat out.'))
+    pField.push(s(firstName(p.name)), t(' sat out.'))
   }
 
   // ── Paragraph 4: the week ──
   const p4: ReportSeg[] = []
   if (champLeader) {
     const secondName = champSecond ? nameOf.get(champSecond.playerId) ?? playerName(dbData, champSecond.playerId) : null
-    const gapText = secondName ? (champGap > 0 ? `, ${champGap} clear of ${lastName(secondName)}` : `, level with ${lastName(secondName)}`) : ''
-    if (remainingRounds === 0 && pending) {
-      p4.push(s(champLeaderName), t(` leads the week at `), s(String(champLeader.total)), t(`${gapText}. `))
-      p4.push(t('The week is decided once this round is signed off.'))
-    } else if (remainingRounds === 0) {
+    const gapText = secondName ? (champGap > 0 ? `, ${champGap} clear of ${firstName(secondName)}` : `, level with ${firstName(secondName)}`) : ''
+    if (remainingRounds === 0) {
       p4.push(s(champLeaderName), t(` wins the week at `), s(String(champLeader.total)), t(`${gapText}.`))
     } else {
       p4.push(s(champLeaderName), t(` leads the week at `), s(String(champLeader.total)), t(`${gapText}. `))
@@ -260,18 +255,15 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
 
   // ── Headline ──
   const winFirst = multi ? recap.winners.map((w) => firstName(w.name)).join(' and ') : firstName(winner.name)
-  const roundClause = pending
-    ? `${winFirst} ${multi ? 'finish level on' : 'tops'} ${theShort}`
-    : `${winFirst} ${multi ? 'share' : 'takes'} ${theShort}`
+  const roundClause = `${winFirst} ${multi ? 'share' : 'takes'} ${theShort}`
   let head = `${roundClause}.`
   if (champLeader) {
     const lf = firstName(champLeaderName)
     let verb: string, tail: string
-    if (remainingRounds === 0 && pending) { verb = 'leads'; tail = 'the week' }
-    else if (remainingRounds === 0) { verb = 'takes'; tail = 'the week' }
+    if (remainingRounds === 0) { verb = 'takes'; tail = 'the week' }
     else if (roundNumber === 1) { verb = 'leads'; tail = 'the week' }
     else if (leaderBefore === champLeader.playerId) { verb = 'keeps'; tail = 'the week' }
-    else { verb = pending ? 'moves into' : 'takes'; tail = 'the week lead' }
+    else { verb = 'takes'; tail = 'the week lead' }
     // The round winner is usually the week leader too. Folding the two into one sentence
     // avoids repeating the name back-to-back ("Jon takes the Red. Jon leads the week."), and
     // a shared "takes" collapses to "… and the week" rather than saying it twice.

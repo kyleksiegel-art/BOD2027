@@ -43,9 +43,7 @@ export function RoundRecap({ vm }: { vm: RoundRecapVM }) {
       : 'tied'
   const heroCaption = vm.live
     ? `pts · ${leadPhrase}${leader?.projection !== null ? ` · proj ${leader.projection}` : ''}`
-    : vm.pending
-      ? `pts · ${shared ? 'level at the top' : vm.margin > 0 ? `top by ${vm.margin}` : 'top on countback'} · awaiting sign-off`
-      : `pts · ${shared ? 'shared' : vm.margin > 0 ? `won by ${vm.margin}` : 'won on countback'}`
+    : `pts · ${shared ? 'shared' : vm.margin > 0 ? `won by ${vm.margin}` : 'won on countback'}`
 
   return (
     <section ref={cardRef} className="round recap-card mt-6 overflow-hidden rounded-lg" data-course={slug}>
@@ -271,8 +269,8 @@ function ActFacts({ vm }: { vm: RoundRecapVM }) {
     if (vm.parThreeCount > 0) rows.push({ k: 'Closest to pin', v: <CtpChips vm={vm} /> })
   } else if (vm.act === 'final') {
     rows.push({
-      // Before sign-off nobody has won anything yet: "Top", and the payout is conditional.
-      k: vm.pending ? 'Top of the card' : vm.roundWinnerCents ? 'Winner · pays' : 'Winner',
+      // Before sign-off the payout is conditional; the result itself reads as a result.
+      k: vm.roundWinnerCents && !vm.pending ? 'Winner · pays' : 'Winner',
       v: (
         <>
           {vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')}
@@ -424,9 +422,9 @@ function ShareButton({ vm, cardRef }: { vm: RoundRecapVM; cardRef: RefObject<HTM
     } else {
       const winnerNames = vm.winners.map((w) => w.name.split(/\s+/)[0]).join(' & ')
       lines.push(
-        `${vm.course.name}: ${winnerNames} ${
-          vm.pending ? (vm.winners.length > 1 ? 'finish level' : 'finishes top') : vm.winners.length > 1 ? 'share it' : 'takes it'
-        } (${vm.winners[0]?.points ?? 0} pts${vm.margin > 0 ? `, by ${vm.margin}` : ''})${vm.pending ? ', awaiting sign-off' : ''}.`,
+        `${vm.course.name}: ${winnerNames} ${vm.winners.length > 1 ? 'share it' : 'takes it'} (${
+          vm.winners[0]?.points ?? 0
+        } pts${vm.margin > 0 ? `, by ${vm.margin}` : ''}).`,
       )
     }
     if (vm.week) lines.push(vm.week.line)

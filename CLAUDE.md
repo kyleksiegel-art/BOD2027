@@ -895,11 +895,13 @@ rounds went.
 
 ## Recap accuracy (2026-10-02, branch `recap-accuracy`) — don't regress
 
-- **"Scores in" is not "final".** `RoundRecapVM.pending` / `ReportVM.pending` = every score in but
-  `round.status !== 'final'`. The act is still `'final'` (the card settles), but copy is provisional:
-  "tops the Red", "finishes top of", "Top of the card … $50 on sign-off", badge "Scores in", footer
-  "Scores in · awaiting sign-off"; the report's last-round week line says "leads", not "wins".
-  Past-tense win/pays wording only once the round is finalized.
+- **"Scores in" vs "final" is a STATUS, not a voice.** `RoundRecapVM.pending` / `ReportVM.pending`
+  = every score in but `round.status !== 'final'`. The story reads as a result either way ("Chris
+  takes the Red", "won by 8"); only the badge ("Scores in"), the footer ("Scores in · awaiting
+  sign-off") and the payout ("$50 on sign-off", label "Winner" not "Winner · pays") wait for
+  Finalize. **Kyle 2026-10-02: a provisional "tops the Red" read as weird — don't bring it back.**
+- **Generated prose uses first names only** (round report + Annual Report letter; Kyle: "we know who
+  we are"). The every-player-named check matches first names. The wire keeps surnames.
 - **Field Report says "net" in the sentence** (`wire.ts scoreVerb`). Plain golf verbs only for what
   the gross score was: no stroke on the hole (gross == net) or a real gross birdie+ ("birdies the 7th
   for a net eagle"). Zeros read "blanks", never "doubles".

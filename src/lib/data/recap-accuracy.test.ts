@@ -55,8 +55,8 @@ function makeDb(status: RoundRow['status']): Db {
 
 const text = (segs: { text: string }[]) => segs.map((s) => s.text).join('')
 
-describe('provisional vs final wording', () => {
-  it('a finalized round is won', () => {
+describe('scores in vs final', () => {
+  it('a finalized round is won, first names only', () => {
     const recap = buildRoundRecap(1, makeDb('final'))!
     expect(recap.pending).toBe(false)
     expect(text(recap.headline)).toBe('Kyle takes the Red.')
@@ -65,42 +65,23 @@ describe('provisional vs final wording', () => {
     const report = buildRoundReport(1, makeDb('final'))!
     expect(report.pending).toBe(false)
     expect(report.headline).toBe('Kyle takes the Red and the week.')
-    expect(text(report.paragraphs[0])).toBe('Kyle Siegel won the Red with 37 points, 2 clear of the field.')
+    expect(text(report.paragraphs[0])).toBe('Kyle won the Red with 37 points, 2 clear of the field.')
+    expect(report.paragraphs.map(text).join(' ')).not.toMatch(/Siegel|Aronson/)
   })
 
-  it('all scores in but not finalized: provisional, nobody has won yet', () => {
+  it('all scores in but not finalized: the story reads the same, only the status is pending', () => {
+    // Kyle 2026-10-02: "top" instead of "wins" was weird. The result is the result once every
+    // score is in; the badge/footer say awaiting sign-off and the payout waits for it.
     const recap = buildRoundRecap(1, makeDb('in_progress'))!
-    expect(recap.act).toBe('final') // complete, so the card settles
+    expect(recap.act).toBe('final')
     expect(recap.pending).toBe(true)
     expect(recap.live).toBe(false)
-    expect(text(recap.headline)).toBe('Kyle tops the Red.')
-    expect(recap.narrative).toBe('Kyle finishes top of the Red by 2 with 37 pts. Awaiting sign-off.')
-    expect(recap.dispatch).toBe('Scores are in. Awaiting sign-off.')
+    expect(text(recap.headline)).toBe('Kyle takes the Red.')
+    expect(recap.narrative).toBe('Kyle takes the Red by 2 with 37 pts.')
 
     const report = buildRoundReport(1, makeDb('in_progress'))!
     expect(report.pending).toBe(true)
-    expect(report.headline).toBe('Kyle tops the Red and leads the week.')
-    const all = report.paragraphs.map(text).join('\n')
-    expect(all).toContain('Kyle Siegel finished top of the Red with 37 points')
-    expect(all).toContain('The week is decided once this round is signed off.')
-    expect(all).not.toMatch(/\bwon\b|\bwins\b/)
-  })
-
-  it('a runaway margin on a pending card stays in the present: no "turned it into a procession"', () => {
-    const db = makeDb('in_progress')
-    // Kyle birdies 3–5 too, Jon bogeys 15–17: 40 v 32, by 8.
-    db.scores = db.scores.map((sc) =>
-      sc.player_id === B && sc.hole_number >= 3 && sc.hole_number <= 5
-        ? { ...sc, gross_strokes: 3 }
-        : sc.player_id === A && sc.hole_number >= 15 && sc.hole_number <= 17
-          ? { ...sc, gross_strokes: 5 }
-          : sc,
-    )
-    const pending = buildRoundRecap(1, db)!
-    expect(pending.margin).toBe(8)
-    expect(pending.dispatch).toBe('Scores are in. Awaiting sign-off.')
-    db.rounds = db.rounds.map((r) => ({ ...r, status: 'final' as const }))
-    expect(buildRoundRecap(1, db)!.dispatch).toBe('Kyle turned it into a procession.')
+    expect(report.headline).toBe('Kyle takes the Red and the week.')
   })
 
   it('no em dashes in generated recap or report copy', () => {
