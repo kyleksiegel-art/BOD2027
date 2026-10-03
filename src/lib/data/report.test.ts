@@ -109,36 +109,30 @@ describe('buildRoundReport', () => {
     expect(buildRoundReport(2, makeDb('in_progress', 12))).toBeNull()
   })
 
-  it('round 1: winner, wire-to-wire, leads the week — and names the whole field', () => {
+  it('round 1: a close win with no big stretch, every player named', () => {
     const vm = buildRoundReport(1, makeDb('final'))!
-    expect(vm.headline).toBe('Jon takes the Blue and leads the week.')
+    // Jon birdies the 1st (37); Chris and Adam par everything (36). Nobody swings 4+ points over
+    // any 3–6 holes, so there is no stretch: the report says when the lead was won.
+    expect(vm.kind).toBe('close')
+    expect(vm.stretch).toBeNull()
+    expect(vm.headline).toMatch(/^Jon holds off (Chris|Adam) by 1\.$/)
     const body = text(vm)
-    expect(body).toContain('Jon won the Blue with 37 points, 1 clear of the field.')
-    expect(body).toContain('Jon led from the 1st and was never caught.')
-    expect(body).toContain('Nobody had a three-hole stretch worse than 6 points.')
-    // Denove and Hersh tie for 2nd; whoever the week line does not name gets a field line.
-    expect(body).toMatch(/(Chris|Adam) finished 2nd with 36 points, 1 back\./)
-    expect(body).toMatch(/Jon leads the week at 37, 1 clear of (Chris|Adam)\. One round to go\./)
-    expect(body).not.toContain('biggest jump') // no prior round to improve on
-    for (const last of ['Jon', 'Chris', 'Adam']) expect(body).toContain(last)
+    expect(body).toMatch(/Jon led from the 1st and was never caught, finishing 1 clear of (Chris|Adam)\./)
+    for (const first of ['Jon', 'Chris', 'Adam']) expect(body).toContain(first)
+    expect(body).toMatch(/Jon leads the week by 1\. The Blue tomorrow, one round to go\./)
     expect(vm.dateline).toBe('Streamsong Blue · Thu, Feb 4')
-    expect(vm.latest).toBe(false) // round 2 has been played — this report opens collapsed
+    expect(vm.latest).toBe(false) // round 2 has been played: this report opens collapsed
   })
 
-  it('round 2: from behind at the turn, the turning hole, worst stretch, the week — everyone named', () => {
+  it('round 2: the lead won late, and the week decided', () => {
     const vm = buildRoundReport(2, makeDb('final'))!
-    // Denove 37 (birdie 15), Hersh 36, Aronson 36 + 1 − 2 − 1 − 1 = 33.
-    // Overall: Denove 73, Hersh 72, Aronson 70. Last round of the trip, so the week is decided.
-    expect(vm.headline).toBe('Chris takes the Blue and the week.')
+    // Jon birdies the 2nd and leads by 1 through 14; Chris birdies 15 as Jon doubles it.
+    // A 1-point deficit is no comeback (that needs 3), so it reads as a close finish.
+    expect(vm.kind).toBe('close')
     const body = text(vm)
-    expect(body).toContain(
-      'Chris won the Blue with 37 points, 1 clear of the field, after trailing at the turn. First round this week won from behind at the turn.',
-    )
-    expect(body).toContain('It turned on the 15th: Chris made a net birdie there while Jon, the leader through 14, made a zero.')
-    expect(body).toContain('Chris posted 37, 1 better than at Blue, the biggest jump of the day.')
-    expect(body).toContain('Worst stretch of the day: Jon, 2 points across the 15th through 17th. Jon is 3rd overall, 3 back.')
-    expect(body).toContain('Adam finished 2nd with 36 points, 1 back.')
-    expect(body).toContain('Chris wins the week at 73, 1 clear of Adam.')
+    expect(body).toContain('Chris took the lead for good on the 15th with a birdie, finishing 1 clear of Adam.')
+    expect(body).toContain('Chris wins the week by 1.')
+    expect(body).not.toMatch(/tomorrow|to go/)
     expect(vm.dayLabel).toBe('Day 2 of 2')
     expect(vm.latest).toBe(true)
   })

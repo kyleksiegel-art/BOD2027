@@ -1,17 +1,30 @@
-import { buildChampionships, buildRoundDetail, buildRoundRecap, buildOverallTiebreak } from './compute'
-import type { Db, RoundDetailVM } from './compute'
+import {
+  buildChampionships,
+  buildRoundDetail,
+  buildRoundRecap,
+  buildOverallTiebreak,
+  resolveRoundWinnerIds,
+} from './compute'
+import type { Db, RoundDetailVM, PlayerRoundVM } from './compute'
 import { standingsThroughRound } from '@/lib/scoring'
-import { courseShortName, formatDay, formatDayLong } from '@/lib/format'
+import { courseShortName, formatDay, formatDayLong, ordinalOf } from '@/lib/format'
 
 /**
- * The round report — the round's story in four short, plain paragraphs, once the round is
- * final. Pure and offline-identical, like every other builder: rows in, a view model out, all
- * facts from the same recap/detail/championship builders the rest of the round page uses.
- * Every sentence is derived from stored scores.
+ * The round report: the round's story as a short narrative, once every score is in. Pure and
+ * offline-identical, like every other builder: rows in, a view model out.
  *
- * Plain language (CLAUDE.md conventions): no boardroom voice — the visual treatment carries the
- * annual-report idea, the copy does not. Names only, never pronouns, so a template never has
- * to guess one.
+ * Two layers, kept apart so every sentence traces to a number (Kyle 2026-10-02, "more of a
+ * narrative", option A):
+ *   1. ANALYSIS: per-hole points, the winner and the player to beat, the decisive stretch, the
+ *      biggest deficit, when the lead was taken for good, the peak lead, each nine, real (gross)
+ *      eagles/birdies vs net ones, closest-to-pins.
+ *   2. PROSE: picks the story the analysis supports (runaway / comeback / late / close / steady
+ *      / shared) and writes four short paragraphs from it: how it was decided, what happened
+ *      after, everyone else (one specific line each), and the week.
+ *
+ * Plain language (CLAUDE.md conventions): no business jargon, no em dashes, first names only,
+ * and never a pronoun, so a template never has to guess one. "Real eagle" means the gross score;
+ * anything earned with a stroke says "net".
  */
 
 /** One run of report text; `strong` marks a derived fact the eye should land on. */
@@ -20,219 +33,424 @@ export interface ReportSeg {
   strong?: boolean
 }
 
+export type StoryKind = 'runaway' | 'comeback' | 'late' | 'close' | 'steady' | 'shared'
+
+/** Where the winner did the damage: a 3–6 hole window, winner's points vs the rival's over it. */
+export interface Stretch {
+  from: number
+  to: number
+  aPts: number // the winner's points over the stretch
+  bPts: number // the rival's points over the same holes
+  gapBefore: number // winner minus rival after hole `from - 1` (negative = behind)
+  gapAfter: number // winner minus rival after hole `to`
+}
+
 export interface ReportVM {
   roundNumber: number
   courseName: string
   dateLabel: string // "Friday, February 5"
   dayLabel: string // "Day 2 of 4"
-  headline: string // "Kyle takes the Black. Jon keeps the week."
+  headline: string // "Chris runs away with the Red."
   paragraphs: ReportSeg[][]
   dateline: string // "Streamsong Black · Fri, Feb 5"
   latest: boolean // the most recent counting round — the report opens by default only then
   /** Scores are all in but the round isn't finalized: only the footer says so; the copy reads as a result. */
   pending: boolean
+  kind: StoryKind
+  stretch: Stretch | null
 }
 
-const COUNT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
 
 function firstName(name: string): string {
   return name.split(/\s+/)[0] || name
-}
-function ordinalOf(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
 }
 function theShortOf(name: string): string {
   const short = courseShortName(name)
   return /^(Red|Blue|Black)$/i.test(short) ? `the ${short}` : short
 }
-/** Small counts as words where they open a sentence ("Two rounds remain."). */
-function countWord(n: number): string {
-  const w = COUNT_WORDS[n]
-  return w ? w[0].toUpperCase() + w.slice(1) : String(n)
+function words(n: number): string {
+  return NUMBER_WORDS[n] ?? String(n)
+}
+function cap(str: string): string {
+  return str ? str[0].toUpperCase() + str.slice(1) : str
 }
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }
-/** Stableford points on one hole, in words. */
-function pointsPhrase(points: number): string {
-  if (points >= 5) return 'a net albatross'
-  if (points === 4) return 'a net eagle'
-  if (points === 3) return 'a net birdie'
-  if (points === 2) return 'a net par'
-  if (points === 1) return 'one point'
-  return 'a zero'
+/** "a, b and c" */
+function listOf(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? ''
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
 }
 
 const t = (text: string): ReportSeg => ({ text })
 const s = (text: string): ReportSeg => ({ text, strong: true })
 
+// ── Analysis ────────────────────────────────────────────────────────────────
+
+interface Line {
+  id: string
+  first: string
+  total: number
+  pts: number[] // points per hole, index = hole - 1, counted window only (0 where not completed)
+  holes: PlayerRoundVM['holeResults']
+}
+
+const cumAt = (l: Line, h: number) => l.pts.slice(0, h).reduce((a, b) => a + b, 0)
+const sumRange = (l: Line, from: number, to: number) => l.pts.slice(from - 1, to).reduce((a, b) => a + b, 0)
+
+/**
+ * The decisive stretch between `a` (the winner) and `b` (the player to beat). Among every 3–6
+ * hole window, find the biggest swing; then take the SHORTEST window that delivers at least
+ * three quarters of it (ties: bigger swing, then earlier). A short window people can picture
+ * beats a long one that only adds a point; requiring most of the max swing stops it
+ * cherry-picking a blip; among equals, the one ending on the bigger lead, then one that starts on a gain. Null when no window swings 4+ points: no stretch, only a grind.
+ * `after` restricts windows to start after that hole (a comeback is told from its low point).
+ */
+export function decisiveStretch(a: number[], b: number[], n: number, after = 0): Stretch | null {
+  const cands: { from: number; to: number; aPts: number; bPts: number; swing: number }[] = []
+  for (let len = 3; len <= 6; len++) {
+    for (let from = after + 1; from + len - 1 <= n; from++) {
+      const to = from + len - 1
+      let aPts = 0
+      let bPts = 0
+      for (let h = from; h <= to; h++) {
+        aPts += a[h - 1] ?? 0
+        bPts += b[h - 1] ?? 0
+      }
+      cands.push({ from, to, aPts, bPts, swing: aPts - bPts })
+    }
+  }
+  if (cands.length === 0) return null
+  const max = Math.max(...cands.map((c) => c.swing))
+  if (max < 4) return null
+  const need = Math.ceil(max * 0.75)
+  const cum = (arr: number[], h: number) => arr.slice(0, h).reduce((p, q) => p + q, 0)
+  const gapAt = (h: number) => cum(a, h) - cum(b, h)
+  const gains = (h: number) => (a[h - 1] ?? 0) > (b[h - 1] ?? 0) // a stretch reads best starting on a gain
+  const pick = cands
+    .filter((c) => c.swing >= need)
+    .sort(
+      (x, y) =>
+        x.to - x.from - (y.to - y.from) ||
+        y.swing - x.swing ||
+        gapAt(y.to) - gapAt(x.to) ||
+        Number(gains(y.from)) - Number(gains(x.from)) ||
+        x.from - y.from,
+    )[0]
+  return {
+    from: pick.from,
+    to: pick.to,
+    aPts: pick.aPts,
+    bPts: pick.bPts,
+    gapBefore: cum(a, pick.from - 1) - cum(b, pick.from - 1),
+    gapAfter: cum(a, pick.to) - cum(b, pick.to),
+  }
+}
+
+const SHOTS: Record<string, { one: string; many: string }> = {
+  albatross: { one: 'a real albatross', many: 'real albatrosses' },
+  eagle: { one: 'a real eagle', many: 'real eagles' },
+  netEagle: { one: 'a net eagle', many: 'net eagles' },
+  birdie: { one: 'a birdie', many: 'birdies' },
+  netBirdie: { one: 'a net birdie', many: 'net birdies' },
+}
+
+/** A notable hole's kind. Gross first ("a real eagle"); "net" only when a stroke earned it. */
+function shotKind(hr: PlayerRoundVM['holeResults'][number]): { kind: string; rank: number } | null {
+  if (!hr.completed || hr.pickedUp || hr.grossStrokes === null) return null
+  const gross = hr.grossStrokes - hr.par
+  const pts = hr.points ?? 0
+  if (gross <= -3) return { kind: 'albatross', rank: 6 }
+  if (gross === -2) return { kind: 'eagle', rank: 5 }
+  if (pts >= 4) return { kind: 'netEagle', rank: 4 }
+  if (gross === -1) return { kind: 'birdie', rank: 3 }
+  if (pts === 3) return { kind: 'netBirdie', rank: 2 }
+  return null
+}
+
+/**
+ * Up to three of a player's best holes inside a stretch, in hole order, with like shots grouped:
+ * "birdies on the 16th and 17th and a real eagle on the par-5 18th".
+ */
+function stretchShots(l: Line, from: number, to: number): string[] {
+  const picked = l.holes
+    .filter((h) => h.holeNumber >= from && h.holeNumber <= to)
+    .map((h) => ({ h, k: shotKind(h) }))
+    .filter((x): x is { h: PlayerRoundVM['holeResults'][number]; k: { kind: string; rank: number } } => x.k !== null)
+    .sort((x, y) => y.k.rank - x.k.rank || x.h.holeNumber - y.h.holeNumber)
+    .slice(0, 3)
+    .sort((x, y) => x.h.holeNumber - y.h.holeNumber)
+  const groups: { kind: string; holes: PlayerRoundVM['holeResults'] }[] = []
+  for (const x of picked) {
+    const g = groups.find((q) => q.kind === x.k.kind)
+    if (g) g.holes.push(x.h)
+    else groups.push({ kind: x.k.kind, holes: [x.h] })
+  }
+  return groups.map((g) => {
+    const names = SHOTS[g.kind]
+    if (g.holes.length > 1) return `${names.many} on the ${listOf(g.holes.map((h) => ordinalOf(h.holeNumber)))}`
+    const h = g.holes[0]
+    const where = g.kind === 'eagle' || g.kind === 'albatross' ? `the par-${h.par} ${ordinalOf(h.holeNumber)}` : `the ${ordinalOf(h.holeNumber)}`
+    return `${names.one} on ${where}`
+  })
+}
+
+/** " with a birdie": the shot that did it, when it was one worth naming. */
+function withShot(l: Line, hole: number): string {
+  const hr = l.holes.find((h) => h.holeNumber === hole)
+  const k = hr ? shotKind(hr) : null
+  return k ? ` with ${SHOTS[k.kind].one}` : ''
+}
+
+/** "once", "twice", "three times" */
+function times(n: number): string {
+  return n === 1 ? 'once' : n === 2 ? 'twice' : `${words(n)} times`
+}
+
+/** "the lead went from 2 to 10": what a stretch did to the gap, from the winner's side. */
+function gapChange(before: number, after: number, winner: string): string {
+  if (before > 0 && after > 0) return `the lead went from ${before} to ${after}`
+  if (before === 0 && after > 0) return `level became a ${after}-point lead`
+  if (before < 0 && after > 0) return `a ${-before}-point deficit became a ${after}-point lead`
+  if (before < 0 && after === 0) return `${winner} drew level`
+  if (before < 0 && after < 0) return `the gap closed from ${-before} to ${-after}`
+  return `the gap went from ${before} to ${after}`
+}
+
+/** "2027-02-05" for "2027-02-04": date-only arithmetic, no timezone involved. */
+function dayAfter(date: string): string {
+  const d = new Date(`${date.slice(0, 10)}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+// ── The builder ─────────────────────────────────────────────────────────────
+
 export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | null {
   const recap = buildRoundRecap(roundNumber, dbData)
   if (!recap || recap.act !== 'final') return null
   const detail = buildRoundDetail(roundNumber, dbData)
-  if (!detail) return null
+  if (!detail || !detail.holes) return null
 
-  const playing = detail.leaderboard // playing only, desc by points
-  if (playing.length === 0) return null
-  const nameOf = new Map(playing.map((p) => [p.playerId, p.name]))
-
-  const winner = playing[0]
-  const multi = recap.winners.length > 1
-  const winnerLabel = multi ? recap.winners.map((w) => firstName(w.name)).join(' and ') : firstName(winner.name)
+  const n = detail.holesCounted
+  const lines: Line[] = detail.leaderboard.map((p) => {
+    const pts = Array.from({ length: n }, (_, i) => {
+      const hr = p.holeResults.find((h) => h.holeNumber === i + 1)
+      return hr?.completed ? hr.points ?? 0 : 0
+    })
+    return { id: p.playerId, first: firstName(p.name), total: p.totalPoints, pts, holes: p.holeResults }
+  })
+  if (lines.length === 0) return null
+  const byId = new Map(lines.map((l) => [l.id, l]))
   const theShort = theShortOf(detail.course.name)
-  const pending = recap.pending
 
-  // Counting rounds so far, and the trip race through this one.
-  const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
-  const remainingRounds = rounds.filter((r) => r.round_number > roundNumber && r.status !== 'abandoned').length
-  const latest = !rounds.some((r) => r.round_number > roundNumber && (r.status === 'final' || r.status === 'in_progress'))
-  const champs = buildChampionships(dbData)
-  // Break the week's ties on the real chain, over the rounds up to each point — the report used
-  // to rank the week on raw points and name the wrong leader on a tie (audit F-011).
-  const countingNums = (upto: number) =>
-    rounds.filter((r) => r.round_number <= upto && (r.status === 'final' || r.status === 'in_progress')).map((r) => r.round_number)
-  const detailsFor = (nums: number[]) => {
-    const m = new Map<number, RoundDetailVM | null>()
-    for (const rn of nums) m.set(rn, buildRoundDetail(rn, dbData))
-    return m
+  // Winner(s) off the same resolver the recap and Money use, so the three always agree.
+  const resolved = resolveRoundWinnerIds(detail)
+  const winnerIds = resolved.ids.length ? resolved.ids : [lines[0].id]
+  const winners = winnerIds.map((id) => byId.get(id)).filter((l): l is Line => !!l)
+  const W = winners[0]
+  const shared = winners.length > 1
+  const R = lines.find((l) => !winnerIds.includes(l.id)) ?? null // the best of the rest
+  const margin = R ? W.total - R.total : 0
+
+  // Leader after each hole, the biggest deficit the winner faced, and when the lead was won for good.
+  const leaderAt = (h: number): Line[] => {
+    const top = Math.max(...lines.map((l) => cumAt(l, h)))
+    return lines.filter((l) => cumAt(l, h) === top)
   }
-  const nowNums = countingNums(roundNumber)
-  const breakTieNow = buildOverallTiebreak(champs, detailsFor(nowNums), nowNums).breakTie
-  const overall = standingsThroughRound(champs, roundNumber, breakTieNow)
-  const before =
-    roundNumber > 1
-      ? standingsThroughRound(
-          champs,
-          roundNumber - 1,
-          buildOverallTiebreak(champs, detailsFor(countingNums(roundNumber - 1)), countingNums(roundNumber - 1)).breakTie,
-        )
-      : []
-  const champLeader = overall[0]
-  const champSecond = overall.find((r) => r.position > 1) ?? null
-  const champGap = champLeader && champSecond ? champLeader.total - champSecond.total : 0
-  const leaderBefore = before[0]?.playerId ?? null
-  const champLeaderName = champLeader ? firstName(nameOf.get(champLeader.playerId) ?? playerName(dbData, champLeader.playerId)) : ''
+  let deficit = 0
+  let deficitHole = 0
+  let chased: Line | null = null
+  for (let h = 1; h < n; h++) {
+    const lead = leaderAt(h)
+    const d = cumAt(lead[0], h) - cumAt(W, h)
+    // Latest hole on a tie: the comeback is told from the last time it looked lost.
+    if (d > 0 && d >= deficit) {
+      deficit = d
+      deficitHole = h
+      chased = lead.find((l) => l.id !== W.id) ?? null
+    }
+  }
+  let forGood: number | null = null
+  for (let h = n; h >= 1; h--) {
+    const lead = leaderAt(h)
+    if (lead.length === 1 && lead[0].id === W.id) forGood = h
+    else break
+  }
 
-  // ── Paragraph 1: the result ──
+  // ── Which story? ──
+  let kind: StoryKind
+  if (shared) kind = 'shared'
+  else if (deficit >= 3 && deficitHole >= 6 && chased) kind = forGood !== null && forGood >= n - 2 ? 'late' : 'comeback'
+  else if (margin >= 6) kind = 'runaway'
+  else if (margin <= 2) kind = 'close'
+  else kind = 'steady'
+  const fromBehind = kind === 'comeback' || kind === 'late'
+
+  const rival = fromBehind && chased ? chased : R
+  const stretch = rival && !shared ? decisiveStretch(W.pts, rival.pts, n, fromBehind ? deficitHole : 0) : null
+
+  // ── Paragraph 1: how it was decided ──
   const p1: ReportSeg[] = []
-  if (multi) {
-    p1.push(s(winnerLabel), t(` shared ${theShort} at `), s(`${winner.totalPoints} points`), t(`.`))
-  } else {
-    p1.push(s(firstName(winner.name)), t(` won ${theShort} with `), s(`${winner.totalPoints} points`))
-    p1.push(t(recap.margin > 0 ? `, ${recap.margin} clear of the field` : ``))
-    const turn = recap.holeLeaders[8]
-    if (turn?.inPlay && turn.order[0] !== winner.playerId) {
-      const nth = nthFromBehind(dbData, roundNumber)
-      p1.push(t(`, after trailing at the turn.${nth === 1 ? ' First round this week won from behind at the turn.' : ''}`))
-    } else {
-      p1.push(t('.'))
-    }
-  }
-
-  // ── Paragraph 2: how it was decided ──
-  const p2: ReportSeg[] = []
-  if (multi) {
-    p2.push(t(`The lead changed hands ${plural(recap.leadChangeCount, 'time')} and nobody got clear.`))
-  } else if (recap.leadChangeCount === 0) {
-    p2.push(s(firstName(winner.name)), t(` led from the 1st and was never caught.`))
-  } else {
-    // The last hole on which the leader changed is where it was decided.
-    let prev: string | null = null
-    let decided: { hole: number; displaced: string | null } | null = null
-    for (const h of recap.holeLeaders) {
-      if (!h.inPlay) continue
-      if (prev !== null && h.order[0] !== prev) decided = { hole: h.holeNumber, displaced: prev }
-      prev = h.order[0]
-    }
-    if (decided) {
-      const wHole = winner.holeResults.find((h) => h.holeNumber === decided!.hole)
-      const displaced = decided.displaced ? playing.find((p) => p.playerId === decided!.displaced) : null
-      const dHole = displaced?.holeResults.find((h) => h.holeNumber === decided!.hole)
-      p2.push(t(`It turned on the `), s(ordinalOf(decided.hole)), t(`: `), s(firstName(winner.name)))
-      p2.push(t(` made ${pointsPhrase(wHole?.points ?? 0)} there`))
-      if (displaced && dHole) {
-        p2.push(
-          t(` while `),
-          s(firstName(displaced.name)),
-          t(`, the leader through ${decided.hole - 1}, made ${pointsPhrase(dHole.points ?? 0)}.`),
-        )
+  if (shared) {
+    p1.push(s(listOf(winners.map((w) => w.first))), t(` finished level on `), s(`${W.total} points`))
+    p1.push(t(`, and the countback could not split them.`))
+    if (recap.leadChangeCount > 0) p1.push(t(` The lead changed hands ${times(recap.leadChangeCount)} along the way.`))
+  } else if (rival) {
+    if (fromBehind) {
+      p1.push(s(rival.first), t(` led `), s(W.first), t(` by `), s(String(deficit)), t(` after the ${ordinalOf(deficitHole)}.`))
+    } else if (stretch && stretch.from > 1) {
+      const g = stretch.gapBefore
+      const after = ordinalOf(stretch.from - 1)
+      if (g >= 4) {
+        p1.push(s(W.first), t(` was already ${g} up on `), s(rival.first), t(` after the ${after}.`))
       } else {
-        p2.push(t('.'))
+        p1.push(t(`It was close for ${stretch.from - 1 === 1 ? 'one hole' : `${words(stretch.from - 1)} holes`}. `))
+        if (g > 0) p1.push(s(W.first), t(` led `), s(rival.first), t(` by ${g} after the ${after}.`))
+        else if (g === 0) p1.push(s(W.first), t(` and `), s(rival.first), t(` were level after the ${after}.`))
+        else p1.push(s(rival.first), t(` led `), s(W.first), t(` by ${-g} after the ${after}.`))
       }
     }
-  }
-  // Biggest improvement on the previous counting round (round 2+).
-  const prevRound = rounds.filter((r) => r.round_number < roundNumber && (r.status === 'final' || r.status === 'in_progress')).pop()
-  if (prevRound) {
-    let best: { name: string; pts: number; delta: number } | null = null
-    for (const p of playing) {
-      // A player who sat out the previous round posts 0 there, so their "jump" would be their
-      // whole score — meaningless. Skip anyone who didn't play the round we're comparing to.
-      const prevRp = dbData.round_players.find((rp) => rp.round_id === prevRound.id && rp.player_id === p.playerId)
-      if (prevRp?.status === 'did_not_play') continue
-      const c = champs.find((x) => x.playerId === p.playerId)
-      const prevPts = c?.byRound.find((r) => r.roundNumber === prevRound.round_number && r.counts)?.points
-      if (prevPts === undefined) continue
-      const delta = p.totalPoints - prevPts
-      if (delta > 0 && (!best || delta > best.delta)) best = { name: firstName(p.name), pts: p.totalPoints, delta }
-    }
-    if (best) {
-      const prevCourse = dbData.courses.find((c) => c.id === prevRound.course_id)
-      const prevShort = prevCourse ? courseShortName(prevCourse.name) : `round ${prevRound.round_number}`
-      if (p2.length) p2.push(t(' '))
-      p2.push(
-        s(best.name),
-        t(` posted ${best.pts}, `),
-        s(`${best.delta} better`),
-        t(` than at ${prevShort}, the biggest jump of the day.`),
-      )
-    }
-  }
-
-  // ── Paragraph 3: the worst three-hole stretch on the books ──
-  const p3: ReportSeg[] = []
-  const worst = worstStretch(playing, detail.holesCounted)
-  if (worst) {
-    const who = firstName(nameOf.get(worst.playerId) ?? '')
-    if (worst.points <= 2) {
-      p3.push(
-        t(`Worst stretch of the day: `),
-        s(who),
-        t(`, ${worst.points === 0 ? 'no points' : plural(worst.points, 'point')} across the `),
-        s(`${ordinalOf(worst.from)} through ${ordinalOf(worst.from + 2)}`),
-        t(`.`),
-      )
-      const row = overall.find((r) => r.playerId === worst.playerId)
-      if (row && champLeader && row.playerId !== champLeader.playerId) {
-        p3.push(t(` ${firstName(who)} is ${ordinalOf(row.position)} overall, ${champLeader.total - row.total} back.`))
+    if (stretch) {
+      const shots = stretchShots(W, stretch.from, stretch.to)
+      if (shots.length) {
+        if (fromBehind) p1.push(t(` ${W.first} answered with ${listOf(shots)}.`))
+        else if (p1.length) p1.push(t(` Then the round broke open: ${listOf(shots)}.`))
+        else p1.push(s(W.first), t(` came out fast: ${listOf(shots)}.`))
       }
+      p1.push(
+        t(`${p1.length ? ' ' : ''}From the `),
+        s(`${ordinalOf(stretch.from)} through the ${ordinalOf(stretch.to)}`),
+        t(`, ${W.first} made `),
+        s(`${stretch.aPts} points`),
+        t(` to ${rival.first}'s ${stretch.bPts}, and ${gapChange(stretch.gapBefore, stretch.gapAfter, W.first)}.`),
+      )
+    } else if (recap.onCountback && R) {
+      p1.push(t(p1.length ? ' ' : ''), s(W.first), t(` and `), s(R.first), t(` finished level on `), s(`${W.total} points`), t(`, and ${W.first} took it on countback.`))
+    } else if (forGood !== null) {
+      p1.push(
+        t(p1.length ? ' ' : ''),
+        s(W.first),
+        t(forGood === 1 ? ` led from the 1st and was never caught` : ` took the lead for good on the ${ordinalOf(forGood)}${withShot(W, forGood)}`),
+        t(`, finishing ${margin} clear of ${R?.first ?? rival.first}.`),
+      )
     } else {
-      p3.push(t(`Nobody had a three-hole stretch worse than ${plural(worst.points, 'point')}.`))
+      p1.push(t(p1.length ? ' ' : ''), s(W.first), t(` won ${theShort} by ${margin}.`))
+    }
+    if (kind === 'late' && forGood !== null && !(stretch && stretch.to >= forGood)) {
+      p1.push(t(forGood === n ? ` ${W.first} went in front on the last hole.` : ` ${W.first} only went in front for good on the ${ordinalOf(forGood)}.`))
+    }
+    if (recap.onCountback && R && stretch) p1.push(t(` ${W.first} and ${R.first} finished level on ${W.total}, and ${W.first} took it on countback.`))
+  }
+
+  // ── Paragraph 2: what happened after ──
+  const p2: ReportSeg[] = []
+  if (!shared && R) {
+    const bits: ReportSeg[] = []
+    if (n === 18) {
+      const backs = lines.map((l) => ({ l, back: sumRange(l, 10, 18) })).sort((a, b) => b.back - a.back)
+      const best = backs[0]
+      const tied = backs.filter((b) => b.back === best.back).length > 1
+      if (!tied && best.l.id !== W.id) bits.push(s(best.l.first), t(` had the best back nine in the group, `), s(`${best.back} points`))
+    }
+    // A late blank by the winner, and the run it ended.
+    const lateZero = W.holes.filter((h) => h.completed && (h.points ?? 0) === 0 && h.holeNumber > n - 3).pop()
+    if (lateZero) {
+      let run = 0
+      for (let h = lateZero.holeNumber - 1; h >= 1 && (W.pts[h - 1] ?? 0) > 0; h--) run++
+      bits.push(
+        t(bits.length ? `, and ` : ''),
+        s(W.first),
+        t(` ${bits.length ? 'finally ' : ''}blanked the ${ordinalOf(lateZero.holeNumber)}`),
+        t(run >= 8 ? ` after ${run} straight holes with points` : ''),
+      )
+    }
+    if (bits.length) {
+      p2.push(...bits, t('.'))
+      // Did the late damage matter? Only say so when the lead actually shrank a lot.
+      let peak = 0
+      for (let h = 1; h <= n; h++) peak = Math.max(peak, cumAt(W, h) - cumAt(R, h))
+      if (peak - margin >= 3 && margin >= 3) p2.push(t(` It only brought the final margin down to ${margin}.`))
+    } else if (kind === 'close' && margin > 0) {
+      // Close finish: how near the chaser got late on.
+      let near: { h: number; g: number } | null = null
+      for (let h = Math.max(1, n - 4); h < n; h++) {
+        const g = cumAt(W, h) - cumAt(R, h)
+        if (!near || g < near.g) near = { h, g }
+      }
+      if (near && near.g <= 1) {
+        p2.push(
+          s(R.first),
+          t(near.g <= 0 ? ` was level with ${words(n - near.h)} to play` : ` was within a point with ${words(n - near.h)} to play`),
+          t(`, and ${W.first} held on by ${margin}.`),
+        )
+      }
     }
   }
 
-  // ── The rest of the field: every player is named, once. Anyone the story above skipped
-  //    gets a line with a place and a hook; anyone who sat out is named as such. ──
-  const named = (id: string) => {
-    const last = firstName(nameOf.get(id) ?? playerName(dbData, id))
-    return [p1, p2, p3].some((para) => para.some((seg) => seg.text.includes(last)))
+  // ── Paragraph 3: everyone else, one specific line each ──
+  const textSoFar = () => [p1, p2].flatMap((p) => p.map((x) => x.text)).join(' ')
+  const named = (first: string) => new RegExp(`\\b${first}\\b`).test(textSoFar())
+  const ctpWins = new Map<string, number[]>()
+  const ctpHoles = detail.holes.filter((h) => h.par === 3 && h.holeNumber <= n).map((h) => h.holeNumber)
+  for (const c of dbData.ctp_results) {
+    if (c.round_id !== detail.round.id || !c.player_id || !ctpHoles.includes(c.hole_number)) continue
+    ctpWins.set(c.player_id, [...(ctpWins.get(c.player_id) ?? []), c.hole_number])
   }
+  const usedHooks = new Set<string>()
   const pField: ReportSeg[] = []
-  for (const p of playing) {
-    if (named(p.playerId)) continue
-    // Competition place: ties share the higher place.
-    const place = playing.findIndex((q) => q.totalPoints === p.totalPoints) + 1
-    const gap = winner.totalPoints - p.totalPoints
+  for (const l of lines) {
+    if (named(l.first)) continue
+    const hooks: { kind: string; text: string }[] = []
+    const front = sumRange(l, 1, Math.min(9, n))
+    const back = n === 18 ? sumRange(l, 10, 18) : null
+    const opening = sumRange(l, 1, 3)
+    if (back !== null && back - front >= 5) {
+      hooks.push(
+        opening <= 3
+          ? { kind: 'turnaround', text: `opened with ${plural(opening, 'point')} through three holes, then came home in ${back}` }
+          : { kind: 'turnaround', text: `turned in ${front} and came home in ${back}` },
+      )
+    } else if (back !== null && front - back >= 6) {
+      hooks.push({ kind: 'fade', text: `went out in ${front} and came home in only ${back}` })
+    }
+    const eagles = l.holes.filter((h) => h.completed && h.grossStrokes !== null && h.grossStrokes - h.par <= -2)
+    if (eagles.length) {
+      const last = eagles[eagles.length - 1].holeNumber
+      hooks.push({
+        kind: 'eagle',
+        text:
+          eagles.length > 1
+            ? `made ${words(eagles.length)} real eagles`
+            : last === n
+              ? `finished with a real eagle on ${last}`
+              : `made a real eagle on the ${ordinalOf(last)}`,
+      })
+    }
+    const ctps = ctpWins.get(l.id) ?? []
+    if (ctps.length >= 2) {
+      hooks.push({ kind: 'ctp', text: `won ${words(ctps.length)} of the ${words(ctpHoles.length)} closest-to-pins, which pay exactly nothing` })
+    }
+    const birdies = l.holes.filter((h) => h.completed && h.grossStrokes !== null && h.grossStrokes - h.par === -1).length
+    if (birdies >= 2) hooks.push({ kind: 'birdies', text: `made ${words(birdies)} real birdies` })
+    const blanks = l.pts.filter((p) => p === 0).length
+    if (blanks >= 4) hooks.push({ kind: 'blanks', text: `blanked ${words(blanks)} holes` })
+
+    // Prefer hooks nobody else has used, so two lines never read the same.
+    const fresh = hooks.filter((h) => !usedHooks.has(h.kind))
+    // The closest-to-pin hook ends in its own aside, so it always goes last.
+    const chosen = (fresh.length ? fresh : hooks).slice(0, 2).sort((a, b) => Number(a.kind === 'ctp') - Number(b.kind === 'ctp'))
+    chosen.forEach((h) => usedHooks.add(h.kind))
+    const place = lines.findIndex((q) => q.total === l.total) + 1
     if (pField.length) pField.push(t(' '))
-    pField.push(s(firstName(p.name)), t(` finished ${ordinalOf(place)} with ${p.totalPoints} points${gap > 0 ? `, ${gap} back` : ''}`))
-    const done = p.holeResults.filter((h) => h.completed)
-    const best = done.reduce<(typeof done)[number] | null>((b, h) => ((h.points ?? 0) >= 3 && (h.points ?? 0) > (b?.points ?? 0) ? h : b), null)
-    const blanks = done.filter((h) => (h.points ?? 0) === 0).length
-    if (best) pField.push(t(`; ${pointsPhrase(best.points ?? 0)} on the ${ordinalOf(best.holeNumber)} was the high point.`))
-    else if (blanks >= 2) pField.push(t(` and ${blanks} blanks.`))
-    else pField.push(t('.'))
+    if (chosen.length) {
+      pField.push(s(l.first), t(` ${chosen.map((h) => h.text).join(' and ')}.`))
+    } else {
+      const back2 = W.total - l.total
+      pField.push(s(l.first), t(` finished ${ordinalOf(place)} with ${l.total} points${back2 > 0 ? `, ${back2} back` : ''}.`))
+    }
   }
   for (const p of detail.players) {
     if (p.status !== 'did_not_play') continue
@@ -240,38 +458,73 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
     pField.push(s(firstName(p.name)), t(' sat out.'))
   }
 
-  // ── Paragraph 4: the week ──
+  // ── Paragraph 4: the week, and what's next ──
+  const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
+  const remaining = rounds.filter((r) => r.round_number > roundNumber && r.status !== 'abandoned')
+  const latest = !rounds.some((r) => r.round_number > roundNumber && (r.status === 'final' || r.status === 'in_progress'))
+  const champs = buildChampionships(dbData)
+  const countingNums = (upto: number) =>
+    rounds.filter((r) => r.round_number <= upto && (r.status === 'final' || r.status === 'in_progress')).map((r) => r.round_number)
+  const detailsFor = (nums: number[]) => {
+    const m = new Map<number, RoundDetailVM | null>()
+    for (const rn of nums) m.set(rn, buildRoundDetail(rn, dbData))
+    return m
+  }
+  const weekAt = (upto: number) => {
+    const nums = countingNums(upto)
+    if (nums.length === 0) return []
+    return standingsThroughRound(champs, upto, buildOverallTiebreak(champs, detailsFor(nums), nums).breakTie)
+  }
+  const overall = weekAt(roundNumber)
+  const before = roundNumber > 1 ? weekAt(roundNumber - 1) : []
+  const nameOfId = (id: string) => firstName(dbData.players.find((p) => p.id === id)?.name ?? 'Unknown')
   const p4: ReportSeg[] = []
-  if (champLeader) {
-    const secondName = champSecond ? nameOf.get(champSecond.playerId) ?? playerName(dbData, champSecond.playerId) : null
-    const gapText = secondName ? (champGap > 0 ? `, ${champGap} clear of ${firstName(secondName)}` : `, level with ${firstName(secondName)}`) : ''
-    if (remainingRounds === 0) {
-      p4.push(s(champLeaderName), t(` wins the week at `), s(String(champLeader.total)), t(`${gapText}.`))
+  const L = overall[0]
+  const S = overall.find((r) => r.playerId !== L?.playerId) ?? null
+  if (L) {
+    const lf = nameOfId(L.playerId)
+    const gap = S ? L.total - S.total : 0
+    const sf = S ? nameOfId(S.playerId) : ''
+    if (remaining.length === 0) {
+      p4.push(s(lf), t(gap > 0 ? ` wins the week by ${gap}.` : ` wins the week on the tiebreak, level with ${sf}.`))
+    } else if (S && gap === 0) {
+      p4.push(s(lf), t(` and `), s(sf), t(` are level for the week on ${L.total}, ${lf} ahead on the tiebreak.`))
+    } else if (before.length === 0) {
+      p4.push(s(lf), t(` leads the week by `), s(String(gap)), t('.'))
+    } else if (before[0]?.playerId === L.playerId) {
+      p4.push(s(lf), t(` still leads the week, `), s(`${gap} clear`), t(` of ${sf}.`))
     } else {
-      p4.push(s(champLeaderName), t(` leads the week at `), s(String(champLeader.total)), t(`${gapText}. `))
-      p4.push(t(remainingRounds === 1 ? 'One round to go.' : `${countWord(remainingRounds)} rounds to go.`))
+      p4.push(s(lf), t(` takes over the week lead, `), s(`${gap} clear`), t(` of ${sf}.`))
+    }
+    const next = remaining[0]
+    if (next) {
+      const course = dbData.courses.find((c) => c.id === next.course_id)
+      const when = dayAfter(detail.round.date) === next.date.slice(0, 10) ? 'tomorrow' : `on ${formatDay(next.date).split(',')[0]}`
+      const left = remaining.length === 1 ? 'one round to go' : `${words(remaining.length)} rounds to go`
+      p4.push(t(` ${cap(course ? theShortOf(course.name) : `round ${next.round_number}`)} ${when}, ${left}.`))
     }
   }
 
-  // ── Headline ──
-  const winFirst = multi ? recap.winners.map((w) => firstName(w.name)).join(' and ') : firstName(winner.name)
-  const roundClause = `${winFirst} ${multi ? 'share' : 'takes'} ${theShort}`
-  let head = `${roundClause}.`
-  if (champLeader) {
-    const lf = firstName(champLeaderName)
-    let verb: string, tail: string
-    if (remainingRounds === 0) { verb = 'takes'; tail = 'the week' }
-    else if (roundNumber === 1) { verb = 'leads'; tail = 'the week' }
-    else if (leaderBefore === champLeader.playerId) { verb = 'keeps'; tail = 'the week' }
-    else { verb = 'takes'; tail = 'the week lead' }
-    // The round winner is usually the week leader too. Folding the two into one sentence
-    // avoids repeating the name back-to-back ("Jon takes the Red. Jon leads the week."), and
-    // a shared "takes" collapses to "… and the week" rather than saying it twice.
-    if (!multi && winner.playerId === champLeader.playerId) {
-      head = verb === 'takes' ? `${roundClause} and ${tail}.` : `${roundClause} and ${verb} ${tail}.`
-    } else {
-      head = `${roundClause}. ${lf} ${verb} ${tail}.`
-    }
+  // ── Headline: the story in a line ──
+  let headline: string
+  switch (kind) {
+    case 'shared':
+      headline = `${listOf(winners.map((w) => w.first))} share ${theShort}.`
+      break
+    case 'late':
+      headline = forGood === n ? `${W.first} catches ${rival!.first} on the last.` : `${W.first} catches ${rival!.first} late on ${theShort}.`
+      break
+    case 'comeback':
+      headline = `${W.first} comes from ${deficit} back to take ${theShort}.`
+      break
+    case 'runaway':
+      headline = `${W.first} runs away with ${theShort}.`
+      break
+    case 'close':
+      headline = recap.onCountback ? `${W.first} edges ${R!.first} on countback.` : `${W.first} holds off ${R!.first} by ${margin}.`
+      break
+    default:
+      headline = `${W.first} takes ${theShort} by ${margin}.`
   }
 
   return {
@@ -279,52 +532,12 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
     courseName: detail.course.name,
     dateLabel: formatDayLong(detail.round.date),
     dayLabel: `Day ${roundNumber} of ${rounds.length}`,
-    headline: head,
-    paragraphs: [p1, p2, p3, pField, p4].filter((p) => p.length > 0),
+    headline,
+    paragraphs: [p1, p2, pField, p4].filter((p) => p.length > 0),
     dateline: `${detail.course.name} · ${formatDay(detail.round.date)}`,
     latest,
-    pending,
+    pending: recap.pending,
+    kind,
+    stretch,
   }
-}
-
-function playerName(dbData: Db, id: string): string {
-  return dbData.players.find((p) => p.id === id)?.name ?? 'Unknown'
-}
-
-/** How many final rounds so far (this one included) were won by someone behind at the turn. */
-function nthFromBehind(dbData: Db, roundNumber: number): number {
-  let n = 0
-  for (const r of dbData.rounds) {
-    if (r.round_number > roundNumber || r.status !== 'final') continue
-    const rc = buildRoundRecap(r.round_number, dbData)
-    if (!rc || rc.winners.length !== 1) continue
-    const turn = rc.holeLeaders[8]
-    const winnerId = rc.standing[0]?.playerId
-    if (turn?.inPlay && winnerId && turn.order[0] !== winnerId) n++
-  }
-  return n
-}
-
-/** The lowest three consecutive completed holes by anyone in the counted window. Ties → earliest, then leaderboard order. */
-function worstStretch(
-  playing: { playerId: string; holeResults: { holeNumber: number; points: number | null; completed: boolean }[] }[],
-  holesCounted: number,
-): { playerId: string; from: number; points: number } | null {
-  let best: { playerId: string; from: number; points: number } | null = null
-  for (const p of playing) {
-    for (let from = 1; from + 2 <= holesCounted; from++) {
-      let sum = 0
-      let ok = true
-      for (let h = from; h <= from + 2; h++) {
-        const hr = p.holeResults.find((x) => x.holeNumber === h)
-        if (!hr?.completed) {
-          ok = false
-          break
-        }
-        sum += hr.points ?? 0
-      }
-      if (ok && (!best || sum < best.points)) best = { playerId: p.playerId, from, points: sum }
-    }
-  }
-  return best
 }

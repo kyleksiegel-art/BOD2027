@@ -64,8 +64,8 @@ describe('scores in vs final', () => {
 
     const report = buildRoundReport(1, makeDb('final'))!
     expect(report.pending).toBe(false)
-    expect(report.headline).toBe('Kyle takes the Red and the week.')
-    expect(text(report.paragraphs[0])).toBe('Kyle won the Red with 37 points, 2 clear of the field.')
+    expect(report.headline).toBe('Kyle holds off Jon by 2.')
+    expect(text(report.paragraphs[0])).toBe('Kyle took the lead for good on the 2nd with a birdie, finishing 2 clear of Jon.')
     expect(report.paragraphs.map(text).join(' ')).not.toMatch(/Siegel|Aronson/)
   })
 
@@ -81,7 +81,7 @@ describe('scores in vs final', () => {
 
     const report = buildRoundReport(1, makeDb('in_progress'))!
     expect(report.pending).toBe(true)
-    expect(report.headline).toBe('Kyle takes the Red and the week.')
+    expect(report.headline).toBe('Kyle holds off Jon by 2.')
   })
 
   it('no em dashes in generated recap or report copy', () => {
