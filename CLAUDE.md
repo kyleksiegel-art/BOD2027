@@ -901,7 +901,10 @@ rounds went.
   sign-off") and the payout ("$50 on sign-off", label "Winner" not "Winner · pays") wait for
   Finalize. **Kyle 2026-10-02: a provisional "tops the Red" read as weird — don't bring it back.**
 - **Generated prose uses first names only** (round report + Annual Report letter; Kyle: "we know who
-  we are"). The every-player-named check matches first names. The wire keeps surnames.
+  we are"), the Field Report included. The every-player-named check matches first names.
+- **Report and Annual Report letter BODY is the app sans, not Fraunces** (Kyle 2026-10-02, "whats up
+  with the font"). Fraunces stays on headlines. The old `opsz 36 / wght 450` body also pinned
+  `wght`, which overrode `font-weight` so the `strong` facts never rendered bold.
 - **Field Report says "net" in the sentence** (`wire.ts scoreVerb`). Plain golf verbs only for what
   the gross score was: no stroke on the hole (gross == net) or a real gross birdie+ ("birdies the 7th
   for a net eagle"). Zeros read "blanks", never "doubles".

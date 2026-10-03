@@ -52,8 +52,7 @@ export function RoundReport({ vm }: { vm: ReportVM }) {
           <hr className="mx-[18px] border-hair" />
           <div className="px-[18px] pb-1 pt-3.5">
             <div
-              className="flex flex-col gap-3 font-display text-[1.02rem] leading-normal text-paper-dim"
-              style={{ fontVariationSettings: "'opsz' 36, 'wght' 450" }}
+              className="flex flex-col gap-3 text-[0.98rem] leading-relaxed text-paper-dim"
             >
               {vm.paragraphs.map((p, i) => (
                 <p key={i}>
