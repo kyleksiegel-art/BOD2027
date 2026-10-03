@@ -951,9 +951,12 @@ hole is the unchanged `buildFieldReport` wire. The Standings ticker strip still 
 - **A hole gets its own entry** when it's the 1st or last, the sole leader changes (or shared ↔
   sole), the gap moves 3+, a CTP is won, or anyone makes an eagle (real or net). Runs of other
   holes fold into one `quiet` entry ("3rd–5th"). A `turn` entry carries the scoreline after 9.
-- Phrasing: "takes the lead outright with a net birdie, 1 clear" · "to go 11 up" (lone scorer is
-  the leader) · "and cuts it to 10" (lone scorer is the chaser) · "3 clear becomes 7" · "The hole
-  that broke it open:" (biggest one-hole growth of a sole lead, 4+) · "the biggest lead of the day"
-  once, on the first hole it's reached (live: "so far") · the leader's blank leads the entry with
-  the run it ended · "wins the pin again, three for the day". Real vs net as in the report.
+- Phrasing is full sentences, never stat-line shorthand (Kyle 2026-10-02: "Chris by 9" / "three
+  for the day" read badly): "takes a 1-point lead with a net birdie" · "takes over the lead, 2
+  ahead" · "Chris leads by 9" / "still leads by 10" · "to lead by 11" (lone scorer is the leader) ·
+  "cuts the lead to 10" (lone scorer is the chaser) · "Chris's lead goes from 3 to 7" · "Pars all
+  round." / "No change at the top." · "takes a zero" (not "blanks") · "The hole that broke it
+  open:" (biggest one-hole growth of a sole lead, 4+) · "the biggest lead of the day" once (live:
+  "so far") · **closest to pin is "CTP"**: "wins the CTP" / "wins a third CTP of the day". Only
+  the lead fact is bold.
 - Tests: `fieldStory.test.ts` (4, incl. the real Round 1 word for word). Full run → **238**.

@@ -12,24 +12,24 @@ describe('buildFieldStory', () => {
   it('tells the real Round 1, newest first', () => {
     const vm = buildFieldStory(reportDb(ROUND_ONE, { ctp: { 6: 2, 8: 2, 14: 2, 16: 1 }, status: 'in_progress' }))!
     expect(lines(vm)).toEqual([
-      "18th · Chris blanks the last, the first hole all day without a point. Jon makes a real eagle and Kyle and Adam birdie. Chris's lead is cut to 8. [Chris 44, Kyle 36, Jon 31, Adam 27]",
-      '17th · Nothing moves. Chris still 11 up.',
-      '16th · Chris makes a net birdie to go 11 up. Kyle wins the closest-to-pin.',
-      '15th · Kyle and Chris make net birdies on the 15th. Chris still 10 up.',
-      '14th · Nothing moves. Chris still 10 up. Adam wins the pin again, three for the day.',
-      '13th · Nothing moves. Chris still 10 up.',
-      '12th · Kyle birdies for a net eagle and cuts it to 10.',
-      '11th · Chris birdies for a net eagle to go 12 up, the biggest lead of the day.',
-      '10th · Jon and Adam birdie the 10th. Chris still 10 up.',
+      "18th · Chris takes a zero on the last, the first of the day. Jon makes a real eagle and Kyle and Adam birdie. Chris's lead is cut to 8. [Chris 44, Kyle 36, Jon 31, Adam 27]",
+      '17th · Pars all round. Chris still leads by 11.',
+      '16th · Chris makes a net birdie to lead by 11. Kyle wins the CTP.',
+      '15th · Kyle and Chris make net birdies. Chris still leads by 10.',
+      '14th · Pars all round. Chris still leads by 10. Adam wins a third CTP of the day.',
+      '13th · Pars all round. Chris still leads by 10.',
+      '12th · Kyle birdies for a net eagle and cuts the lead to 10.',
+      '11th · Chris birdies for a net eagle to lead by 12, the biggest lead of the day.',
+      '10th · Jon and Adam birdie. Chris still leads by 10.',
       'The turn ·  [Chris 25, Kyle 15, Jon 11, Adam 9]',
-      '9th · Chris birdies for a net eagle and Kyle birdies. Chris by 10.',
-      '8th · Jon and Chris birdie. Chris by 9. Adam wins the pin again, two for the day.',
+      '9th · Chris birdies for a net eagle and Kyle birdies. Chris leads by 10.',
+      '8th · Jon and Chris birdie. Chris leads by 9. Adam wins a second CTP of the day.',
       // Gross 3 on the par-5 7th with no stroke: a REAL eagle. Everyone else 0.
-      '7th · The hole that broke it open: Chris makes a real eagle while the other three blank. 3 clear becomes 7.',
-      '6th · Jon and Chris birdie. Chris by 3. Adam wins the closest-to-pin.',
-      '3rd–5th · Chris birdies the 3rd and Kyle and Adam birdie the 4th. Chris by 2.',
+      "7th · The hole that broke it open: Chris makes a real eagle while the other three take zeros. Chris's lead goes from 3 to 7.",
+      '6th · Jon and Chris birdie. Chris leads by 3. Adam wins the CTP.',
+      '3rd–5th · Chris birdies the 3rd and Kyle and Adam birdie the 4th. Chris leads by 2.',
       // The 2nd is a par with a stroke for Chris: a NET birdie.
-      '2nd · Chris takes the lead outright with a net birdie, 1 clear. Jon blanks.',
+      '2nd · Chris takes a 1-point lead with a net birdie. Jon takes a zero.',
       '1st · Kyle and Chris share the early lead.',
     ])
     expect(vm.entries.filter((e) => e.emphasis).map((e) => e.label)).toEqual(['7th', '2nd'])
@@ -42,7 +42,7 @@ describe('buildFieldStory', () => {
     const [first, second] = lines(buildFieldStory(db)!)
     expect(first).toBe('12th · Kyle and Chris in: Kyle birdies for a net eagle. Jon and Adam still to post.')
     // Live, the peak is only the biggest "so far".
-    expect(second).toBe('11th · Chris birdies for a net eagle to go 12 up, the biggest lead so far.')
+    expect(second).toBe('11th · Chris birdies for a net eagle to lead by 12, the biggest lead so far.')
   })
 
   it('first names only, no em dashes', () => {

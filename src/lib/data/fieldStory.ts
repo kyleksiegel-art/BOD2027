@@ -60,7 +60,7 @@ const SHOT: Record<string, { rank: number; one: string; many: string; noun: stri
   netEagle: { rank: 4, one: 'makes a net eagle', many: 'make net eagles', noun: 'a net eagle' },
   birdie: { rank: 3, one: 'birdies', many: 'birdie', noun: 'a birdie' },
   netBirdie: { rank: 2, one: 'makes a net birdie', many: 'make net birdies', noun: 'a net birdie' },
-  blank: { rank: 0, one: 'blanks', many: 'blank', noun: 'a blank' },
+  blank: { rank: 0, one: 'takes a zero', many: 'take zeros', noun: 'a zero' },
 }
 
 function shotOf(hr: Hr | undefined): string | null {
@@ -76,6 +76,7 @@ function shotOf(hr: Hr | undefined): string | null {
   if (pts === 3) return 'netBirdie'
   return null
 }
+const ORDINAL_WORDS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth']
 const isEagleish = (k: string | null) => k === 'albatross' || k === 'eagle' || k === 'birdieNetEagle' || k === 'netEagle'
 
 /**
@@ -92,7 +93,7 @@ function shotsClause(shots: { p: P; kind: string }[], hole?: number): string {
   return listOf(
     groups.map((g) => {
       const verb = g.names.length > 1 ? SHOT[g.kind].many : SHOT[g.kind].one
-      const where = hole === undefined ? '' : /^(birdies?|blanks?)$/.test(verb) ? ` the ${ordinalOf(hole)}` : ` on the ${ordinalOf(hole)}`
+      const where = hole === undefined ? '' : /^birdies?$/.test(verb) ? ` the ${ordinalOf(hole)}` : ` on the ${ordinalOf(hole)}`
       return `${listOf(g.names)} ${verb}${where}`
     }),
   )
@@ -169,14 +170,19 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
     return players.some((p) => isEagleish(shotOf(p.holes.get(h))))
   }
 
+  const allPars = (from: number, to: number) => {
+    for (let q = from; q <= to; q++) if (!players.every((p) => (p.holes.get(q)?.points ?? -1) === 2)) return false
+    return true
+  }
+
   // ── Prose ──
   const entries: StoryEntry[] = [] // oldest first, reversed at the end
   const tail = (l: Lead, h: number, prev: Lead | null): string => {
     if (l.leaders.length > 1) return l.leaders.length === players.length ? 'All square.' : `${listOf(l.leaders.map((p) => p.first))} level at the top.`
     const who = l.leaders[0].first
-    if (biggest(h)) return `${who} ${l.gap} clear${biggest(h)}.`
-    if (prev && soleId(prev) === soleId(l) && l.gap === prev.gap) return `${who} still ${l.gap} up.`
-    return `${who} by ${l.gap}.`
+    if (biggest(h)) return `${who} leads by ${l.gap}${biggest(h)}.`
+    if (prev && soleId(prev) === soleId(l) && l.gap === prev.gap) return `${who} still leads by ${l.gap}.`
+    return `${who} leads by ${l.gap}.`
   }
 
   let h = 1
@@ -191,10 +197,10 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
         const shots = players
           .map((p) => ({ p, kind: shotOf(p.holes.get(q)) }))
           .filter((x): x is { p: P; kind: string } => x.kind !== null && x.kind !== 'blank')
-        if (shots.length) bits.push(shotsClause(shots, q))
+        if (shots.length) bits.push(shotsClause(shots, h === end ? undefined : q))
       }
       const after = leadAt(end)
-      const lead = bits.length ? `${cap(listOf(bits.slice(0, 3)))}. ` : 'Nothing moves. '
+      const lead = bits.length ? `${cap(listOf(bits.slice(0, 3)))}. ` : `${allPars(h, end) ? 'Pars all round.' : 'No change at the top.'} `
       entries.push({
         key: `q${h}`,
         label: h === end ? ordinalOf(h) : `${ordinalOf(h)}–${ordinalOf(end)}`,
@@ -218,8 +224,15 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
       if (changed && now.leaders.length === 1) {
         const x = now.leaders[0]
         const mine = shots.find((q) => q.p.id === x.id && q.kind !== 'blank')
-        const verb = h === 1 ? 'leads early' : prev && prev.leaders.length > 1 ? 'takes the lead outright' : 'takes the lead'
-        segs.push(s(x.first), t(` ${verb}${mine ? ` with ${SHOT[mine.kind].noun}` : ''}, ${now.gap} clear.`))
+        // "Chris takes a 1-point lead with a net birdie." / "Kyle takes over the lead, 2 ahead."
+        const how = mine ? ` with ${SHOT[mine.kind].noun}` : ''
+        const sentence =
+          h === 1
+            ? ` leads by ${now.gap} after one${how}.`
+            : prev && prev.leaders.length === 1
+              ? ` takes over the lead${how}, ${now.gap} ahead.`
+              : ` takes a ${now.gap}-point lead${how}.`
+        segs.push(s(x.first), t(sentence))
         used = new Set([x.id])
       } else if (changed && now.leaders.length > 1) {
         segs.push(
@@ -239,7 +252,7 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
       const prevLeader = prev && prev.leaders.length === 1 ? prev.leaders[0] : null
       const leaderBlank = prevLeader ? blanks.find((b) => b.p.id === prevLeader.id) : undefined
       if (othersAllBlank) {
-        clause = `${scorers[0].p.first} ${SHOT[scorers[0].kind].one} while the other ${words(blanks.length)} blank`
+        clause = `${scorers[0].p.first} ${SHOT[scorers[0].kind].one} while the other ${words(blanks.length)} take zeros`
       } else {
         const leaderIds = new Set((prev ?? now).leaders.map((p) => p.id))
         const shown = [...scorers, ...blanks.filter((b) => (leaderIds.has(b.p.id) && !leaderBlank) || (blanks.length === 1 && !leaderBlank))]
@@ -248,10 +261,10 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
         if (!changed && prev && sole && scorers.length === 1 && !leaderBlank) {
           // One scorer moving the gap reads as one sentence: "to go 11 up" / "and cuts it to 10".
           if (scorers[0].p.id === sole.id && now.gap > prev.gap && breaker?.h !== h) {
-            clause += ` to go ${now.gap} up${biggest(h)}`
+            clause += ` to lead by ${now.gap}${biggest(h)}`
             gapSaid = true
           } else if (scorers[0].p.id !== sole.id && now.gap < prev.gap) {
-            clause += ` and cuts it to ${now.gap}`
+            clause += ` and cuts the lead to ${now.gap}`
             gapSaid = true
           }
         }
@@ -261,8 +274,8 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
         let run = 0
         for (let q = h - 1; q >= 1 && (prevLeader.holes.get(q)?.points ?? 0) > 0; q--) run++
         const where = h === n ? 'the last' : `the ${ordinalOf(h)}`
-        const note = run === h - 1 && run >= 8 ? ', the first hole all day without a point' : run >= 8 ? ` after ${run} straight holes with points` : ''
-        segs.push(t(`${segs.length ? ' ' : ''}${prevLeader.first} blanks ${where}${note}.`))
+        const note = run === h - 1 && run >= 8 ? ', the first of the day' : run >= 8 ? ` after scoring on ${run} straight holes` : ''
+        segs.push(t(`${segs.length ? ' ' : ''}${prevLeader.first} takes a zero on ${where}${note}.`))
       }
       if (clause) segs.push(t(`${segs.length && !segs[segs.length - 1].text.endsWith(': ') ? ' ' : ''}${cap(clause)}.`))
 
@@ -274,13 +287,12 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
           now.leaders.length > 1
             ? tail(now, h, prev)
             : g >= 3
-              ? `${a.gap} clear becomes ${now.gap}${biggest(h)}.`
+              ? `${who}'s lead goes from ${a.gap} to ${now.gap}${biggest(h)}.`
               : g <= -3
                 ? `${who}'s lead is cut to ${now.gap}.`
-                : !clause && !leaderBlank && g === 0
-                  ? `Nothing moves. ${who} still ${now.gap} up.`
-                  : tail(now, h, prev)
-        segs.push(t(segs.length ? ' ' : ''), s(text))
+                : tail(now, h, prev)
+        if (!clause && !leaderBlank && g === 0) segs.push(t(allPars(h, h) ? 'Pars all round. ' : 'No change at the top. '))
+        segs.push(t(segs.length && !segs[segs.length - 1].text.endsWith(' ') ? ' ' : ''), s(text))
       }
 
       const ctp = ctpByHole.get(h)
@@ -289,7 +301,7 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
         if (winner) {
           const c = (ctpCount.get(ctp) ?? 0) + 1
           ctpCount.set(ctp, c)
-          segs.push(t(c >= 2 ? ` ${winner.first} wins the pin again, ${words(c)} for the day.` : ` ${winner.first} wins the closest-to-pin.`))
+          segs.push(t(c >= 2 ? ` ${winner.first} wins a ${ORDINAL_WORDS[c] ?? ordinalOf(c)} CTP of the day.` : ` ${winner.first} wins the CTP.`))
         }
       }
 
