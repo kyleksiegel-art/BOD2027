@@ -1,12 +1,12 @@
 // Read-only hooks the screens use. Each subscribes to Dexie via useLiveQuery and runs the
 // pure assembly in compute.ts. Screens import ONLY from here — never Dexie or scoring
 // directly — so the data-layering rule stays enforceable by grep.
+import { buildFieldStory } from './fieldStory'
+import type { StoryVM } from './fieldStory'
 import { buildRoundReport } from './report'
 import type { ReportVM } from './report'
 import { buildAnnualReport } from './annualReport'
 import type { AnnualReportVM } from './annualReport'
-import { buildFieldReport } from './wire'
-import type { WireVM } from './wire'
 import { buildPlayerForm } from './form'
 import type { PlayerFormVM } from './form'
 import { buildStrokesCards } from './strokesCard'
@@ -119,9 +119,10 @@ export function useAnnualReport(): AnnualReportVM | null {
 }
 
 /** The Field Report wire — the live round's events, else the latest counting round's. */
-export function useFieldReport(): WireVM | null | undefined {
+/** The Field Report's default view: the round as a short story, newest first. */
+export function useFieldStory(): StoryVM | null | undefined {
   const data = useDbData()
-  return useMemo(() => (data ? buildFieldReport(data) : undefined), [data])
+  return useMemo(() => (data ? buildFieldStory(data) : undefined), [data])
 }
 
 export interface PlayerCardVM {
