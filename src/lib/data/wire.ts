@@ -59,10 +59,6 @@ export interface WireVM {
 
 const ORDINAL_WORDS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth']
 
-function lastName(name: string): string {
-  const parts = name.split(/\s+/)
-  return parts[parts.length - 1] || name
-}
 function firstName(name: string): string {
   return name.split(/\s+/)[0] || name
 }
@@ -218,7 +214,7 @@ export function buildFieldReport(dbData: Db): WireVM | null {
     const leadersAfter = playing.filter((p) => (cum.get(p.playerId) ?? 0) === topAfter).map((p) => p.playerId)
     const secondAfter = Math.max(0, ...playing.map((p) => cum.get(p.playerId) ?? 0).filter((v) => v < topAfter))
     const margin = topAfter - secondAfter
-    const leaderName = leadersAfter.length === 1 ? lastName(nameOf.get(leadersAfter[0]) ?? '') : null
+    const leaderName = leadersAfter.length === 1 ? firstName(nameOf.get(leadersAfter[0]) ?? '') : null
     const anyMove = done.some(({ p }) => rankBefore.get(p.playerId) !== rankAfter.get(p.playerId))
 
     const events: WireEvent[] = []
@@ -238,7 +234,7 @@ export function buildFieldReport(dbData: Db): WireVM | null {
       })
     } else {
       for (const { p, points, pickedUp, grossToPar, stroked } of done) {
-        const last = lastName(p.name)
+        const last = firstName(p.name)
         const before = rankBefore.get(p.playerId) ?? 1
         const after = rankAfter.get(p.playerId) ?? 1
         const wasLeader = leadersBefore.includes(p.playerId)
@@ -325,7 +321,7 @@ export function buildFieldReport(dbData: Db): WireVM | null {
           kind: 'ctp',
           playerId: ctp,
           colorIndex: colorRank.get(ctp) ?? 0,
-          segs: [s(lastName(winner)), t(` takes closest to pin on the ${nth}.`)],
+          segs: [s(firstName(winner)), t(` takes closest to pin on the ${nth}.`)],
           meta: 'closest to pin',
           emphasis: false,
           notability: 3,

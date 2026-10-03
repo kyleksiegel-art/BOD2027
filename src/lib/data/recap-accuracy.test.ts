@@ -115,7 +115,7 @@ describe('Field Report verbs: net in the sentence', () => {
   it('the wire reads a scratch birdie as a birdie, and an all-par hole as the field parring', () => {
     const vm = buildFieldReport(makeDb('in_progress'))!
     const lines = vm.holes.flatMap((h) => h.events.map((e) => text(e.segs)))
-    expect(lines.some((l) => l.startsWith('Siegel birdies the 2nd.'))).toBe(true)
+    expect(lines.some((l) => l.startsWith('Kyle birdies the 2nd.'))).toBe(true)
     expect(lines).toContain('Field pars the 3rd. No movement.')
     for (const l of lines) expect(l).not.toContain('—')
   })

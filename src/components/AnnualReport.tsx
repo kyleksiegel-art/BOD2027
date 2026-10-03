@@ -158,8 +158,7 @@ export function AnnualReport({ vm }: { vm: AnnualReportVM }) {
             <div className="mt-7">
               <span className="eyebrow block">To the board</span>
               <div
-                className="mt-3 flex flex-col gap-3 font-display text-[1.04rem] leading-[1.6] text-paper-dim"
-                style={{ fontVariationSettings: "'opsz' 36, 'wght' 450" }}
+                className="mt-3 flex flex-col gap-3 text-[0.98rem] leading-relaxed text-paper-dim"
               >
                 {vm.letter.map((para, i) => (
                   <p key={i}>

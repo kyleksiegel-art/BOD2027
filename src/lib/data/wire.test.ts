@@ -111,9 +111,9 @@ describe('buildFieldReport', () => {
     const vm = buildFieldReport(makeDb())!
     const h1 = vm.holes.find((h) => h.holeNumber === 1)!
     // Hole 1 is the opener — no "no movement" collapse there (positions have not been set).
-    expect(h1.events.map(text)).toEqual(['Aronson pars the 1st.', 'Denove pars the 1st.', 'Hersh pars the 1st.'])
+    expect(h1.events.map(text)).toEqual(['Jon pars the 1st.', 'Chris pars the 1st.', 'Adam pars the 1st.'])
     const h3 = vm.holes.find((h) => h.holeNumber === 3)!
-    expect(h3.events.map(text)).toEqual(['Hersh takes closest to pin on the 3rd.', 'Field pars the 3rd. No movement.'])
+    expect(h3.events.map(text)).toEqual(['Adam takes closest to pin on the 3rd.', 'Field pars the 3rd. No movement.'])
     expect(h3.events[1].meta).toBe('2 pts each')
     expect(h3.events[0].kind).toBe('ctp')
   })
@@ -121,19 +121,19 @@ describe('buildFieldReport', () => {
   it('writes the lead change first, then the move, then the rest', () => {
     const vm = buildFieldReport(makeDb())!
     const h2 = vm.holes.find((h) => h.holeNumber === 2)!
-    expect(text(h2.events[0])).toBe('Aronson birdies the 2nd. Takes the lead by 1.')
+    expect(text(h2.events[0])).toBe('Jon birdies the 2nd. Takes the lead by 1.')
     expect(h2.events[0].emphasis).toBe(true)
     expect(h2.events[0].meta).toBe('net birdie · 3 pts · lead change')
     // The opening tie is nobody's lead: the others slip, they do not "lose the lead".
-    expect(text(h2.events[1])).toBe('Denove pars the 2nd. Slips to 2nd, 1 back of Aronson.')
+    expect(text(h2.events[1])).toBe('Chris pars the 2nd. Slips to 2nd, 1 back of Jon.')
     expect(h2.events[1].kind).toBe('move')
 
     const h4 = vm.holes.find((h) => h.holeNumber === 4)!
     const lines = h4.events.map(text)
     // Cumulative after 4: Denove 9, Aronson 7, Hersh 6 — Denove takes it, Aronson drops, Hersh slips.
-    expect(lines[0]).toBe('Denove birdies the 4th. Takes the lead by 2.')
-    expect(lines[1]).toBe('Aronson blanks the 4th. Drops to 2nd, 2 back of Denove. First zero of the round.')
-    expect(lines[2]).toBe('Hersh picks up on the 4th. Slips to 3rd, 3 back of Denove. First zero of the round.')
+    expect(lines[0]).toBe('Chris birdies the 4th. Takes the lead by 2.')
+    expect(lines[1]).toBe('Jon blanks the 4th. Drops to 2nd, 2 back of Chris. First zero of the round.')
+    expect(lines[2]).toBe('Adam picks up on the 4th. Slips to 3rd, 3 back of Chris. First zero of the round.')
     expect(h4.events[2].meta).toBe('picked up · 0 pts · position change')
     // The strip reads the top of the newest hole.
     expect(vm.latestHole).toBe(4)
