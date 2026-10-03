@@ -912,3 +912,28 @@ rounds went.
   off the strokes received, not the player's index. Field is still named `vsIndex`.
 - No em dashes and no implementation copy ("derived on-device", "nothing is typed") in generated text.
 - Tests: `recap-accuracy.test.ts` (5). Full `vitest run` → **225**.
+
+## Narrative round report (2026-10-02, branch `narrative-report`) — the shape to reuse
+
+Kyle wanted "more of a narrative" and picked **option A** (a ~130-word story) off three drafts.
+`report.ts` was rewritten; the old four fixed paragraphs (worst stretch, biggest jump) are gone.
+
+- **Analysis, then prose.** `buildRoundReport` first derives per-hole points, winner (via
+  `resolveRoundWinnerIds`, same as recap + Money), the best of the rest, biggest deficit + hole,
+  when the lead was won for good, then picks a `StoryKind`: `shared` · `late` (came from 3+ back
+  after the 6th, in front for good only in the last 3) · `comeback` · `runaway` (6+) · `close`
+  (≤2) · `steady`. `ReportVM.kind` and `.stretch` expose it for tests.
+- **`decisiveStretch(a, b, n, after)`** (exported): over every 3–6 hole window, take the biggest
+  swing, then the SHORTEST window with ≥75% of it; ties → bigger swing, bigger lead at the end,
+  starts on a gaining hole, earlier. Null below a 4-point swing (then "took the lead for good on
+  the Nth with a birdie"). A comeback looks only after the deficit hole.
+- **Shots**: "a real eagle on the par-5 7th" is gross; "a net eagle on the 9th" only when a stroke
+  made it; like shots group ("birdies on the 16th and 17th").
+- **Paragraphs**: how it was decided · after (best back nine if not the winner, the winner's late
+  blank and the run it ended, "only brought the margin down to N") · everyone not yet named gets
+  1–2 hooks (slow start → came home in N, real eagles, real birdies, 2+ CTPs "which pay exactly
+  nothing", blanks), never repeating a hook kind across players, CTP aside always last · the week
+  + "The Blue tomorrow, three rounds to go."
+- Fixture: `src/test/reportFixture.ts` builds a Db from **points per hole** (+ strokes); `ROUND_ONE`
+  is the hosted Round 1 as of 2026-10-02. Golden test of its full text in `report-narrative.test.ts`.
+- Tests: `report-narrative.test.ts` (9), `report.test.ts` (4). Full `vitest run` → **234**.
