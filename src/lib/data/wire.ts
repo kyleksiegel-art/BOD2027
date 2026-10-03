@@ -126,7 +126,7 @@ function rankOf(cum: Map<string, number>, playing: PlayerRoundVM[]): Map<string,
 }
 
 /** The round the wire follows: the live one, else the most recent counting round. */
-function pickRound(dbData: Db): number | null {
+export function pickRound(dbData: Db): number | null {
   const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
   const live = rounds.filter((r) => r.status === 'in_progress').pop()
   if (live) return live.round_number

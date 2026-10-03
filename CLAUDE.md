@@ -937,3 +937,23 @@ Kyle wanted "more of a narrative" and picked **option A** (a ~130-word story) of
 - Fixture: `src/test/reportFixture.ts` builds a Db from **points per hole** (+ strokes); `ROUND_ONE`
   is the hosted Round 1 as of 2026-10-02. Golden test of its full text in `report-narrative.test.ts`.
 - Tests: `report-narrative.test.ts` (9), `report.test.ts` (4). Full `vitest run` → **234**.
+
+## Field Report story view (2026-10-02, branch `field-story`) — the shape to reuse
+
+Kyle wanted the Field Report in the round report's narrative style, compared side by side.
+`/standings/wire` now has a **Story | Every hole** toggle (`ViewToggle`, default Story); Every
+hole is the unchanged `buildFieldReport` wire. The Standings ticker strip still reads the wire.
+
+- **`src/lib/data/fieldStory.ts` `buildFieldStory(db) → StoryVM`**: same round as the wire
+  (`pickRound`, now exported from `wire.ts`). A hole counts only when EVERY playing player has it;
+  the next hole, if some are in, is a `partial` entry ("Kyle and Chris in: …. Jon and Adam still
+  to post.") that calls no lead change.
+- **A hole gets its own entry** when it's the 1st or last, the sole leader changes (or shared ↔
+  sole), the gap moves 3+, a CTP is won, or anyone makes an eagle (real or net). Runs of other
+  holes fold into one `quiet` entry ("3rd–5th"). A `turn` entry carries the scoreline after 9.
+- Phrasing: "takes the lead outright with a net birdie, 1 clear" · "to go 11 up" (lone scorer is
+  the leader) · "and cuts it to 10" (lone scorer is the chaser) · "3 clear becomes 7" · "The hole
+  that broke it open:" (biggest one-hole growth of a sole lead, 4+) · "the biggest lead of the day"
+  once, on the first hole it's reached (live: "so far") · the leader's blank leads the entry with
+  the run it ended · "wins the pin again, three for the day". Real vs net as in the report.
+- Tests: `fieldStory.test.ts` (4, incl. the real Round 1 word for word). Full run → **238**.
