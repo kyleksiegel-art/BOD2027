@@ -940,12 +940,16 @@ Kyle wanted "more of a narrative" and picked **option A** (a ~130-word story) of
 
 ## Field Report story view (2026-10-02, branch `field-story`) — the shape to reuse
 
-Kyle wanted the Field Report in the round report's narrative style, compared side by side.
-`/standings/wire` now has a **Story | Every hole** toggle (`ViewToggle`, default Story); Every
-hole is the unchanged `buildFieldReport` wire. The Standings ticker strip still reads the wire.
+Kyle wanted the Field Report in the round report's narrative style, compared it side by side
+with the old line-per-player wire, and chose **story only** (2026-10-02). `wire.ts` /
+`buildFieldReport` / `useFieldReport` are **deleted**; `/standings/wire` renders only the story
+(route path kept), and the Standings ticker (`FieldReportStrip`) rolls the newest 8 story entries
+(label as the marker, the scoreline-only turn entry skipped). The old "Field Report (2026-09-07)"
+section above describes the removed wire.
 
-- **`src/lib/data/fieldStory.ts` `buildFieldStory(db) → StoryVM`**: same round as the wire
-  (`pickRound`, now exported from `wire.ts`). A hole counts only when EVERY playing player has it;
+- **`src/lib/data/fieldStory.ts` `buildFieldStory(db) → StoryVM`**: follows the live round, else
+  the latest final one (its own `pickRound`); `StoryVM` carries the header fields (`live`,
+  `complete`, `roundThru`, `courseName`, `dateIso`). A hole counts only when EVERY playing player has it;
   the next hole, if some are in, is a `partial` entry ("Kyle and Chris in: …. Jon and Adam still
   to post.") that calls no lead change.
 - **A hole gets its own entry** when it's the 1st or last, the sole leader changes (or shared ↔
@@ -959,4 +963,4 @@ hole is the unchanged `buildFieldReport` wire. The Standings ticker strip still 
   open:" (biggest one-hole growth of a sole lead, 4+) · "the biggest lead of the day" once (live:
   "so far") · **closest to pin is "CTP"**: "wins the CTP" / "wins a third CTP of the day". Only
   the lead fact is bold.
-- Tests: `fieldStory.test.ts` (4, incl. the real Round 1 word for word). Full run → **238**.
+- Tests: `fieldStory.test.ts` (4, incl. the real Round 1 word for word). Full run → **231** (the wire's tests went with it).

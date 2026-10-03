@@ -7,8 +7,6 @@ import { buildRoundReport } from './report'
 import type { ReportVM } from './report'
 import { buildAnnualReport } from './annualReport'
 import type { AnnualReportVM } from './annualReport'
-import { buildFieldReport } from './wire'
-import type { WireVM } from './wire'
 import { buildPlayerForm } from './form'
 import type { PlayerFormVM } from './form'
 import { buildStrokesCards } from './strokesCard'
@@ -121,11 +119,6 @@ export function useAnnualReport(): AnnualReportVM | null {
 }
 
 /** The Field Report wire — the live round's events, else the latest counting round's. */
-export function useFieldReport(): WireVM | null | undefined {
-  const data = useDbData()
-  return useMemo(() => (data ? buildFieldReport(data) : undefined), [data])
-}
-
 /** The Field Report's default view: the round as a short story, newest first. */
 export function useFieldStory(): StoryVM | null | undefined {
   const data = useDbData()

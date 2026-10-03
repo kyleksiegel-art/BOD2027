@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Movement } from '@/components/Movement'
 import { FieldReportStrip } from '@/components/FieldReportStrip'
 import { AnnualReport } from '@/components/AnnualReport'
-import { useStandings, useFieldReport, useAnnualReport } from '@/lib/data/selectors'
+import { useStandings, useFieldStory, useAnnualReport } from '@/lib/data/selectors'
 import type { StandingsLiveRound } from '@/lib/data/compute'
 import { formatStandingBack, formatPosition, formatLiveLine } from '@/lib/format'
 
@@ -42,7 +42,7 @@ function LiveStatus({ live }: { live: StandingsLiveRound }) {
 
 export default function Standings() {
   const standings = useStandings()
-  const wire = useFieldReport()
+  const wire = useFieldStory()
   const annual = useAnnualReport()
 
   if (!standings) return <LoadingStandings />

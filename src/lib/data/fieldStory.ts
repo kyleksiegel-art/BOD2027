@@ -1,13 +1,12 @@
 import { buildRoundDetail } from './compute'
 import type { Db, PlayerRoundVM } from './compute'
-import { pickRound } from './wire'
 import { ordinalOf } from '@/lib/format'
 
 /**
  * The Field Report as a story (Kyle 2026-10-02, "switch the field report to the narrative style"):
  * one or two sentences per hole about what CHANGED, quiet holes folded together, a scoreboard line
- * at the turn and at the finish. Newest first. Sits beside the hole-by-hole wire (`wire.ts`) on
- * the same page; this is the default view, that one is "Every hole".
+ * at the turn and at the finish. Newest first. Kyle picked it over the old line-per-player wire
+ * ("story only", 2026-10-02), which was removed; this is the whole Field Report and its ticker.
  *
  * Same rules as the round report: analysis first (per-hole points, the lead before/after every
  * hole), prose second; first names, no pronouns, no em dashes; "real eagle" is the gross score,
@@ -31,7 +30,21 @@ export interface StoryEntry {
 
 export interface StoryVM {
   roundNumber: number
+  courseName: string
+  dateIso: string
+  live: boolean // the round is in_progress
+  complete: boolean // every playing player through the counted window (scores in, maybe not signed off)
+  roundThru: number // furthest hole any playing player has saved
   entries: StoryEntry[] // newest first
+}
+
+/** The round the Field Report follows: the live one, else the most recent final one. */
+function pickRound(dbData: Db): number | null {
+  const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
+  const live = rounds.filter((r) => r.status === 'in_progress').pop()
+  if (live) return live.round_number
+  const final = rounds.filter((r) => r.status === 'final').pop()
+  return final ? final.round_number : null
 }
 
 type Hr = PlayerRoundVM['holeResults'][number]
@@ -273,9 +286,9 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
         // The leader's blank is the news: lead with it, and say what run it ended.
         let run = 0
         for (let q = h - 1; q >= 1 && (prevLeader.holes.get(q)?.points ?? 0) > 0; q--) run++
-        const where = h === n ? 'the last' : `the ${ordinalOf(h)}`
+        const where = h === n ? ' on the last' : '' // the entry's label already names the hole
         const note = run === h - 1 && run >= 8 ? ', the first of the day' : run >= 8 ? ` after scoring on ${run} straight holes` : ''
-        segs.push(t(`${segs.length ? ' ' : ''}${prevLeader.first} takes a zero on ${where}${note}.`))
+        segs.push(t(`${segs.length ? ' ' : ''}${prevLeader.first} takes a zero${where}${note}.`))
       }
       if (clause) segs.push(t(`${segs.length && !segs[segs.length - 1].text.endsWith(': ') ? ' ' : ''}${cap(clause)}.`))
 
@@ -344,7 +357,15 @@ export function buildFieldStory(dbData: Db): StoryVM | null {
     })
   }
 
-  return { roundNumber, entries: entries.reverse() }
+  return {
+    roundNumber,
+    courseName: detail.course.name,
+    dateIso: detail.round.date,
+    live: detail.round.status === 'in_progress',
+    complete: complete === n,
+    roundThru: Math.max(0, ...players.map((p) => Math.max(0, ...[...p.holes.values()].filter((h) => h.completed).map((h) => h.holeNumber)))),
+    entries: entries.reverse(),
+  }
 }
 
 function cap(str: string): string {
