@@ -13,7 +13,7 @@ This file is what a fresh session reads to restore context cheaply. Keep it curr
 
 ## The trip in one paragraph
 
-Four players (Jon Aronson, Kyle Siegel, Adam Hersh, Chris Denove) play four rounds at Streamsong Resort, one per day Feb 4–7 2027: Red (Thu), Blue (Fri), Black (Sat), Bone Valley (Sun). Net Stableford scoring, cumulative across all counting rounds. Money split three ways — championship, round winners, closest to pin — with the CTP pot per-round proportional to that round's par-3 count (the printed cards give every course four par 3s — Red, Blue, Black and Bone Valley alike). App is used one-handed in a cart in Florida sun, and must work fully offline.
+Four players (Jon Aronson, Kyle Siegel, Adam Hersh, Chris Denove) play four rounds at Streamsong Resort, one per day Feb 4–7 2027, per the booked tee sheet: Red (Thu 1:10 PM), Black (Fri 10:33 AM), Blue (Sat 10:35 AM), Bone Valley (Sun 8:28 AM) — Black/Blue are swapped vs the brief (`decisions.md`). Net Stableford scoring, cumulative across all counting rounds. Money: a buy-in funds 1st overall, 2nd overall and a per-round winner; closest to pin is tracked but pays nothing (see Money path below). App is used one-handed in a cart in Florida sun, and must work fully offline.
 
 ## Architecture in one paragraph
 
