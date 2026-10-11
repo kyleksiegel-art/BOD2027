@@ -588,7 +588,7 @@ function tournamentOpener(c: Ctx, pick: Pick, daypart: string): string[] | null 
     out.push(
       `${pot > 0 ? `${dollars(pot)} on the line. ` : ''}${dollars(purse.champFirstCents)} for the champion, ${dollars(purse.champSecondCents)} for second${
         purse.roundWinnerCents > 0 ? `, and ${dollars(purse.roundWinnerCents)} to whoever wins each round` : ''
-      }. Plus closest to the pin, settled in the parking lot, like gentlemen.`,
+      }. Plus closest to the pin and shits, settled at the nineteenth hole, like gentlemen.`,
     )
   }
   return out

@@ -36,7 +36,7 @@ describe('buildRadioCall', () => {
     expect(lines[0]).toMatch(/welcome to the Board of Directors/)
     expect(lines).toContain("Let's meet the field. Jon Air-un-sun. Kyle See-gul. Adam Hersh. Chris Den-oh-vee.")
     expect(lines).toContain("Here's the road ahead: the Red today, the Blue on Friday, the Black on Saturday and Bone Valley on Sunday.")
-    expect(lines.some((l) => l.startsWith('$1000 on the line. $600 for the champion, $200 for second, and $50 to whoever wins each round.'))).toBe(true)
+    expect(lines).toContain('$1000 on the line. $600 for the champion, $200 for second, and $50 to whoever wins each round. Plus closest to the pin and shits, settled at the nineteenth hole, like gentlemen.')
     // Round 2's preview is not the trip opener.
     const r2 = { ...reportDb(ROUND_ONE), settings: [PURSE] }
     const second = r2.rounds.find((r) => r.round_number === 2)!
