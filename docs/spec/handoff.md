@@ -4,7 +4,8 @@
   Save (dev server may point at the hosted DB); Home + Enter render clean at 375px.
 - #4 (Clear scores resurrected by a dead-zone phone) fixed on `clear-scores-epoch`: `rounds.scores_epoch`.
   **Push `20261010120000_round_scores_epoch.sql` to the hosted DB** (`supabase db push`). vitest 237, pgTAP 251.
-- Still pinned: the minor list in memory (PIN throttle XFF, precache size, tap targets, etc.).
+- `minor-fixes`: AVIF-only precache (5.1 → 1.8 MB), revoke TRUNCATE from anon (**push the migration**),
+  44px tap targets. Still pinned: PIN throttle XFF, Annual Report lower-tie T / abandoned CTPs, etc.
 - Pre-trip checklist (late January, on the real phones) unchanged from the 2026-09-14 handoff:
   1. Supabase awake on a non-pausing tier; hydrate returns rows; `pin-verify` unlocks.
   2. Reset every round to upcoming; real indexes, tees, tee times, money amounts.

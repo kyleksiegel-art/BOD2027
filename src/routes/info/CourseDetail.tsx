@@ -172,7 +172,7 @@ export default function CourseDetail() {
     return (
       <Page>
         <p className="mt-8 text-paper-faint">Course not found.</p>
-        <Link to="/info/courses" className="mt-4 inline-block text-[0.85rem] text-gold">
+        <Link to="/info/courses" className="tap mt-4 inline-flex items-center text-[0.85rem] text-gold">
           ← All courses
         </Link>
       </Page>
@@ -215,7 +215,7 @@ export default function CourseDetail() {
       <div className="mx-auto w-full max-w-[720px] px-5 pt-4">
         <Link
           to="/info/courses"
-          className="text-[0.75rem] uppercase tracking-[0.12em] text-paper-faint hover:text-paper-dim"
+          className="tap inline-flex items-center text-[0.75rem] uppercase tracking-[0.12em] text-paper-faint hover:text-paper-dim"
         >
           ← Courses
         </Link>
