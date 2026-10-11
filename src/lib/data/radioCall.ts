@@ -607,7 +607,11 @@ function finalCall(c: Ctx, pick: Pick): string[] {
 }
 
 /** How the group's names are actually said, respelled for a voice (Kyle 2026-10-11). */
-const SAY_AS: [RegExp, string][] = [[/\bDenove\b/g, 'Den-oh-vee']]
+const SAY_AS: [RegExp, string][] = [
+  [/\bDenove\b/g, 'Den-oh-vee'],
+  [/\bSiegel\b/g, 'See-gul'],
+  [/\bAronson\b/g, 'Air-un-sun'],
+]
 
 /** What a voice would trip on: names, the closest-to-the-pin shorthand, the en dash, double spaces. */
 function forSpeech(s: string): string {
