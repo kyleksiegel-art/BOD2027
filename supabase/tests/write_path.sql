@@ -11,7 +11,7 @@
 
 begin;
 
-select plan(79);
+select plan(84);
 
 create extension if not exists pgtap with schema extensions;
 
@@ -469,6 +469,45 @@ select is(
      from public.rounds r, t_r1 where r.id = t_r1.r1),
   'upcoming/0/0/0/' || (select count(*)::text from public.round_players rp, t_r1 where rp.round_id = t_r1.r1),
   'reset puts the round back to upcoming with no scores, CTP or money, and keeps round_players');
+
+-- ── Clear / Reset retire queued cells (2026-10-10, scores_epoch) ────────────
+-- A phone that queued holes before an admin wipe must not bring them back when it flushes.
+-- Reset above bumped the epoch 0 → 1; Clear bumps it again and leaves the round in_progress.
+select is(
+  (select (public.rpc_clear_round_scores('good-token', r1) -> 'row' ->> 'scores_epoch') from t_r1),
+  '2', 'reset and clear each bump the round''s scores_epoch');
+
+select is(
+  (select public.rpc_upsert_scores(jsonb_build_array(jsonb_build_object(
+      'round_id', r1, 'player_id', jon, 'hole_number', 1, 'gross_strokes', 4, 'picked_up', false,
+      'scores_epoch', 1, 'client_updated_at_raw', '2027-02-04T20:00:00Z', 'client_id', client_a)))
+     -> 0 ->> 'error'
+   from t_r1, t_ids),
+  'round_cleared', 'a score queued before the clear is refused, not resurrected');
+
+select is(
+  (select public.rpc_upsert_ctp(jsonb_build_array(jsonb_build_object(
+      'round_id', r1, 'hole_number', 6, 'player_id', jon, 'scores_epoch', 0,
+      'client_updated_at_raw', '2027-02-04T20:00:00Z', 'client_id', client_a)))
+     -> 0 ->> 'error'
+   from t_r1, t_ids),
+  'round_cleared', 'so is a closest-to-pin result');
+
+select is(
+  (select public.rpc_upsert_scores(jsonb_build_array(jsonb_build_object(
+      'round_id', r1, 'player_id', jon, 'hole_number', 1, 'gross_strokes', 4, 'picked_up', false,
+      'scores_epoch', 2, 'client_updated_at_raw', '2027-02-04T20:01:00Z', 'client_id', client_a)))
+     -> 0 ->> 'applied'
+   from t_r1, t_ids),
+  'true', 'a score stamped with the current epoch lands');
+
+select is(
+  (select public.rpc_upsert_scores(jsonb_build_array(jsonb_build_object(
+      'round_id', r1, 'player_id', jon, 'hole_number', 2, 'gross_strokes', 5, 'picked_up', false,
+      'client_updated_at_raw', '2027-02-04T20:02:00Z', 'client_id', client_a)))
+     -> 0 ->> 'applied'
+   from t_r1, t_ids),
+  'true', 'a score with no epoch (a phone on the old bundle) is still accepted');
 
 select ok(public.rpc_revoke_all_sessions('good-token') >= 1,
   'a valid session can revoke all sessions (changing the PIN must invalidate tokens)');

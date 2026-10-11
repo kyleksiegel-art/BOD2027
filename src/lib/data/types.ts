@@ -59,6 +59,8 @@ export interface RoundRow {
   tee_time: string | null
   status: RoundStatusRow
   holes_counted: number | null
+  /** Bumped by Clear scores / Reset to upcoming. Optional: rows cached before the column existed. */
+  scores_epoch?: number
 }
 
 export type RpStatusRow = 'playing' | 'did_not_play'
@@ -166,6 +168,8 @@ export interface ScorePayload {
   hole_number: number
   gross_strokes: number | null
   picked_up: boolean
+  /** The round's scores_epoch when Save was tapped — stamped by the outbox, not the caller. */
+  scores_epoch?: number
 }
 
 export interface CtpPayload {
@@ -173,6 +177,8 @@ export interface CtpPayload {
   hole_number: number
   player_id: string | null
   distance_feet: number | null
+  /** As on ScorePayload. */
+  scores_epoch?: number
 }
 
 /**
