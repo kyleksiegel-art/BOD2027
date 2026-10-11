@@ -13,6 +13,8 @@ import { buildStrokesCards } from './strokesCard'
 import type { StrokesCardVM } from './strokesCard'
 import { buildPlayerWeek } from './playerWeek'
 import type { PlayerWeekVM } from './playerWeek'
+import { buildWinOdds, buildOddsHistory } from './winProb'
+import type { WinOddsVM, OddsHistoryVM } from './winProb'
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
@@ -123,6 +125,18 @@ export function useAnnualReport(): AnnualReportVM | null {
 export function useFieldStory(): StoryVM | null | undefined {
   const data = useDbData()
   return useMemo(() => (data ? buildFieldStory(data) : undefined), [data])
+}
+
+/** Each player's chance to win the week; null before the week starts and once it is decided. */
+export function useWinOdds(): WinOddsVM | null | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildWinOdds(data) : undefined), [data])
+}
+
+/** How those odds moved, hole by hole — the round in focus and the whole week. */
+export function useOddsHistory(): OddsHistoryVM | null | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildOddsHistory(data) : undefined), [data])
 }
 
 export interface PlayerCardVM {

@@ -174,3 +174,11 @@ const clockFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-
 export function formatClock(iso: string): string {
   return clockFmt.format(new Date(iso)).replace(/\s?[AP]M$/i, '')
 }
+
+/** A win chance for display: never "0%" or "100%" while it is still live; "Out" once it can't happen. */
+export function formatOdds(pct: number, out: boolean): string {
+  if (out) return 'Out'
+  if (pct < 1) return '<1%'
+  if (pct > 99 && pct < 100) return '>99%'
+  return `${Math.round(pct)}%`
+}

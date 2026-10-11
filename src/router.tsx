@@ -10,6 +10,7 @@ import Home from '@/routes/Home'
 
 const Standings = lazy(() => import('@/routes/Standings'))
 const FieldReport = lazy(() => import('@/routes/FieldReport'))
+const Odds = lazy(() => import('@/routes/Odds'))
 const Rounds = lazy(() => import('@/routes/Rounds'))
 const RoundDetail = lazy(() => import('@/routes/RoundDetail'))
 const Enter = lazy(() => import('@/routes/Enter'))
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <Home /> },
       { path: '/standings', element: <Standings /> },
       { path: '/standings/wire', element: <FieldReport /> },
+      { path: '/standings/odds', element: <Odds /> },
       { path: '/rounds', element: <Rounds /> },
       { path: '/rounds/:roundNumber', element: <RoundDetail /> },
       { path: '/enter', element: <Enter /> },

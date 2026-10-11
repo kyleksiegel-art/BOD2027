@@ -4,7 +4,8 @@ import { PageHeader } from '@/components/PageHeader'
 import { Movement } from '@/components/Movement'
 import { FieldReportStrip } from '@/components/FieldReportStrip'
 import { AnnualReport } from '@/components/AnnualReport'
-import { useStandings, useFieldStory, useAnnualReport, useMoney } from '@/lib/data/selectors'
+import { WinOdds } from '@/components/WinOdds'
+import { useStandings, useFieldStory, useAnnualReport, useMoney, useWinOdds } from '@/lib/data/selectors'
 import type { StandingsLiveRound } from '@/lib/data/compute'
 import { formatStandingBack, formatPosition, formatLiveLine, formatMoney } from '@/lib/format'
 
@@ -72,6 +73,7 @@ export default function Standings() {
   const standings = useStandings()
   const wire = useFieldStory()
   const annual = useAnnualReport()
+  const odds = useWinOdds()
 
   if (!standings) return <LoadingStandings />
 
@@ -161,6 +163,8 @@ export default function Standings() {
           {tiebreakNote && (
             <p className="mt-3 text-[0.72rem] leading-relaxed text-paper-faint">{tiebreakNote}</p>
           )}
+
+          {odds && <WinOdds vm={odds} />}
 
           <MoneyLink />
 

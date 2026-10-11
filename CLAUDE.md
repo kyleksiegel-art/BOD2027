@@ -1023,3 +1023,19 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
 - **Home's live buttons are Enter scores + Field report** (Standings is a tab away); the board
   heading is "Standings" / "Final standings" so it fits one line at 375px. The Field Report's back
   link reads "‹ Home" when opened from that button (`state.from = 'home'`), else "‹ Standings".
+
+## Win probability (2026-10-11, branch `win-probability`) — trial, Kyle undecided
+
+Each player's chance to win the week. **No new tables, no schema change, no scoring change.**
+
+- **`src/lib/data/winProb.ts`** — pure, seeded (mulberry32, fixed seed → no flicker). Every hole
+  left is drawn from the player's own points spread, weighed against 72 holes of the field's
+  pooled spread (itself pulled toward a generic net-Stableford PRIOR) so form moves the odds but
+  handicaps stay the main story. Settles each run on total → best single round → holes won;
+  still level shares the win (countback skipped). `Out` = can't reach the leader even at 5 pts/hole.
+- `buildWinOdds` (5,000 runs, plus a second run at "one hole earlier" for the ▲/▼) and
+  `buildOddsHistory` (1,000 runs per checkpoint, round + whole week, top-3 swings). Null before
+  any round counts and once nothing is left open. ~50 ms / ~250 ms on a Mac — main thread.
+- UI: `WinOdds.tsx` panel under the Standings board; `/standings/odds` (`routes/Odds.tsx`) chart.
+  `formatOdds` in `format.ts`. Player colours share the recap's slots (`playerColor`).
+- Tests: `winProb.test.ts` (8). Full `vitest run` → **245**.
