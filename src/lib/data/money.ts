@@ -5,8 +5,8 @@
 //
 // The model (Kyle 2026-08-23, from the trip's money sheet):
 //   Buy-in per man funds three payouts — 1st overall, 2nd overall, and a per-round winner.
-//   There is NO closest-to-pin money (CTP is still entered on the round screen for bragging
-//   rights, it just doesn't pay). Ties pool the tied positions' purses and split evenly, the
+//   There is NO closest-to-pin money IN THE APP: CTP is entered on the round screen but paid
+//   out in person, outside this ledger (Kyle 2026-10-11), so it awards $0 here. Ties pool the tied positions' purses and split evenly, the
 //   remainder cent going to the player higher in the standings.
 //
 // All arithmetic is INTEGER CENTS; rounding happens only at display. The cent-splits and the

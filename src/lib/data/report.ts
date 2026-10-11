@@ -431,7 +431,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
     }
     const ctps = ctpWins.get(l.id) ?? []
     if (ctps.length >= 2) {
-      hooks.push({ kind: 'ctp', text: `won ${words(ctps.length)} of the ${words(ctpHoles.length)} closest-to-pins, which pay exactly nothing` })
+      hooks.push({ kind: 'ctp', text: `won ${words(ctps.length)} of the ${words(ctpHoles.length)} closest-to-pins` })
     }
     const birdies = l.holes.filter((h) => h.completed && h.grossStrokes !== null && h.grossStrokes - h.par === -1).length
     if (birdies >= 2) hooks.push({ kind: 'birdies', text: `made ${words(birdies)} real birdies` })

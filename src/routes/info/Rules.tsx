@@ -106,8 +106,8 @@ export default function Rules() {
         </ul>
         <p>
           Closest to the pin is played and recorded on every par 3: the winner is closest to the pin
-          on the green and must make par or better to claim it. It’s for bragging rights — there’s no
-          money on it.
+          on the green and must make par or better to claim it. It’s paid separately, in person, and
+          isn’t part of the buy-in purse.
         </p>
       </Section>
 

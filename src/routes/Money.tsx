@@ -247,7 +247,7 @@ function Footnotes() {
     <section className="mt-10 space-y-1 border-t border-hair pt-4 text-[0.75rem] text-paper-faint">
       <p>
         Ties pool the tied places and split evenly; the remainder cent goes to the player higher in
-        the standings. Closest-to-pin is tracked for bragging rights only — it pays nothing.
+        the standings. Closest-to-pin is paid separately, outside this ledger.
       </p>
     </section>
   )

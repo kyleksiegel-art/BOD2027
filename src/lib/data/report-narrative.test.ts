@@ -45,7 +45,7 @@ describe('buildRoundReport narrative', () => {
       // Back nines: Kyle 21, Jon 20, Chris 19, Adam 18. Chris 0 on 18 after 1–17 all scoring. Peak 12, final 8.
       'Kyle had the best back nine in the group, 21 points, and Chris finally blanked the 18th after 17 straight holes with points. It only brought the final margin down to 8.',
       // Jon 1+0+1 = 2 through three, back 20, gross eagle on the par-5 18th. Adam gross birdies 4, 10, 18.
-      'Jon opened with 2 points through three holes, then came home in 20 and finished with a real eagle on 18. Adam made three real birdies and won three of the four closest-to-pins, which pay exactly nothing.',
+      'Jon opened with 2 points through three holes, then came home in 20 and finished with a real eagle on 18. Adam made three real birdies and won three of the four closest-to-pins.',
       'Chris leads the week by 8. The Blue tomorrow, three rounds to go.',
     ])
   })
