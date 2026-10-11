@@ -28,14 +28,6 @@ function Enter(props: IconProps) {
   )
 }
 
-function Money(props: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
-      <path d="M12 2v20M17 5.5C17 3.6 14.8 2.5 12 2.5S7 3.6 7 5.5 9 8.5 12 9s5 1.4 5 3.5-2.2 3.5-5 3.5-5-1.1-5-3" />
-    </svg>
-  )
-}
-
 function Info(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
@@ -51,12 +43,14 @@ export interface NavItem {
   Icon: ComponentType<IconProps>
 }
 
-/** The five persistent bottom tabs. Order is fixed. */
+/**
+ * The persistent bottom tabs. Money is not one (Kyle 2026-10-10): it's reached from the
+ * Standings board and Home's end-of-trip panel.
+ */
 export const TABS: NavItem[] = [
   { to: '/standings', label: 'Standings', Icon: Standings },
   { to: '/rounds', label: 'Rounds', Icon: Rounds },
   { to: '/enter', label: 'Enter', Icon: Enter },
-  { to: '/money', label: 'Money', Icon: Money },
   { to: '/info', label: 'Info', Icon: Info },
 ]
 
