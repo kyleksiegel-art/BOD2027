@@ -376,7 +376,17 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
   for (const r of c.db.ctp_results) if (r.round_id === c.detail.round.id && r.player_id && r.hole_number <= h) ctp.set(r.player_id, (ctp.get(r.player_id) ?? 0) + 1)
   for (const [id, k] of ctp) {
     const p = c.players.find((x) => x.id === id)
-    if (p && k >= 2) notes.push({ who: id, rank: 4, text: `${p.first} has ${words(k)} closest to the pins today, which pay exactly nothing and mean everything.` })
+    // CTP is paid outside the app (Kyle 2026-10-11), so it's money, just not on the books.
+    if (p && k >= 2) {
+      notes.push({
+        who: id,
+        rank: 4,
+        text: pick([
+          `${p.first} has ${words(k)} closest to the pins today. That's real money, settled in the parking lot.`,
+          `${p.first} has won ${words(k)} closest to the pins. ${p.first} may not be winning the round, but ${p.first} is getting paid.`,
+        ]),
+      })
+    }
   }
   const out: string[] = []
   const used = new Set<string>()
