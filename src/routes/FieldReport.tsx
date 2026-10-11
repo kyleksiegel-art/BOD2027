@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
-import { useFieldStory } from '@/lib/data/selectors'
-import type { StoryEntry, StoryVM } from '@/lib/data/fieldStory'
-import { radioScript } from '@/lib/speech/radioCall'
+import { useFieldStory, useRadioCall } from '@/lib/data/selectors'
+import type { StoryEntry } from '@/lib/data/fieldStory'
 import { speakLines, speechAvailable, stopSpeaking } from '@/lib/speech/speak'
 import { formatDay } from '@/lib/format'
 
@@ -15,6 +14,7 @@ import { formatDay } from '@/lib/format'
  */
 export default function FieldReport() {
   const vm = useFieldStory()
+  const secretTap = useSecretCall()
 
   if (vm === undefined) {
     return (
@@ -28,7 +28,7 @@ export default function FieldReport() {
   return (
     <Page>
       <BackLink />
-      <div className="mt-4">
+      <div className="mt-4 select-none [touch-action:manipulation]" onClick={secretTap}>
         <PageHeader
           eyebrow="The Wire"
           title="Field Report"
@@ -53,8 +53,6 @@ export default function FieldReport() {
                 : `Live · thru ${vm.roundThru}`}
           </div>
 
-          <RadioCall vm={vm} />
-
           <ol className="mt-4 border-t border-hair-strong">
             {vm.entries.map((e) => (
               <StoryRow key={e.key} e={e} />
@@ -67,44 +65,31 @@ export default function FieldReport() {
 }
 
 /**
- * The radio call: the story read out loud by the phone's built-in voice, oldest hole first.
- * Works offline. iOS only starts speech from a tap, and stops it when the phone locks or the
- * app goes to the background — so it's a button, never automatic.
+ * The radio call's secret trigger (Kyle 2026-10-11, "bust this out without them knowing"): a
+ * triple tap on the page title starts the call; another triple tap stops it. No button, no hint.
+ * iOS only starts speech inside a tap, which the third tap is. Stops when the page unmounts.
  */
-function RadioCall({ vm }: { vm: StoryVM }) {
-  const [playing, setPlaying] = useState(false)
+function useSecretCall() {
+  const call = useRadioCall()
+  const taps = useRef<number[]>([])
+  const playing = useRef(false)
   useEffect(() => stopSpeaking, [])
-  if (!speechAvailable()) return null
-
-  const toggle = () => {
-    if (playing) {
+  return () => {
+    const now = Date.now()
+    taps.current = [...taps.current.filter((t) => now - t < 700), now]
+    if (taps.current.length < 3) return
+    taps.current = []
+    if (playing.current) {
+      playing.current = false
       stopSpeaking()
-      setPlaying(false)
       return
     }
-    setPlaying(true)
-    speakLines(radioScript(vm), () => setPlaying(false))
+    if (!call || !speechAvailable()) return
+    playing.current = true
+    speakLines(call.script(), () => {
+      playing.current = false
+    })
   }
-
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-pressed={playing}
-      className="tap mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-hair-strong bg-ground-2 text-[0.95rem] font-semibold text-paper"
-    >
-      {playing ? (
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-          <rect x="2" y="2" width="10" height="10" rx="1" fill="currentColor" />
-        </svg>
-      ) : (
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-          <path d="M3 1.5v11l9.5-5.5z" fill="currentColor" />
-        </svg>
-      )}
-      {playing ? 'Stop the call' : 'Play the call'}
-    </button>
-  )
 }
 
 function StoryRow({ e }: { e: StoryEntry }) {

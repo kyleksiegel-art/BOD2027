@@ -13,6 +13,8 @@ import { buildStrokesCards } from './strokesCard'
 import type { StrokesCardVM } from './strokesCard'
 import { buildPlayerWeek } from './playerWeek'
 import type { PlayerWeekVM } from './playerWeek'
+import { buildRadioCall } from './radioCall'
+import type { RadioCallVM } from './radioCall'
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
@@ -123,6 +125,12 @@ export function useAnnualReport(): AnnualReportVM | null {
 export function useFieldStory(): StoryVM | null | undefined {
   const data = useDbData()
   return useMemo(() => (data ? buildFieldStory(data) : undefined), [data])
+}
+
+/** The radio call for wherever the round is right now; null when there's no round to call. */
+export function useRadioCall(): RadioCallVM | null | undefined {
+  const data = useDbData()
+  return useMemo(() => (data ? buildRadioCall(data) : undefined), [data])
 }
 
 export interface PlayerCardVM {

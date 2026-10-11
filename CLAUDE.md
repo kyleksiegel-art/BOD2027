@@ -1026,16 +1026,27 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
 
 ## Radio call (2026-10-11, branch `radio-call`) — the shape to reuse
 
-"Play the call" on the Field Report: the story read out loud by the phone's built-in voice
-(Web Speech API), oldest hole first. Offline. No data, schema or scoring change.
+A broadcaster's update, read out loud by the phone's built-in voice (Web Speech API). Offline.
+**Secret on purpose** (Kyle: "bust this out without them knowing"): no button — a **triple tap
+on the Field Report's title** starts it, another stops it (`useSecretCall` in `FieldReport.tsx`,
+3 taps inside 700 ms). Don't add a visible button or a hint without Kyle saying so.
 
-- `src/lib/speech/radioCall.ts` `radioScript(StoryVM) → string[]` — pure: an open ("Here's the
-  call from …, through the 13th" / "Here's how round N went on …"), one line per story entry
-  ("The 3rd through the 5th. …", "At the turn, it's …", partial → "On the 12th, Kyle and Chris are
-  in."), "Final tally" on the last hole, a close. "CTP" → "closest to the pin", en dash → "to".
-- `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, en-US first, Apple's
-  novelty voices excluded), `speakLines` queues EVERY utterance inside the tap (iOS only starts
-  speech from a gesture), `stopSpeaking` on Stop and on unmount.
-- iOS stops speech when the phone locks or the app backgrounds. A better voice is a one-time
-  per-phone download: Settings → Accessibility → Spoken Content → Voices → English → a Premium one.
-- Tests: `radioCall.test.ts` (3). Full `vitest run` → **240**.
+- **`src/lib/data/radioCall.ts` `buildRadioCall(db, todayET?) → { phase, script(rand) }`** —
+  pure. Follows the live round; else the next round on its own date (first-tee preview, before
+  Start round); else the last final one. Phase by holes the WHOLE group has finished: `preview`
+  (0) · `early` 1–3 · `front` 4–8 · `turn` 9 · `back` 10–14 · `closing` 15–17 · `final`.
+  Segments: open → recent action (the Field Report's own last two hole lines) → stretch review
+  (front nine at the turn, last nine from the 12th) → color notes (zero runs, no-zero days, hot
+  three holes, net-par runs, fresh real eagles, pick-ups, CTPs won so far; one player each) →
+  round stakes (gap/holes-left bands + the round-winner $) → week stakes (lead changes today,
+  "winning the day but X leads the week", "if it ended now" $) → next hole (yardage off the
+  group's tee, par, stroke-index flavor, who gets a shot, par-3 CTP) → the finish → close.
+  Final: the whole story minus "pars all round" filler, the week, what's next.
+- `script(rand)` picks from line pools, so every tap is a different take; tests pass a fixed rand.
+  Names only, never a pronoun (asserted). "CTP" → "closest to the pin".
+- `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
+  `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
+- `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
+- iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
+  Voices → English → a Premium one (per phone, one time).
+- Tests: `radioCall.test.ts` (9). Full `vitest run` → **246**.

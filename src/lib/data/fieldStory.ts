@@ -66,7 +66,7 @@ const t = (text: string): StorySeg => ({ text })
 const s = (text: string): StorySeg => ({ text, strong: true })
 
 // A shot worth naming, with its verb for one player and for several.
-const SHOT: Record<string, { rank: number; one: string; many: string; noun: string }> = {
+export const SHOT: Record<string, { rank: number; one: string; many: string; noun: string }> = {
   albatross: { rank: 7, one: 'makes a real albatross', many: 'make real albatrosses', noun: 'a real albatross' },
   eagle: { rank: 6, one: 'makes a real eagle', many: 'make real eagles', noun: 'a real eagle' },
   birdieNetEagle: { rank: 5, one: 'birdies for a net eagle', many: 'birdie for net eagles', noun: 'a birdie for a net eagle' },
@@ -76,7 +76,7 @@ const SHOT: Record<string, { rank: number; one: string; many: string; noun: stri
   blank: { rank: 0, one: 'takes a zero', many: 'take zeros', noun: 'a zero' },
 }
 
-function shotOf(hr: Hr | undefined): string | null {
+export function shotOf(hr: Hr | undefined): string | null {
   if (!hr?.completed) return null
   const pts = hr.points ?? 0
   if (hr.pickedUp || pts === 0) return 'blank'
