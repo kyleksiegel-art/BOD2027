@@ -225,7 +225,8 @@ function LivePanel({ standings }: { standings: StandingsVM | undefined }) {
         {mode === 'playing' ? (
           <>
             <PrimaryLink to="/enter">Enter scores</PrimaryLink>
-            <LiveLink to="/standings">View standings</LiveLink>
+            {/* Standings is one tab away; this is the round's running story instead. */}
+            <LiveLink to="/standings/wire">Field report</LiveLink>
           </>
         ) : mode === 'done' ? (
           <>
@@ -346,7 +347,7 @@ function HomeBoard({
     <section className="mt-8" aria-label="Championship standings">
       <div className="flex items-baseline justify-between gap-3">
         <span className="eyebrow block">
-          {mode === 'done' ? 'Final championship standings' : 'Championship standings'}
+          {mode === 'done' ? 'Final standings' : 'Standings'}
         </span>
         <span className="shrink-0 text-[0.66rem] uppercase tracking-[0.1em] text-paper-faint">
           All rounds · pts
