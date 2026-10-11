@@ -1017,3 +1017,6 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
   and its `<Page>` the only content column.
 - **A round's back link names its origin**: Standings' R1–R4 links pass `state.from =
   'standings'` → "‹ Standings"; anything else (Rounds list, shared link, cold start) → "‹ All rounds".
+- **Home's hero shrinks to a 140px photo band (`CompactHero`) while a round is `in_progress`**
+  (and the countdown is done), so Enter scores and the top of the board are on the first screen.
+  Countdown, between rounds and after the last round keep the full cover.

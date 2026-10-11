@@ -561,6 +561,7 @@ export default function Home() {
   const [r, setR] = useState<Remaining>(() => remainingFrom(nowMs()))
   const [openRound, setOpenRound] = useState<number | null>(null)
   const standings = useStandings()
+  const roundsList = useRoundsList()
 
   useEffect(() => {
     if (r.done) return
@@ -575,43 +576,51 @@ export default function Home() {
   // its own the morning of the 4th.
   const showLive = r.done
   const boardUp = showLive && (standings?.hasCountingRound ?? false)
+  // While a round is in progress the hero shrinks to a photo band, so "Enter scores" and the
+  // top of the board land on the first screen in the cart (Kyle 2026-10-10). Before the trip,
+  // between rounds and after the last one, Home keeps the full cover.
+  const compactHero =
+    showLive && (roundsList?.some((x) => x.round.status === 'in_progress') ?? false)
 
   return (
     <div>
-      {/* Hero */}
-      <header className="relative flex min-h-[clamp(420px,72vh,640px)] flex-col justify-between overflow-hidden px-5 pb-10 pt-4">
-        <HeroPhoto />
-        {/* Scrim: darkens for the cover text, dissolves into the page ground at the base. */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(to bottom, rgba(16,14,10,0.46) 0%, rgba(16,14,10,0.12) 24%, rgba(16,14,10,0.10) 42%, rgba(16,14,10,0.74) 82%, var(--ground) 100%)',
-          }}
-        />
-        <img
-          src="/assets/streamsong-logo.svg"
-          alt="Streamsong"
-          className="relative z-10 h-8 w-auto"
-        />
-        <div className="relative z-10 max-w-[640px]">
-          {/* Hero copy sits over the photo — force light values regardless of theme tokens. */}
-          <span className="eyebrow block" style={{ color: '#e6a442' }}>
-            {TRIP.name}
-          </span>
-          <h1 className="fx-display mt-3 font-display text-[clamp(2.6rem,13vw,4.8rem)] font-semibold leading-[0.94] text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.5)]">
-            Streamsong
-            <br />
-            20<span className="text-[#e6a442]">2</span>7
-          </h1>
-          <p className="mt-4 font-display text-[clamp(1.05rem,4.6vw,1.4rem)] text-[#f5efe1]">
-            {TRIP.dates}
-          </p>
-          <p className="mt-1 text-[0.8rem] uppercase tracking-[0.12em] text-[#dad3c5]">
-            {TRIP.venue} · {TRIP.venueCity}
-          </p>
-        </div>
-      </header>
+      {compactHero ? (
+        <CompactHero />
+      ) : (
+        <header className="relative flex min-h-[clamp(420px,72vh,640px)] flex-col justify-between overflow-hidden px-5 pb-10 pt-4">
+          <HeroPhoto />
+          {/* Scrim: darkens for the cover text, dissolves into the page ground at the base. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(to bottom, rgba(16,14,10,0.46) 0%, rgba(16,14,10,0.12) 24%, rgba(16,14,10,0.10) 42%, rgba(16,14,10,0.74) 82%, var(--ground) 100%)',
+            }}
+          />
+          <img
+            src="/assets/streamsong-logo.svg"
+            alt="Streamsong"
+            className="relative z-10 h-8 w-auto"
+          />
+          <div className="relative z-10 max-w-[640px]">
+            {/* Hero copy sits over the photo — force light values regardless of theme tokens. */}
+            <span className="eyebrow block" style={{ color: '#e6a442' }}>
+              {TRIP.name}
+            </span>
+            <h1 className="fx-display mt-3 font-display text-[clamp(2.6rem,13vw,4.8rem)] font-semibold leading-[0.94] text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.5)]">
+              Streamsong
+              <br />
+              20<span className="text-[#e6a442]">2</span>7
+            </h1>
+            <p className="mt-4 font-display text-[clamp(1.05rem,4.6vw,1.4rem)] text-[#f5efe1]">
+              {TRIP.dates}
+            </p>
+            <p className="mt-1 text-[0.8rem] uppercase tracking-[0.12em] text-[#dad3c5]">
+              {TRIP.venue} · {TRIP.venueCity}
+            </p>
+          </div>
+        </header>
+      )}
 
       <div className="mx-auto max-w-[720px] px-5 pb-4">
         {/* Before first tee: countdown. Once underway: the live board. */}
@@ -648,6 +657,28 @@ export default function Home() {
         </footer>
       </div>
     </div>
+  )
+}
+
+/** The hero as a short photo band — Home's look, a fraction of the height. Live rounds only. */
+function CompactHero() {
+  return (
+    <header className="relative flex h-[140px] items-end overflow-hidden px-5 pb-4">
+      <HeroPhoto />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(to bottom, rgba(16,14,10,0.10) 0%, rgba(16,14,10,0.62) 100%)',
+        }}
+      />
+      <div className="relative z-10 flex items-baseline gap-3">
+        <span className="fx-head font-display text-[1.6rem] font-semibold leading-none text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.5)]">
+          Streamsong 20<span className="text-[#e6a442]">2</span>7
+        </span>
+        <span className="text-[0.85rem] text-[#f5efe1]">{TRIP.dates.replace(/,\s*\d{4}$/, '')}</span>
+      </div>
+    </header>
   )
 }
 
