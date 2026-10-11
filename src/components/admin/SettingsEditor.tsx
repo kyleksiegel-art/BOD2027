@@ -197,7 +197,7 @@ function PurseCard({ settings, disabled }: { settings: AdminSettingsVM; disabled
         <p className="mt-2 text-[0.78rem] leading-relaxed text-paper-faint">
           The Money page reconciles buy-ins against the payouts: 1st + 2nd + (round winner ×
           counting rounds) should equal the buy-in per man × players. Closest-to-pin is still
-          entered for bragging rights but pays nothing.
+          entered here but paid separately, outside the app.
         </p>
       </div>
       <Report report={report} />

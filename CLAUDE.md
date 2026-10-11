@@ -291,8 +291,10 @@ The money ledger, assembled the same way every other screen is: Dexie rows → p
 **Model revised 2026-08-23 (Kyle — the trip's real money sheet), see `decisions.md §"Money
 model: buy-in funds 1st/2nd + round winners, no CTP money"`:** a buy-in per man funds three
 payouts — **1st overall, 2nd overall, and a per-round winner**. There is **no closest-to-pin
-money** (CTP is still entered on the round screen for bragging rights, it just pays $0). The old
-40/30/30 championship/round/CTP weighted split is gone.
+money in the app** (CTP is still entered on the round screen, it just pays $0 here). The old
+40/30/30 championship/round/CTP weighted split is gone. **CTP is paid outside the app (Kyle
+2026-10-11); the app still awards $0.** Copy must never say CTP "pays nothing" or is "bragging
+rights": say it's paid separately, outside the app / this ledger. `buildMoney` stays $0 for CTP.
 
 - **`src/lib/data/money.ts` `buildMoney(dbData) → MoneyVM`** is the whole ledger, pure and
   offline-identical. It reads `settings.purse_amounts` = `{ buy_in_per_player_cents,
@@ -802,7 +804,7 @@ design canvas, then de-jargoned to plain copy (the seal + Fraunces carry the ann
   longest scoring streak + net-birdies (via `buildPlayerForm` `bestRun` / counting `points>=3`),
   holes won outright (**reuses `buildOverallTiebreak(...).ctx.holesWonById`** — the same tally the
   standings tiebreak uses, so it can't disagree), roughest hole (max `netToPar`), and CTP count
-  (bragging, $0). Each tile carries `who` (first name, for the caption) **and `playerId`** — the
+  (paid outside the app, $0 here). Each tile carries `who` (first name, for the caption) **and `playerId`** — the
   letter matches players by *last name*, so it must use full names via `playerId`, not `who`, or it
   double-names someone.
 - **The letter** mirrors `report.ts` at trip scale: names only (no pronouns), `strong` marks derived
@@ -931,8 +933,8 @@ Kyle wanted "more of a narrative" and picked **option A** (a ~130-word story) of
   made it; like shots group ("birdies on the 16th and 17th").
 - **Paragraphs**: how it was decided · after (best back nine if not the winner, the winner's late
   blank and the run it ended, "only brought the margin down to N") · everyone not yet named gets
-  1–2 hooks (slow start → came home in N, real eagles, real birdies, 2+ CTPs "which pay exactly
-  nothing", blanks), never repeating a hook kind across players, CTP aside always last · the week
+  1–2 hooks (slow start → came home in N, real eagles, real birdies, 2+ CTPs (no money claim),
+  blanks), never repeating a hook kind across players, CTP aside always last · the week
   + "The Blue tomorrow, three rounds to go."
 - Fixture: `src/test/reportFixture.ts` builds a Db from **points per hole** (+ strokes); `ROUND_ONE`
   is the hosted Round 1 as of 2026-10-02. Golden test of its full text in `report-narrative.test.ts`.

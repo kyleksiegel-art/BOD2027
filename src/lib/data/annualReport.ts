@@ -356,13 +356,13 @@ function buildSuperlatives(
     out.push({ key: 'roughest', label: 'Roughest hole', value: `+${roughest.over}`, who: first(roughest.playerId), playerId: roughest.playerId, detail: `net · ${courseShortName(roughest.course)} ${ordinalOf(roughest.hole)}` })
   }
 
-  // Closest to pin — the bragging-rights count (no money). Ties → the first recorded winner.
+  // Closest to pin: the count (paid outside the app, $0 in the ledger). Ties → the first recorded winner.
   const ctp = new Map<string, number>()
   for (const c of dbData.ctp_results) if (c.player_id) ctp.set(c.player_id, (ctp.get(c.player_id) ?? 0) + 1)
   let mostCtp: { count: number; playerId: string } | null = null
   for (const [playerId, count] of ctp) if (!mostCtp || count > mostCtp.count) mostCtp = { count, playerId }
   if (mostCtp && mostCtp.count > 0) {
-    out.push({ key: 'ctp', label: 'Closest to pin', value: String(mostCtp.count), who: first(mostCtp.playerId), playerId: mostCtp.playerId, detail: 'bragging rights' })
+    out.push({ key: 'ctp', label: 'Closest to pin', value: String(mostCtp.count), who: first(mostCtp.playerId), playerId: mostCtp.playerId, detail: 'paid on the side' })
   }
 
   return out
