@@ -4,9 +4,9 @@ import { PageHeader } from '@/components/PageHeader'
 import { Movement } from '@/components/Movement'
 import { FieldReportStrip } from '@/components/FieldReportStrip'
 import { AnnualReport } from '@/components/AnnualReport'
-import { useStandings, useFieldStory, useAnnualReport } from '@/lib/data/selectors'
+import { useStandings, useFieldStory, useAnnualReport, useMoney } from '@/lib/data/selectors'
 import type { StandingsLiveRound } from '@/lib/data/compute'
-import { formatStandingBack, formatPosition, formatLiveLine } from '@/lib/format'
+import { formatStandingBack, formatPosition, formatLiveLine, formatMoney } from '@/lib/format'
 
 /**
  * The live-round status line ("● ROUND 3 LIVE · SCORES THROUGH HOLE 12"). Renders only while
@@ -40,6 +40,34 @@ function LiveStatus({ live }: { live: StandingsLiveRound }) {
   )
 }
 
+/**
+ * The way into Money. Money left the bottom tab bar (Kyle 2026-10-10 — it's opened a handful
+ * of times a trip), so the board it hangs off carries the entry point, one row under the
+ * standings. Home's end-of-trip panel links it too.
+ */
+function MoneyLink() {
+  const money = useMoney()
+  const sub = money?.settleable
+    ? 'Final payouts and who pays whom'
+    : money?.hasMoney
+      ? `${formatMoney(money.totalPotCents).replace(/\.00$/, '')} pot · 1st, 2nd and round winners`
+      : 'Payouts and settle-up'
+  return (
+    <Link
+      to="/money"
+      className="tap mt-6 flex items-center justify-between gap-3 border-y border-hair py-3"
+    >
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[1.05rem] font-semibold text-paper">Money</span>
+        <span className="tnum truncate text-[0.78rem] text-paper-faint">{sub}</span>
+      </span>
+      <span className="text-[1.2rem] text-gold" aria-hidden>
+        →
+      </span>
+    </Link>
+  )
+}
+
 export default function Standings() {
   const standings = useStandings()
   const wire = useFieldStory()
@@ -68,9 +96,12 @@ export default function Standings() {
       {wire && <FieldReportStrip vm={wire} />}
 
       {!hasCountingRound ? (
-        <p className="mt-8 text-paper-dim">
-          No round has started yet. Standings appear the moment the first round is underway.
-        </p>
+        <>
+          <p className="mt-8 text-paper-dim">
+            No round has started yet. Standings appear the moment the first round is underway.
+          </p>
+          <MoneyLink />
+        </>
       ) : (
         <>
           <ol className="mt-6">
@@ -131,6 +162,8 @@ export default function Standings() {
             <p className="mt-3 text-[0.72rem] leading-relaxed text-paper-faint">{tiebreakNote}</p>
           )}
 
+          <MoneyLink />
+
           <section className="mt-10">
             <span className="eyebrow block">Round by round</span>
             <div className="mt-4 overflow-x-auto">
@@ -152,6 +185,7 @@ export default function Standings() {
                               table stays quiet; a hairline appears only on hover/focus. */}
                           <Link
                             to={`/rounds/${c.roundNumber}`}
+                            state={{ from: 'standings' }}
                             className="tap inline-flex flex-col items-end justify-center rounded-sm outline-none hover:text-gold focus-visible:ring-2 focus-visible:ring-gold-fill/60"
                             aria-label={`Round ${c.roundNumber}${isLive ? ', live' : ''}`}
                           >

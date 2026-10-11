@@ -3,6 +3,15 @@ import type { ComponentType, SVGProps } from 'react'
 type IconProps = SVGProps<SVGSVGElement>
 
 // Minimal 24×24 stroke icons — no icon dependency, no hover requirement.
+function Home(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
+      <path d="M3 11l9-7 9 7" />
+      <path d="M5 9.5V20h5v-6h4v6h5V9.5" />
+    </svg>
+  )
+}
+
 function Standings(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
@@ -28,14 +37,6 @@ function Enter(props: IconProps) {
   )
 }
 
-function Money(props: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
-      <path d="M12 2v20M17 5.5C17 3.6 14.8 2.5 12 2.5S7 3.6 7 5.5 9 8.5 12 9s5 1.4 5 3.5-2.2 3.5-5 3.5-5-1.1-5-3" />
-    </svg>
-  )
-}
-
 function Info(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden {...props}>
@@ -51,12 +52,17 @@ export interface NavItem {
   Icon: ComponentType<IconProps>
 }
 
-/** The five persistent bottom tabs. Order is fixed. */
+/**
+ * The five persistent bottom tabs (Kyle 2026-10-10). Home took Money's slot — the live board
+ * is the screen you look at most in a round, and the logo was its only way in. Enter stays
+ * dead centre, under the thumb. Money is reached from the Standings board and Home's
+ * end-of-trip panel.
+ */
 export const TABS: NavItem[] = [
+  { to: '/', label: 'Home', Icon: Home },
   { to: '/standings', label: 'Standings', Icon: Standings },
-  { to: '/rounds', label: 'Rounds', Icon: Rounds },
   { to: '/enter', label: 'Enter', Icon: Enter },
-  { to: '/money', label: 'Money', Icon: Money },
+  { to: '/rounds', label: 'Rounds', Icon: Rounds },
   { to: '/info', label: 'Info', Icon: Info },
 ]
 

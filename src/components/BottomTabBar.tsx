@@ -14,6 +14,8 @@ export function BottomTabBar() {
           <li key={to} className="flex-1">
             <NavLink
               to={to}
+              // Home is "/", which every route starts with; without `end` it would light up everywhere.
+              end={to === '/'}
               className={({ isActive }) =>
                 `tap flex flex-col items-center justify-center gap-1 py-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] transition-colors ${
                   isActive ? 'text-gold' : 'text-paper-dim'
