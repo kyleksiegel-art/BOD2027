@@ -1023,3 +1023,19 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
 - **Home's live buttons are Enter scores + Field report** (Standings is a tab away); the board
   heading is "Standings" / "Final standings" so it fits one line at 375px. The Field Report's back
   link reads "‹ Home" when opened from that button (`state.from = 'home'`), else "‹ Standings".
+
+## Radio call (2026-10-11, branch `radio-call`) — the shape to reuse
+
+"Play the call" on the Field Report: the story read out loud by the phone's built-in voice
+(Web Speech API), oldest hole first. Offline. No data, schema or scoring change.
+
+- `src/lib/speech/radioCall.ts` `radioScript(StoryVM) → string[]` — pure: an open ("Here's the
+  call from …, through the 13th" / "Here's how round N went on …"), one line per story entry
+  ("The 3rd through the 5th. …", "At the turn, it's …", partial → "On the 12th, Kyle and Chris are
+  in."), "Final tally" on the last hole, a close. "CTP" → "closest to the pin", en dash → "to".
+- `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, en-US first, Apple's
+  novelty voices excluded), `speakLines` queues EVERY utterance inside the tap (iOS only starts
+  speech from a gesture), `stopSpeaking` on Stop and on unmount.
+- iOS stops speech when the phone locks or the app backgrounds. A better voice is a one-time
+  per-phone download: Settings → Accessibility → Spoken Content → Voices → English → a Premium one.
+- Tests: `radioCall.test.ts` (3). Full `vitest run` → **240**.

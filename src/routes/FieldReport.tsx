@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { useFieldStory } from '@/lib/data/selectors'
-import type { StoryEntry } from '@/lib/data/fieldStory'
+import type { StoryEntry, StoryVM } from '@/lib/data/fieldStory'
+import { radioScript } from '@/lib/speech/radioCall'
+import { speakLines, speechAvailable, stopSpeaking } from '@/lib/speech/speak'
 import { formatDay } from '@/lib/format'
 
 /**
@@ -50,6 +53,8 @@ export default function FieldReport() {
                 : `Live · thru ${vm.roundThru}`}
           </div>
 
+          <RadioCall vm={vm} />
+
           <ol className="mt-4 border-t border-hair-strong">
             {vm.entries.map((e) => (
               <StoryRow key={e.key} e={e} />
@@ -58,6 +63,47 @@ export default function FieldReport() {
         </>
       )}
     </Page>
+  )
+}
+
+/**
+ * The radio call: the story read out loud by the phone's built-in voice, oldest hole first.
+ * Works offline. iOS only starts speech from a tap, and stops it when the phone locks or the
+ * app goes to the background — so it's a button, never automatic.
+ */
+function RadioCall({ vm }: { vm: StoryVM }) {
+  const [playing, setPlaying] = useState(false)
+  useEffect(() => stopSpeaking, [])
+  if (!speechAvailable()) return null
+
+  const toggle = () => {
+    if (playing) {
+      stopSpeaking()
+      setPlaying(false)
+      return
+    }
+    setPlaying(true)
+    speakLines(radioScript(vm), () => setPlaying(false))
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={playing}
+      className="tap mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-hair-strong bg-ground-2 text-[0.95rem] font-semibold text-paper"
+    >
+      {playing ? (
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+          <rect x="2" y="2" width="10" height="10" rx="1" fill="currentColor" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+          <path d="M3 1.5v11l9.5-5.5z" fill="currentColor" />
+        </svg>
+      )}
+      {playing ? 'Stop the call' : 'Play the call'}
+    </button>
   )
 }
 
