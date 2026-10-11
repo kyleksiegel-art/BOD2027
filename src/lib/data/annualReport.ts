@@ -161,7 +161,10 @@ export function buildAnnualReport(dbData: Db): AnnualReportVM | null {
   const champId = champRow.playerId
   const champName = nameOf(champId)
   const sharedChamp = champRow.tie
+  // Everyone level at the top. A shared title names them all, not rows[0] plus whoever sorts next.
+  const coChampIds = rows.filter((r) => r.position === champRow.position).map((r) => r.playerId)
   const secondRow = rows.find((r) => r.position > champRow.position) ?? null
+  const champNames = joinAnd(coChampIds.map((id) => firstName(nameOf(id))))
 
   const champMoney = money.players.find((p) => p.playerId === champId)
   const champRoundWins = money.rounds.filter((r) => r.roundWinner?.playerIds.includes(champId)).length
@@ -201,8 +204,16 @@ export function buildAnnualReport(dbData: Db): AnnualReportVM | null {
   const moneyVM: AnnualMoneyVM = {
     totalPot: formatMoney(money.totalPotCents),
     lines: [
-      { label: `1st overall · ${firstName(champName)}`, amount: formatMoney(money.champFirstCents) },
-      ...(secondRow ? [{ label: `2nd overall · ${firstName(nameOf(secondRow.playerId))}`, amount: formatMoney(money.champSecondCents) }] : []),
+      // Same pooling as the Money page: a tie for 1st shares 1st + 2nd in one line, and a tie
+      // for 2nd names everyone sharing it.
+      ...(sharedChamp
+        ? [{ label: `1st & 2nd shared · ${champNames}`, amount: formatMoney(money.champFirstCents + money.champSecondCents) }]
+        : [
+            { label: `1st overall · ${firstName(champName)}`, amount: formatMoney(money.champFirstCents) },
+            ...(money.secondPlace
+              ? [{ label: `2nd overall · ${joinAnd(money.secondPlace.playerIds.map((id) => firstName(nameOf(id))))}`, amount: formatMoney(money.champSecondCents) }]
+              : []),
+          ]),
       { label: `Round winners · ${plural(roundWinners.length, 'round')} × ${formatMoney(money.rounds.find((r) => r.counts)?.roundPurseCents ?? 0)}`, amount: formatMoney(money.roundWinnersTotalCents) },
     ],
     balanced: money.reconciliation.balanced,
@@ -220,6 +231,7 @@ export function buildAnnualReport(dbData: Db): AnnualReportVM | null {
     roundWinners,
     champId,
     sharedChamp,
+    coChampIds,
     secondRow,
     nameOf,
   })
@@ -227,7 +239,7 @@ export function buildAnnualReport(dbData: Db): AnnualReportVM | null {
   return {
     seasonLabel: seasonLabelFor(countingRounds.map((r) => r.date)),
     dateLabel: seasonDateLabel(countingRounds.map((r) => r.date)),
-    headline: `${firstName(champName)} ${sharedChamp ? 'shares' : 'takes'} ${seasonYear(countingRounds.map((r) => r.date))}.`,
+    headline: `${sharedChamp ? `${champNames} share` : `${firstName(champName)} takes`} ${seasonYear(countingRounds.map((r) => r.date))}.`,
     champion: {
       name: champName,
       total: champRow.total,
@@ -249,6 +261,12 @@ function seasonYear(dates: string[]): string {
 function seasonLabelFor(dates: string[]): string {
   const y = seasonYear(dates)
   return y ? `The ${y} Season` : 'The Season'
+}
+
+/** "Kyle", "Kyle and Jon", "Kyle, Jon and Adam". */
+function joinAnd(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
 function winningsDetailFor(hasChampMoney: boolean, shared: boolean, roundWins: number): string {
@@ -362,6 +380,7 @@ interface LetterInput {
   roundWinners: AnnualRoundWinnerVM[]
   champId: string
   sharedChamp: boolean
+  coChampIds: string[]
   secondRow: ReturnType<typeof buildStandings>['rows'][number] | null
   nameOf: (id: string) => string
 }
@@ -391,8 +410,9 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
 
   // ── Paragraph 1: the result + when it was decided ──
   const p1: ReportSeg[] = []
-  if (input.sharedChamp && secondRow) {
-    p1.push(s(`${firstName(champName)} and ${firstName(nameOf(secondRow.playerId))}`), t(` shared the season at `), s(`${champTotal} points`), t(`.`))
+  if (input.sharedChamp) {
+    const names = joinAnd(input.coChampIds.map((id) => firstName(nameOf(id))))
+    p1.push(s(names), t(` shared the season at `), s(`${champTotal} points`), t(`.`))
   } else {
     p1.push(s(champName), t(` takes the season with `), s(`${champTotal} points`))
     if (secondRow) {
@@ -404,8 +424,8 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
       p1.push(t(`.`))
     }
     // When the champion took the lead for good.
-    const firstLeader = leaders[0]?.leader
-    if (firstLeader === champId) {
+    // "Never caught" means led after EVERY round, not just the first.
+    if (leaders.length > 0 && leaders.every((l) => l.leader === champId)) {
       const firstRound = detailByRound.get(countingRoundNumbers[0])
       if (firstRound) p1.push(t(` ${firstName(champName)} led from ${weekdayOf(firstRound.round.date)} and was never caught.`))
     } else {

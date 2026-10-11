@@ -121,13 +121,22 @@ export default function Enter() {
     persistHole(h)
   }
 
-  function clearHoleDrafts(h: number, part: 'players' | 'ctp') {
-    if (part === 'players') {
+  /**
+   * After a save, drop the drafts that were sent — and only those. A draft object is replaced
+   * (never mutated) on every tap, so identity says whether a cell was touched again after
+   * Save snapshotted it; a correction tapped in that window stays as an unsaved draft.
+   */
+  function clearSentDrafts(h: number, sentPlayers: Record<string, EnterDraft> | null, sentCtp: boolean) {
+    if (sentPlayers) {
+      const forHole = { ...(draftsRef.current[h] ?? {}) }
+      for (const [pid, d] of Object.entries(sentPlayers)) if (forHole[pid] === d) delete forHole[pid]
       const rest = { ...draftsRef.current }
-      delete rest[h]
+      if (Object.keys(forHole).length > 0) rest[h] = forHole
+      else delete rest[h]
       draftsRef.current = rest
       setDrafts(rest)
-    } else {
+    }
+    if (sentCtp) {
       const rest = { ...ctpRef.current }
       delete rest[h]
       ctpRef.current = rest
@@ -197,12 +206,15 @@ export default function Enter() {
     if (!vm || !dirty) return
     // `hole` is non-null once this renders; the hoisted declaration cannot see that narrowing.
     const h = holeShown
+    // Snapshot what is being sent before the first await: taps can land while Dexie writes.
+    const sentPlayers = holeIsDirty ? { ...holeDrafts } : null
+    const sentCtpWinner = ctpIsDirty ? (ctpDrafts[h] ?? null) : undefined
     // Scores and CTP are one Save. saveCells/saveCtp each resolve true once the entry is
     // durably queued — offline included — and false only if this device could not record it
     // at all, and then the edits stay put.
-    if (holeIsDirty) {
+    if (sentPlayers) {
       const ok = await saveCells(
-        Object.entries(holeDrafts).map(([playerId, d]) => ({
+        Object.entries(sentPlayers).map(([playerId, d]) => ({
           roundId: vm.round.id,
           playerId,
           holeNumber: h,
@@ -211,23 +223,29 @@ export default function Enter() {
         })),
       )
       if (!ok) return
-      clearHoleDrafts(h, 'players')
+      clearSentDrafts(h, sentPlayers, false)
     }
-    if (ctpIsDirty) {
+    if (sentCtpWinner !== undefined) {
       const ok = await saveCtp({
         round_id: vm.round.id,
         hole_number: h,
-        player_id: ctpDrafts[h] ?? null, // string winner, or null for "no winner"
+        player_id: sentCtpWinner, // string winner, or null for "no winner"
         distance_feet: null, // distance is not tracked
       })
       if (!ok) return
-      clearHoleDrafts(h, 'ctp')
+      // Same rule as the scores: a pick changed after Save stays unsaved.
+      clearSentDrafts(h, null, ctpRef.current[h] === sentCtpWinner)
     }
     setJustSaved(h)
     // Save is gated on every playing player being in, so a saved hole is a finished hole:
     // move on to the next one. The "Saved" state stays on the hole left behind, so paging
-    // back confirms it. The 18th stays put — there is nowhere to go.
-    if (h < 18) setHole(h + 1)
+    // back confirms it. The 18th stays put — there is nowhere to go. Only advance if the
+    // scorer is still on the saved hole and left nothing unsaved on it; never yank them off
+    // a hole they paged to, or past a correction they just made.
+    const leftUnsaved =
+      Object.keys(draftsRef.current[h] ?? {}).length > 0 ||
+      (Object.prototype.hasOwnProperty.call(ctpRef.current, h) && ctpRef.current[h] !== ctpStored)
+    if (h < 18 && !leftUnsaved) setHole((cur) => (cur === h ? h + 1 : cur))
   }
 
   return (

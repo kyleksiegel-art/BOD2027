@@ -142,11 +142,16 @@ function looksOffline(message: string): boolean {
   )
 }
 
+const RPC_TIMEOUT_MS = 10_000
+
 export const supabaseTransport: Transport = {
   async call(fn, args) {
     let data: unknown
     try {
-      const res = await supabase.rpc(fn, args)
+      // A cart on one bar of signal can hold a request open for minutes. Give up after
+      // RPC_TIMEOUT_MS: the abort reads as offline, so it costs no attempt, and the entry
+      // stays queued for the next trigger. Re-sending is harmless — same stamp, same row.
+      const res = await supabase.rpc(fn, args).abortSignal(AbortSignal.timeout(RPC_TIMEOUT_MS))
       if (res.error) {
         // supabase-js catches fetch failures and hands them back as an error object rather
         // than throwing, so the offline case has to be recognised from here too.

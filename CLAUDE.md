@@ -964,3 +964,25 @@ section above describes the removed wire.
   "so far") · **closest to pin is "CTP"**: "wins the CTP" / "wins a third CTP of the day". Only
   the lead fact is bold.
 - Tests: `fieldStory.test.ts` (4, incl. the real Round 1 word for word). Full run → **231** (the wire's tests went with it).
+
+## Pinned bug fixes (2026-10-10, branch `pinned-bug-fixes`) — don't regress
+
+Four of the five bugs pinned in the 2026-09-28 review. No schema change.
+
+- **Save resolves on enqueue, not on the network.** `saveCells`/`saveCtp` publish `queued` the
+  moment Dexie has the cells and flush in the background (`flushAndReport`; one combined outcome
+  when the par-3 scores + CTP flushes both settle, worst status wins). Outbox RPCs abort after
+  **10 s** (`RPC_TIMEOUT_MS`) — reads as offline, costs no attempt.
+- **Enter clears only what it sent.** `saveHole` snapshots the drafts before the first await;
+  `clearSentDrafts` drops a cell only if its draft object is identical (a re-tap makes a new
+  object). It advances only if the scorer is still on that hole and nothing on it is unsaved.
+- **Hydrate's deletion pass needs a pre-fetch snapshot.** `snapshotStampedRows()` runs after the
+  flush, before `fetchAll()`; `mergeStampedRows(p, before)` deletes only rows that were here,
+  same stamp, when the fetch went out. Without `before` it keeps the old behaviour (tests).
+- **Annual Report shared title** names every co-champion (`joinAnd`), pools 1st + 2nd into one
+  money line like the Money page, and "never caught" requires leading after every round.
+- **Home tee times read `rounds.tee_time`** (`teeLabel`); `trip.ts` ROUNDS is only the fallback.
+- **Still pinned:** #4, Clear scores undone by a dead-zone phone's queued writes (needs a
+  `scores_epoch` migration).
+- Tests: `save-no-wait.test.ts` (1), +3 in `deletion-superseded`, +1 in `annualReport`. Full
+  `vitest run` → **236**.

@@ -10,7 +10,7 @@ import { resetClientIdCache } from '@/lib/clientId'
 import { FakeServer } from '@/test/fakeServer'
 import { resetClockCache } from './clock'
 import { enqueueScores, flushOutbox, setTransport } from './outbox'
-import { mergeStampedRows } from './merge'
+import { mergeStampedRows, snapshotStampedRows } from './merge'
 import type { ScorePayload, ScoreRow } from '@/lib/data/types'
 
 const ROUND = 'aaaaaaaa-0000-0000-0000-000000000001'
@@ -64,6 +64,33 @@ describe('hydrate removes server-deleted rows (F-014)', () => {
     })
     expect(rep.deleted).toBe(0)
     expect(await db.scores.get([ROUND, JON, 9])).toBeDefined()
+  })
+})
+
+describe('hydrate never deletes what arrived while the fetch was out (pinned 2026-09-28 #2)', () => {
+  it('keeps a row saved and flushed mid-fetch — absent from the payload, not in the snapshot', async () => {
+    const before = await snapshotStampedRows() // the fetch goes out
+    await enqueueScores([cell(4, 5)])
+    await flushOutbox() // ...and the save lands on the server after the fetch read it
+    expect(await db.outbox.count()).toBe(0)
+    const rep = await mergeStampedRows({ scores: [], ctp_results: [], round_players: [] }, before)
+    expect(rep.deleted).toBe(0)
+    expect((await db.scores.get([ROUND, JON, 4]))?.gross_strokes).toBe(5)
+  })
+
+  it('keeps a row overwritten mid-fetch (stamp changed since the snapshot)', async () => {
+    await db.scores.put(row(6, 4, DEVICE_A, '2027-02-06T18:00:00.000Z'))
+    const before = await snapshotStampedRows()
+    await db.scores.put(row(6, 5, DEVICE_B, '2027-02-06T18:05:00.000Z')) // a Realtime row
+    const rep = await mergeStampedRows({ scores: [], ctp_results: [], round_players: [] }, before)
+    expect(rep.deleted).toBe(0)
+  })
+
+  it('still deletes a ghost that was here, unchanged, before the fetch', async () => {
+    await db.scores.put(row(8, 4, DEVICE_A, '2027-02-06T18:00:00.000Z'))
+    const before = await snapshotStampedRows()
+    const rep = await mergeStampedRows({ scores: [], ctp_results: [], round_players: [] }, before)
+    expect(rep.deleted).toBe(1)
   })
 })
 

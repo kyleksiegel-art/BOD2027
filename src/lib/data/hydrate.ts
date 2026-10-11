@@ -33,7 +33,7 @@ import type {
   LodgingAssignmentRow,
 } from './types'
 import { flushOutbox } from '@/lib/sync/outbox'
-import { mergeStampedRows } from '@/lib/sync/merge'
+import { mergeStampedRows, snapshotStampedRows, type LocalSnapshot } from '@/lib/sync/merge'
 
 async function selectAll<T>(table: string): Promise<T[]> {
   const { data, error } = await supabase.from(table).select('*')
@@ -82,7 +82,7 @@ async function fetchAll(): Promise<HydratePayload> {
   }
 }
 
-async function writeToDexie(p: HydratePayload): Promise<void> {
+async function writeToDexie(p: HydratePayload, before: LocalSnapshot): Promise<void> {
   await db.transaction(
     'rw',
     [
@@ -120,7 +120,7 @@ async function writeToDexie(p: HydratePayload): Promise<void> {
         db.lodging.bulkPut(p.lodging),
         db.lodging_assignments.bulkPut(p.lodging_assignments),
       ])
-      await mergeStampedRows(p)
+      await mergeStampedRows(p, before)
     },
   )
 }
@@ -136,8 +136,11 @@ export function useHydrate() {
     queryFn: async () => {
       // Flush before fetch. Non-negotiable — see the header.
       await flushOutbox()
+      // What this phone holds as the request goes out — the merge's deletion pass may only
+      // remove rows from this set (merge.ts snapshotStampedRows).
+      const before = await snapshotStampedRows()
       const payload = await fetchAll()
-      await writeToDexie(payload)
+      await writeToDexie(payload, before)
       return { at: new Date().toISOString(), counts: countsOf(payload) }
     },
     staleTime: 30_000,
