@@ -48,7 +48,7 @@ export const router = createBrowserRouter([
         path: '/info',
         element: <InfoLayout />,
         children: [
-          { index: true, element: <Navigate to="itinerary" replace /> },
+          { index: true, element: <Navigate to="players" replace /> },
           { path: 'itinerary', element: <Itinerary /> },
           { path: 'courses', element: <Courses /> },
           { path: 'courses/:courseId', element: <CourseDetail /> },
