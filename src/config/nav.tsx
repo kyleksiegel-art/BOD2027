@@ -61,7 +61,9 @@ export const TABS: NavItem[] = [
 ]
 
 /**
- * Info section sub-pages. Empty scaffolds until their build phase.
+ * Info section sub-pages, most-used first (Kyle 2026-10-10): Players carries the week line,
+ * strokes card and form; Games is needed on the first tee; Courses is reference only. The
+ * Info bottom tab lands on the first entry (router index redirect).
  *
  * Admin is the odd one out: it is a top-level route (`/admin`), not an `/info/*` sub-page,
  * so tapping it leaves the Info section and lands on the PIN gate. It lives here only as a
@@ -70,10 +72,10 @@ export const TABS: NavItem[] = [
  * nothing.
  */
 export const INFO_SUBNAV: { to: string; label: string }[] = [
-  { to: '/info/itinerary', label: 'Itinerary' },
-  { to: '/info/courses', label: 'Courses' },
   { to: '/info/players', label: 'Players' },
-  { to: '/info/rules', label: 'Rules' },
+  { to: '/info/itinerary', label: 'Itinerary' },
   { to: '/info/side-games', label: 'Games' },
+  { to: '/info/rules', label: 'Rules' },
+  { to: '/info/courses', label: 'Courses' },
   { to: '/admin', label: 'Admin' },
 ]
