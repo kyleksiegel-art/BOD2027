@@ -185,6 +185,7 @@ export default function Standings() {
                               table stays quiet; a hairline appears only on hover/focus. */}
                           <Link
                             to={`/rounds/${c.roundNumber}`}
+                            state={{ from: 'standings' }}
                             className="tap inline-flex flex-col items-end justify-center rounded-sm outline-none hover:text-gold focus-visible:ring-2 focus-visible:ring-gold-fill/60"
                             aria-label={`Round ${c.roundNumber}${isLive ? ', live' : ''}`}
                           >

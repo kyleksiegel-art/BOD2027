@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useLocation, Link } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Leaderboard } from '@/components/round/Leaderboard'
@@ -89,13 +89,19 @@ export default function RoundDetail() {
   )
 }
 
+/**
+ * Back to wherever the round was opened from (Kyle 2026-10-10): Standings' R1–R4 headers pass
+ * `state.from = 'standings'`; everything else — the Rounds list, a shared link, a cold start —
+ * falls back to the Rounds list. The label always names the destination.
+ */
 function BackLink() {
+  const fromStandings = (useLocation().state as { from?: string } | null)?.from === 'standings'
   return (
     <Link
-      to="/rounds"
+      to={fromStandings ? '/standings' : '/rounds'}
       className="tap -ml-1 inline-flex items-center gap-1 text-[0.8rem] text-paper-faint"
     >
-      <span aria-hidden>‹</span> All rounds
+      <span aria-hidden>‹</span> {fromStandings ? 'Standings' : 'All rounds'}
     </Link>
   )
 }

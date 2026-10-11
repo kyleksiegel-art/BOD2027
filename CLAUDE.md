@@ -1005,3 +1005,15 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
 - **Tap targets**: Standings R1–R4 header links and both CourseDetail back links carry `tap`
   (44px). The Scorecard Points/Gross pill stays visually small; each half's `::after` extends
   10px above/below for a 56px hit area — so the pill must NOT get `overflow-hidden` back.
+
+## Navigation (2026-10-10, branches `info-nav-order`, `money-off-tabbar`) — don't regress
+
+- **Bottom tabs: Home · Standings · Enter · Rounds · Info** (`src/config/nav.tsx` `TABS`). Enter
+  stays dead centre. Home's NavLink carries `end` or it lights up on every route.
+- **Money is not a tab.** Reached from the `MoneyLink` row under the Standings board and Home's
+  end-of-trip panel.
+- **Info sub-tabs: Players · Games · Rules · Courses · Itinerary · Admin**; `/info` redirects to
+  Players. `InfoLayout` has no title of its own — each sub-page's `PageHeader` is the only header
+  and its `<Page>` the only content column.
+- **A round's back link names its origin**: Standings' R1–R4 links pass `state.from =
+  'standings'` → "‹ Standings"; anything else (Rounds list, shared link, cold start) → "‹ All rounds".
