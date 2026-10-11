@@ -136,10 +136,19 @@ function HeroPhoto() {
 }
 
 /** Small CTA that matches the annual-report treatment — gold hairline, plain copy. */
-function LiveLink({ to, children }: { to: string; children: React.ReactNode }) {
+function LiveLink({
+  to,
+  state,
+  children,
+}: {
+  to: string
+  state?: unknown
+  children: React.ReactNode
+}) {
   return (
     <Link
       to={to}
+      state={state}
       className="flex min-h-[48px] items-center justify-center whitespace-nowrap rounded-sm border border-hair-strong px-3 text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-paper transition-colors hover:border-gold hover:text-gold-bright"
     >
       {children}
@@ -226,7 +235,9 @@ function LivePanel({ standings }: { standings: StandingsVM | undefined }) {
           <>
             <PrimaryLink to="/enter">Enter scores</PrimaryLink>
             {/* Standings is one tab away; this is the round's running story instead. */}
-            <LiveLink to="/standings/wire">Field report</LiveLink>
+            <LiveLink to="/standings/wire" state={{ from: 'home' }}>
+              Field report
+            </LiveLink>
           </>
         ) : mode === 'done' ? (
           <>

@@ -1020,3 +1020,6 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
 - **Home's hero shrinks to a 140px photo band (`CompactHero`) while a round is `in_progress`**
   (and the countdown is done), so Enter scores and the top of the board are on the first screen.
   Countdown, between rounds and after the last round keep the full cover.
+- **Home's live buttons are Enter scores + Field report** (Standings is a tab away); the board
+  heading is "Standings" / "Final standings" so it fits one line at 375px. The Field Report's back
+  link reads "‹ Home" when opened from that button (`state.from = 'home'`), else "‹ Standings".

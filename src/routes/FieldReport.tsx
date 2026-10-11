@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { useFieldStory } from '@/lib/data/selectors'
@@ -89,10 +89,16 @@ function StoryRow({ e }: { e: StoryEntry }) {
   )
 }
 
+/** Back to wherever it was opened from: Home's live "Field report" button passes
+ *  `state.from = 'home'`; the Standings ticker, a shared link or a cold start go to Standings. */
 function BackLink() {
+  const fromHome = (useLocation().state as { from?: string } | null)?.from === 'home'
   return (
-    <Link to="/standings" className="tap -ml-1 inline-flex items-center gap-1 text-[0.8rem] text-paper-faint">
-      <span aria-hidden>‹</span> Standings
+    <Link
+      to={fromHome ? '/' : '/standings'}
+      className="tap -ml-1 inline-flex items-center gap-1 text-[0.8rem] text-paper-faint"
+    >
+      <span aria-hidden>‹</span> {fromHome ? 'Home' : 'Standings'}
     </Link>
   )
 }
