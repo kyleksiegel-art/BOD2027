@@ -29,6 +29,21 @@ describe('buildRadioCall', () => {
     expect(lines).toContain('Kyle and Chris get a shot there.')
   })
 
+  it('opens the whole trip on the first tee of round 1', () => {
+    const db = live(0)
+    db.settings = [{ key: 'purse_amounts', value: { buy_in_per_player_cents: 25000, champ_first_cents: 60000, champ_second_cents: 20000, round_winner_cents: 5000 } }]
+    const { lines } = call(db)
+    expect(lines[0]).toMatch(/welcome to the Board of Directors/)
+    expect(lines).toContain("Let's meet the field. Jon Air-un-sun. Kyle See-gul. Adam Hersh. Chris Den-oh-vee.")
+    expect(lines).toContain("Here's the road ahead: the Red today, the Blue on Friday, the Black on Saturday and Bone Valley on Sunday.")
+    expect(lines.some((l) => l.startsWith('$1000 on the line. $600 for the champion, $200 for second, and $50 to whoever wins each round.'))).toBe(true)
+    // Round 2's preview is not the trip opener.
+    const r2 = { ...reportDb(ROUND_ONE), settings: [PURSE] }
+    const second = r2.rounds.find((r) => r.round_number === 2)!
+    r2.round_players = [...r2.round_players, ...r2.round_players.map((rp) => ({ ...rp, round_id: second.id }))]
+    expect(call(r2, second.date).lines.join(' ')).not.toMatch(/meet the field/)
+  })
+
   it('at the turn reviews the front nine and sets up the 10th', () => {
     const { lines } = call(live(9))
     expect(lines[0]).toMatch(/^That's the turn on the Red\./)
@@ -81,7 +96,8 @@ describe('buildRadioCall', () => {
     const all = [0, 2, 6, 9, 12, 16, 18].flatMap((t) => [0, 0.5, 0.99].flatMap((r) => buildRadioCall(live(t), '2027-02-04')!.script(() => r))).join(' ')
     expect(all).not.toMatch(/\b(he|his|him|she|her)\b/i)
     expect(all).not.toMatch(/CTP|–|—|\.\s*\./)
-    expect(all).not.toMatch(/Aronson|Siegel|Hersh|Denove/)
+    // Full names only where the field is introduced, respelled for the voice.
+    expect(all.replace(/Let's meet the field\.[^]*?Chris Den-oh-vee\./g, '')).not.toMatch(/Aronson|Air-un-sun|Siegel|See-gul|Hersh|Denove|Den-oh-vee/)
   })
 })
 

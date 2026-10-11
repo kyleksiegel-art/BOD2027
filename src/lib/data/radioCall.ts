@@ -127,7 +127,7 @@ function callFor(db: Db, focus: { roundNumber: number; preview: boolean }): Radi
     edge,
     story: roundStory,
     roundNumber: focus.roundNumber,
-    course: `the ${courseShortName(detail.course.name)}`,
+    course: courseRef(detail.course.name),
     courseFull: detail.course.name,
   }
   return {
@@ -553,12 +553,54 @@ function liveCall(c: Ctx, phase: CallPhase, pick: Pick): string[] {
   return out
 }
 
+/**
+ * The very first tee of the trip (Kyle 2026-10-11): the welcome, the field by full name, the
+ * four days, and the whole purse. Only before the first round has a point on the board.
+ */
+function tournamentOpener(c: Ctx, pick: Pick, daypart: string): string[] | null {
+  const rounds = c.db.rounds.filter((r) => r.status !== 'abandoned').sort((a, b) => a.round_number - b.round_number)
+  if (rounds[0]?.round_number !== c.roundNumber || rounds.some((r) => r.status === 'final')) return null
+  const out: string[] = [
+    pick([
+      `Good ${daypart}, everybody, and welcome to the Board of Directors. Streamsong, twenty twenty-seven.`,
+      `Good ${daypart}, and welcome to Streamsong for the Board of Directors, twenty twenty-seven.`,
+    ]),
+    `${cap(words(rounds.length))} rounds. ${cap(words(rounds.length))} courses. ${cap(words(rounds.length))} days. And ${words(c.players.length)} men who have been talking about this trip for months.`,
+  ]
+  const field = c.players
+    .map((p) => c.db.players.find((x) => x.id === p.id))
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((p) => p.name)
+  if (field.length > 0) out.push(`Let's meet the field. ${field.map((n) => `${n}.`).join(' ')}`)
+
+  const weekday = (iso: string) => new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`))
+  const stops = rounds.map((r, i) => {
+    const course = c.db.courses.find((x) => x.id === r.course_id)
+    const name = course ? courseRef(course.name) : `round ${r.round_number}`
+    return i === 0 ? `${name} today` : `${name} on ${weekday(r.date)}`
+  })
+  if (stops.length > 1) out.push(`Here's the road ahead: ${listOf(stops)}.`)
+
+  const purse = purseSettingsOf(c.db)
+  const pot = purse.buyInPerPlayerCents * c.players.length
+  if (purse.champFirstCents > 0) {
+    out.push(
+      `${pot > 0 ? `${dollars(pot)} on the line. ` : ''}${dollars(purse.champFirstCents)} for the champion, ${dollars(purse.champSecondCents)} for second${
+        purse.roundWinnerCents > 0 ? `, and ${dollars(purse.roundWinnerCents)} to whoever wins each round` : ''
+      }. Plus closest to the pin, settled in the parking lot, like gentlemen.`,
+    )
+  }
+  return out
+}
+
 function previewCall(c: Ctx, pick: Pick): string[] {
   const after = roundsAfter(c).length
   const tee = c.detail.round.tee_time
   const hour = tee ? Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/New_York' }).format(new Date(tee))) : 12
   const daypart = hour < 12 ? 'morning' : 'afternoon'
-  const out: string[] = [
+  const opener = tournamentOpener(c, pick, daypart)
+  const out: string[] = opener ?? [
     pick([
       `Good ${daypart}, and welcome to Streamsong for round ${c.roundNumber}, ${c.courseFull}.`,
       `Good ${daypart} from ${c.courseFull}, where round ${c.roundNumber} is about to get underway.`,
@@ -600,7 +642,7 @@ function finalCall(c: Ctx, pick: Pick): string[] {
   if (next) {
     const course = c.db.courses.find((x) => x.id === next.course_id)
     const tee = formatTeeTime(next.tee_time)
-    out.push(`Next up: ${course ? `the ${courseShortName(course.name)}` : `round ${next.round_number}`}${tee ? `, at ${tee.replace(/ ET$/, '')}` : ''}.`)
+    out.push(`Next up: ${course ? courseRef(course.name) : `round ${next.round_number}`}${tee ? `, at ${tee.replace(/ ET$/, '')}` : ''}.`)
   }
   out.push(pick(["That's the round.", "That's the round. Somebody's buying.", "That's the round. Hydrate. Stretch. Lie about it later."]))
   return out
@@ -623,6 +665,12 @@ function forSpeech(s: string): string {
     .replace(/\.\./g, '.')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/** "the Red", "the Black", "the Blue", but just "Bone Valley". */
+function courseRef(name: string): string {
+  const short = courseShortName(name)
+  return /^(Red|Black|Blue)$/.test(short) ? `the ${short}` : short
 }
 
 function cap(str: string): string {

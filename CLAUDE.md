@@ -1042,6 +1042,10 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   "winning the day but X leads the week", "if it ended now" $) → next hole (yardage off the
   group's tee, par, stroke-index flavor, who gets a shot, par-3 CTP) → the finish → close.
   Final: the whole story minus "pars all round" filler, the week, what's next.
+  **Round 1's preview is the trip opener** (`tournamentOpener`): the welcome, the field by FULL
+  name (the only place surnames are said, respelled via `SAY_AS`: Den-oh-vee, See-gul,
+  Air-un-sun), the four days, the whole purse. CTP is paid outside the app (never "pays nothing").
+  `courseRef`: "the Red/Black/Blue" but plain "Bone Valley".
 - `script(rand)` picks from line pools, so every tap is a different take; tests pass a fixed rand.
   Names only, never a pronoun (asserted). "CTP" → "closest to the pin".
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
@@ -1049,4 +1053,4 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (9). Full `vitest run` → **246**.
+- Tests: `radioCall.test.ts` (10). Full `vitest run` → **247**.
