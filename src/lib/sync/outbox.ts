@@ -54,6 +54,9 @@ const TERMINAL_ERRORS = new Set([
   // reopens it — a queued cell that lands after the fact is refused, kept in dead letter.
   'round_final',
   'round_abandoned',
+  // Admin cleared or reset the round after this cell was queued (scores_epoch moved on). The
+  // cell belongs to a round that no longer exists in that form; it must not bring it back.
+  'round_cleared',
   'course_data_is_placeholder',
   'no_round_player_row',
   'player_not_playing',
@@ -184,6 +187,17 @@ export function setTransport(next: Transport): void {
  * 5-minute clamp, and guessing would be worse than being provisionally optimistic — the
  * server's own row replaces it on acknowledgement.
  */
+/**
+ * Stamp a cell with its round's scores_epoch as this phone knows it right now. Clear scores
+ * and Reset bump the epoch on the server, so a cell queued before the wipe and flushed after
+ * it is refused ('round_cleared') rather than resurrecting the cleared round. A round cached
+ * before the column existed has no epoch; the cell then goes without one, as before.
+ */
+async function withEpoch<T extends { round_id: string; scores_epoch?: number }>(payload: T): Promise<T> {
+  const round = await db.rounds.get(payload.round_id)
+  return round?.scores_epoch === undefined ? payload : { ...payload, scores_epoch: round.scores_epoch }
+}
+
 export async function enqueueScores(cells: ScorePayload[]): Promise<OutboxEntry[]> {
   if (cells.length === 0) return []
   const ts = await nextStamp()
@@ -200,9 +214,10 @@ export async function enqueueScores(cells: ScorePayload[]): Promise<OutboxEntry[
     created_at: new Date().toISOString(),
   }))
 
-  await db.transaction('rw', [db.scores, db.outbox], async () => {
+  await db.transaction('rw', [db.scores, db.outbox, db.rounds], async () => {
     for (const entry of entries) {
-      const p = entry.payload as ScorePayload
+      entry.payload = await withEpoch(entry.payload as ScorePayload)
+      const { scores_epoch: _epoch, ...p } = entry.payload as ScorePayload
       const existing = await db.scores.get([p.round_id, p.player_id, p.hole_number])
       await db.scores.put({
         // Keep the server id if we have one; invent a local one if this cell is new. The
@@ -235,9 +250,10 @@ export async function enqueueCtp(results: CtpPayload[]): Promise<OutboxEntry[]> 
     created_at: new Date().toISOString(),
   }))
 
-  await db.transaction('rw', [db.ctp_results, db.outbox], async () => {
+  await db.transaction('rw', [db.ctp_results, db.outbox, db.rounds], async () => {
     for (const entry of entries) {
-      const p = entry.payload as CtpPayload
+      entry.payload = await withEpoch(entry.payload as CtpPayload)
+      const { scores_epoch: _epoch, ...p } = entry.payload as CtpPayload
       const existing = await db.ctp_results.get([p.round_id, p.hole_number])
       await db.ctp_results.put({
         id: existing?.id ?? crypto.randomUUID(),

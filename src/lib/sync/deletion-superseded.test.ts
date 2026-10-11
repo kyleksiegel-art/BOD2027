@@ -31,7 +31,7 @@ function row(hole: number, gross: number, clientId: string, eff: string): ScoreR
 }
 
 beforeEach(async () => {
-  await Promise.all([db.outbox.clear(), db.dead_letter.clear(), db.scores.clear(), db.ctp_results.clear(), db.round_players.clear(), db.sync_meta.clear()])
+  await Promise.all([db.outbox.clear(), db.dead_letter.clear(), db.scores.clear(), db.ctp_results.clear(), db.round_players.clear(), db.rounds.clear(), db.sync_meta.clear()])
   resetClockCache()
   localStorage.setItem('bod2027.client_id', DEVICE_A)
   resetClientIdCache()
@@ -116,5 +116,28 @@ describe('a save superseded by another device is reported, not silent (F-013)', 
     await enqueueScores([cell(2, 4)])
     const report = await flushOutbox()
     expect(report.superseded).toBe(0)
+  })
+})
+
+describe('queued cells carry the round epoch (pinned 2026-09-28 #4)', () => {
+  it('stamps the outbox payload, keeps it off the local row, and dead-letters round_cleared', async () => {
+    await db.rounds.put({
+      id: ROUND, round_number: 1, date: '2027-02-04', course_id: 'c', tee_time: null,
+      status: 'in_progress', holes_counted: null, scores_epoch: 3,
+    })
+    server.offline = true
+    await enqueueScores([cell(11, 4)])
+    const [entry] = await db.outbox.toArray()
+    expect((entry.payload as ScorePayload).scores_epoch).toBe(3)
+    expect(await db.scores.get([ROUND, JON, 11])).not.toHaveProperty('scores_epoch')
+
+    // The server has since been cleared: it refuses the stale cell, and the outbox keeps it
+    // in dead letter rather than retrying it forever.
+    setTransport({
+      call: async () => [{ key: { round_id: ROUND, player_id: JON, hole_number: 11 }, applied: false, error: 'round_cleared', row: null }],
+    })
+    const report = await flushOutbox()
+    expect(report.deadLettered).toBe(1)
+    expect(await db.outbox.count()).toBe(0)
   })
 })

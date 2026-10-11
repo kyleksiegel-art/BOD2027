@@ -982,7 +982,13 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
 - **Annual Report shared title** names every co-champion (`joinAnd`), pools 1st + 2nd into one
   money line like the Money page, and "never caught" requires leading after every round.
 - **Home tee times read `rounds.tee_time`** (`teeLabel`); `trip.ts` ROUNDS is only the fallback.
-- **Still pinned:** #4, Clear scores undone by a dead-zone phone's queued writes (needs a
-  `scores_epoch` migration).
+- **#4 fixed (2026-10-10, branch `clear-scores-epoch`): `rounds.scores_epoch`.** Clear scores and
+  Reset to upcoming bump it; `outbox.ts withEpoch()` stamps each queued score/CTP with the epoch
+  Dexie holds at Save (kept off the local row); the upserts refuse a mismatch as `round_cleared`
+  (terminal → dead letter). A cell without an epoch (old bundle, or a round cached before the
+  column) is accepted. Side effect, accepted: a phone that hasn't heard about a clear stamps the
+  old epoch, so holes it enters for the restarted round dead-letter until it hydrates.
+  Migration `20261010120000_round_scores_epoch.sql` — **Kyle pushes it** (`supabase db push`);
+  order vs the client deploy doesn't matter. pgTAP → **251** (`write_path.sql` plan 84).
 - Tests: `save-no-wait.test.ts` (1), +3 in `deletion-superseded`, +1 in `annualReport`. Full
-  `vitest run` → **236**.
+  `vitest run` → **237**.
