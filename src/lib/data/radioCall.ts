@@ -606,8 +606,12 @@ function finalCall(c: Ctx, pick: Pick): string[] {
   return out
 }
 
-/** What a voice would trip on: the closest-to-the-pin shorthand, the en dash, double spaces. */
+/** How the group's names are actually said, respelled for a voice (Kyle 2026-10-11). */
+const SAY_AS: [RegExp, string][] = [[/\bDenove\b/g, 'Den-oh-vee']]
+
+/** What a voice would trip on: names, the closest-to-the-pin shorthand, the en dash, double spaces. */
 function forSpeech(s: string): string {
+  for (const [re, said] of SAY_AS) s = s.replace(re, said)
   return s
     .replace(/\bthe CTP\b/g, 'closest to the pin')
     .replace(/\bCTPs?\b/g, 'closest to the pin')
