@@ -136,10 +136,19 @@ function HeroPhoto() {
 }
 
 /** Small CTA that matches the annual-report treatment — gold hairline, plain copy. */
-function LiveLink({ to, children }: { to: string; children: React.ReactNode }) {
+function LiveLink({
+  to,
+  state,
+  children,
+}: {
+  to: string
+  state?: unknown
+  children: React.ReactNode
+}) {
   return (
     <Link
       to={to}
+      state={state}
       className="flex min-h-[48px] items-center justify-center whitespace-nowrap rounded-sm border border-hair-strong px-3 text-[0.78rem] font-semibold uppercase tracking-[0.08em] text-paper transition-colors hover:border-gold hover:text-gold-bright"
     >
       {children}
@@ -225,7 +234,10 @@ function LivePanel({ standings }: { standings: StandingsVM | undefined }) {
         {mode === 'playing' ? (
           <>
             <PrimaryLink to="/enter">Enter scores</PrimaryLink>
-            <LiveLink to="/standings">View standings</LiveLink>
+            {/* Standings is one tab away; this is the round's running story instead. */}
+            <LiveLink to="/standings/wire" state={{ from: 'home' }}>
+              Field report
+            </LiveLink>
           </>
         ) : mode === 'done' ? (
           <>
@@ -346,7 +358,7 @@ function HomeBoard({
     <section className="mt-8" aria-label="Championship standings">
       <div className="flex items-baseline justify-between gap-3">
         <span className="eyebrow block">
-          {mode === 'done' ? 'Final championship standings' : 'Championship standings'}
+          {mode === 'done' ? 'Final standings' : 'Standings'}
         </span>
         <span className="shrink-0 text-[0.66rem] uppercase tracking-[0.1em] text-paper-faint">
           All rounds · pts
