@@ -17,6 +17,28 @@ export interface MergeReport {
   deleted: number
 }
 
+/** Every stamped row this device held, by outbox key → stamp fingerprint. */
+export type LocalSnapshot = Map<string, string>
+
+function fingerprint(row: { client_updated_at_effective?: string | null; client_id?: string | null }): string {
+  return `${row.client_updated_at_effective ?? ''}|${row.client_id ?? ''}`
+}
+
+/**
+ * Record what this device holds BEFORE the fetch goes out. The deletion pass below may only
+ * remove a row that was already here, unchanged, when the server was asked — anything saved
+ * or received over Realtime while the fetch was in the air is newer than the server's answer
+ * and its absence from that answer proves nothing.
+ */
+export async function snapshotStampedRows(): Promise<LocalSnapshot> {
+  const snap: LocalSnapshot = new Map()
+  for (const r of await db.scores.toArray())
+    snap.set(scoreKey(r.round_id, r.player_id, r.hole_number), fingerprint(r))
+  for (const r of await db.ctp_results.toArray()) snap.set(ctpKey(r.round_id, r.hole_number), fingerprint(r))
+  for (const r of await db.round_players.toArray()) snap.set(rpKey(r.round_id, r.player_id), fingerprint(r))
+  return snap
+}
+
 /**
  * Merge the fetched stamped tables into Dexie. Never a bulkPut.
  *
@@ -29,7 +51,7 @@ export async function mergeStampedRows(payload: {
   scores: ScoreRow[]
   ctp_results: CtpResultRow[]
   round_players?: RoundPlayerRow[]
-}): Promise<MergeReport> {
+}, before?: LocalSnapshot): Promise<MergeReport> {
   const pending = await pendingStamps()
   let applied = 0
   let skipped = 0
@@ -75,17 +97,22 @@ export async function mergeStampedRows(payload: {
   // matters: without this, a phone that missed the Realtime DELETE keeps ghost rows that
   // resurface as that round's scores when it is re-started (audit F-014). Rows we own are
   // safe: an unflushed write is in `pending`, and a flushed one is in the payload.
+  // With a `before` snapshot (hydrate always passes one), a row is also kept unless it was
+  // already here, unchanged, when the fetch went out — a save that flushed, or a Realtime
+  // row that arrived, mid-fetch is in neither `pending` nor the payload, and is not a ghost.
+  const stale = (key: string, row: Parameters<typeof fingerprint>[0]) =>
+    !before || before.get(key) === fingerprint(row)
   const serverScores = new Set(payload.scores.map((r) => scoreKey(r.round_id, r.player_id, r.hole_number)))
   for (const local of await db.scores.toArray()) {
     const key = scoreKey(local.round_id, local.player_id, local.hole_number)
-    if (serverScores.has(key) || pending.has(key)) continue
+    if (serverScores.has(key) || pending.has(key) || !stale(key, local)) continue
     await db.scores.delete([local.round_id, local.player_id, local.hole_number])
     deleted += 1
   }
   const serverCtp = new Set(payload.ctp_results.map((r) => ctpKey(r.round_id, r.hole_number)))
   for (const local of await db.ctp_results.toArray()) {
     const key = ctpKey(local.round_id, local.hole_number)
-    if (serverCtp.has(key) || pending.has(key)) continue
+    if (serverCtp.has(key) || pending.has(key) || !stale(key, local)) continue
     await db.ctp_results.delete([local.round_id, local.hole_number])
     deleted += 1
   }
@@ -94,7 +121,7 @@ export async function mergeStampedRows(payload: {
     const serverRp = new Set(payload.round_players.map((r) => rpKey(r.round_id, r.player_id)))
     for (const local of await db.round_players.toArray()) {
       const key = rpKey(local.round_id, local.player_id)
-      if (serverRp.has(key) || pending.has(key)) continue
+      if (serverRp.has(key) || pending.has(key) || !stale(key, local)) continue
       await db.round_players.delete([local.round_id, local.player_id])
       deleted += 1
     }

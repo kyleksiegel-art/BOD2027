@@ -54,14 +54,15 @@ export function getWriteState(): WriteState {
  * Record a hole's worth of cells.
  *
  * Resolves true once the cells are durably queued — which is the moment the scorer's tap
- * is safe, connection or no connection. It resolves false only if Dexie itself refused,
- * which means the device could not record the score at all and the caller must keep its
- * unsaved edits.
+ * is safe, connection or no connection. It does NOT wait for the network: the flush runs
+ * behind it and reports through the write state. (It used to await the flush, and on one
+ * bar of signal the scorer sat on "Saving…" while Enter's post-save bookkeeping waited —
+ * long enough to tap a correction that the bookkeeping then threw away.) It resolves false
+ * only if Dexie itself refused, which means the device could not record the score at all
+ * and the caller must keep its unsaved edits.
  */
 export async function saveCells(cells: ScoreCellInput[]): Promise<boolean> {
   if (cells.length === 0) return true
-  publish({ status: 'saving', message: null })
-
   const payloads: ScorePayload[] = cells.map((c) => ({
     round_id: c.roundId,
     player_id: c.playerId,
@@ -69,45 +70,7 @@ export async function saveCells(cells: ScoreCellInput[]): Promise<boolean> {
     gross_strokes: c.grossStrokes,
     picked_up: c.pickedUp,
   }))
-
-  try {
-    await enqueueScores(payloads)
-  } catch (e) {
-    publish({
-      status: 'error',
-      message: `Couldn’t record that on this phone: ${e instanceof Error ? e.message : String(e)}`,
-    })
-    return false
-  }
-
-  // Queued and safe. The flush is best-effort from here: its failure changes what the
-  // badge says, never whether the score was kept.
-  let report: FlushReport
-  try {
-    report = await flushOutbox()
-  } catch (e) {
-    publish({ status: 'queued', message: PENDING_NOTE })
-    return true
-  }
-
-  if (report.deadLettered > 0) {
-    publish({
-      status: 'error',
-      message: `The server refused ${report.deadLettered} entr${report.deadLettered === 1 ? 'y' : 'ies'} (${report.message ?? 'see Diagnostics'}). Kept — nothing was lost.`,
-    })
-  } else if (report.superseded > 0) {
-    // The save landed but another phone had a newer value for a cell; the screen now shows
-    // that winner. Tell the scorer rather than let it revert silently under "Saved".
-    publish({
-      status: 'superseded',
-      message: `A newer score from another phone replaced ${report.superseded === 1 ? 'one entry' : `${report.superseded} entries`}.`,
-    })
-  } else if (report.status === 'offline' || report.remaining > 0) {
-    publish({ status: 'queued', message: PENDING_NOTE })
-  } else {
-    publish({ status: 'idle', message: null })
-  }
-  return true
+  return record(() => enqueueScores(payloads))
 }
 
 /**
@@ -117,9 +80,13 @@ export async function saveCells(cells: ScoreCellInput[]): Promise<boolean> {
  * an explicit "no winner" for the hole (no rollover), distinct from a hole not entered yet.
  */
 export async function saveCtp(result: CtpPayload): Promise<boolean> {
+  return record(() => enqueueCtp([result]))
+}
+
+async function record(enqueue: () => Promise<unknown>): Promise<boolean> {
   publish({ status: 'saving', message: null })
   try {
-    await enqueueCtp([result])
+    await enqueue()
   } catch (e) {
     publish({
       status: 'error',
@@ -127,33 +94,54 @@ export async function saveCtp(result: CtpPayload): Promise<boolean> {
     })
     return false
   }
+  // Queued and safe — say so now, so Save is free for the next hole. The flush is
+  // best-effort from here: its outcome replaces this note, never whether the score was kept.
+  publish({ status: 'queued', message: PENDING_NOTE })
+  void flushAndReport()
+  return true
+}
 
-  let report: FlushReport
+/** Saves that are still waiting on their flush. A par-3 Save queues scores and CTP back to
+ *  back; the outcome is published once, when the last one settles, so the CTP's clean flush
+ *  can't paper over the scores' "superseded" notice. */
+let flushesOutstanding = 0
+let worst: WriteState | null = null
+
+const RANK: Record<WriteStatus, number> = { idle: 0, saving: 0, queued: 1, superseded: 2, error: 3 }
+
+async function flushAndReport(): Promise<void> {
+  flushesOutstanding += 1
+  let next: WriteState
   try {
-    report = await flushOutbox()
+    next = outcomeOf(await flushOutbox())
   } catch {
-    publish({ status: 'queued', message: PENDING_NOTE })
-    return true
+    next = { status: 'queued', message: PENDING_NOTE }
   }
+  if (!worst || RANK[next.status] > RANK[worst.status]) worst = next
+  flushesOutstanding -= 1
+  if (flushesOutstanding === 0) {
+    publish(worst)
+    worst = null
+  }
+}
 
+function outcomeOf(report: FlushReport): WriteState {
   if (report.deadLettered > 0) {
-    publish({
+    return {
       status: 'error',
       message: `The server refused ${report.deadLettered} entr${report.deadLettered === 1 ? 'y' : 'ies'} (${report.message ?? 'see Diagnostics'}). Kept — nothing was lost.`,
-    })
-  } else if (report.superseded > 0) {
+    }
+  }
+  if (report.superseded > 0) {
     // The save landed but another phone had a newer value for a cell; the screen now shows
     // that winner. Tell the scorer rather than let it revert silently under "Saved".
-    publish({
+    return {
       status: 'superseded',
       message: `A newer score from another phone replaced ${report.superseded === 1 ? 'one entry' : `${report.superseded} entries`}.`,
-    })
-  } else if (report.status === 'offline' || report.remaining > 0) {
-    publish({ status: 'queued', message: PENDING_NOTE })
-  } else {
-    publish({ status: 'idle', message: null })
+    }
   }
-  return true
+  if (report.status === 'offline' || report.remaining > 0) return { status: 'queued', message: PENDING_NOTE }
+  return { status: 'idle', message: null }
 }
 
 // Offline is a normal operating mode here, not an error. No destructive copy.

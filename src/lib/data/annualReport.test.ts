@@ -190,3 +190,28 @@ describe('buildAnnualReport', () => {
     for (const last of ['Jon', 'Chris', 'Adam']) expect(body).toContain(last)
   })
 })
+
+describe('buildAnnualReport — a shared title (pinned 2026-09-28 #3)', () => {
+  // Denove plays Aronson's exact card both days: 74 each, nothing to break it on.
+  function tiedDb(): Db {
+    const db = makeDb('final')
+    return {
+      ...db,
+      scores: [
+        ...db.scores.filter((s) => s.player_id !== P2),
+        ...scoresFor(P2, R1, { 1: -1, 2: -1 }),
+        ...scoresFor(P2, R2),
+      ],
+    }
+  }
+
+  it('names both co-champions and pools 1st + 2nd in one money line', () => {
+    const vm = buildAnnualReport(tiedDb())!
+    expect(vm.champion.shared).toBe(true)
+    expect(vm.headline).toMatch(/^Jon and Chris share /)
+    expect(vm.money.lines[0]).toEqual({ label: '1st & 2nd shared · Jon and Chris', amount: expect.any(String) })
+    expect(vm.money.lines.some((l) => l.label.startsWith('2nd overall'))).toBe(false)
+    expect(letterText(vm)).toContain('Jon and Chris shared the season at 74 points.')
+    expect(letterText(vm)).not.toContain('Adam shared')
+  })
+})

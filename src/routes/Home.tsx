@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { COUNTDOWN_TARGET_ISO, TRIP, PLAYERS, ROUNDS } from '@/config/trip'
 import { useRoundsList, useStandings, useRoundDetail } from '@/lib/data/selectors'
-import { courseSlug, formatStandingBack, formatPosition, formatLiveLine } from '@/lib/format'
+import { courseSlug, formatStandingBack, formatPosition, formatLiveLine, formatTeeTime } from '@/lib/format'
 import type { StandingsVM, StandingsLiveRound } from '@/lib/data/compute'
 import { useSyncSnapshot } from '@/lib/sync/engine'
 
@@ -206,12 +206,17 @@ function LivePanel({ standings }: { standings: StandingsVM | undefined }) {
         <OnCourse
           course={inProgress.course.name}
           roundNo={inProgress.round.round_number}
+          teeTime={inProgress.round.tee_time}
           live={standings.liveRound}
         />
       ) : mode === 'done' ? (
         <Complete overall={overall} />
       ) : nextUp ? (
-        <BetweenRounds course={nextUp.course.name} roundNo={nextUp.round.round_number} />
+        <BetweenRounds
+          course={nextUp.course.name}
+          roundNo={nextUp.round.round_number}
+          teeTime={nextUp.round.tee_time}
+        />
       ) : (
         <p className="mt-6 text-center text-paper-dim">The trip is underway.</p>
       )}
@@ -253,10 +258,12 @@ function progressLine(live: StandingsLiveRound): string {
 function OnCourse({
   course,
   roundNo,
+  teeTime,
   live,
 }: {
   course: string
   roundNo: number
+  teeTime: string | null
   live: StandingsLiveRound | null
 }) {
   const card = ROUNDS.find((r) => r.no === roundNo)
@@ -275,7 +282,7 @@ function OnCourse({
         {card ? (
           <>
             {' · '}
-            <span className="text-gold">{card.day}</span> · {card.tee}
+            <span className="text-gold">{card.day}</span> · {teeLabel(teeTime, card.tee)}
           </>
         ) : null}
       </p>
@@ -288,7 +295,15 @@ function OnCourse({
   )
 }
 
-function BetweenRounds({ course, roundNo }: { course: string; roundNo: number }) {
+function BetweenRounds({
+  course,
+  roundNo,
+  teeTime,
+}: {
+  course: string
+  roundNo: number
+  teeTime: string | null
+}) {
   const card = ROUNDS.find((r) => r.no === roundNo)
   return (
     <>
@@ -303,7 +318,7 @@ function BetweenRounds({ course, roundNo }: { course: string; roundNo: number })
         {card ? (
           <>
             {' · '}
-            <span className="text-gold">{card.day}</span> · {card.tee}
+            <span className="text-gold">{card.day}</span> · {teeLabel(teeTime, card.tee)}
           </>
         ) : null}
       </p>
@@ -484,7 +499,7 @@ function CardRound({
           <span className="tnum whitespace-nowrap text-right text-[0.8rem] text-paper-dim">
             {round.day}
             <span className="mt-0.5 block text-[0.72rem] tracking-[0.04em] text-gold">
-              {round.tee}
+              {teeLabel(vm?.round.tee_time ?? null, round.tee)}
             </span>
           </span>
           <Chevron open={open} />
@@ -634,4 +649,10 @@ export default function Home() {
       </div>
     </div>
   )
+}
+
+/** The tee time an admin set on the round wins; the booked time in trip.ts is the fallback
+ *  for before the database has answered. */
+function teeLabel(teeTime: string | null, booked: string): string {
+  return formatTeeTime(teeTime) ?? booked
 }
