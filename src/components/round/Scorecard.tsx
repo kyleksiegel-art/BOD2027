@@ -90,13 +90,16 @@ function ModeToggle({
   setMode: (m: 'points' | 'gross') => void
 }) {
   return (
-    <div className="inline-flex overflow-hidden rounded-full border border-hair-strong text-[0.68rem]">
+    // The pill stays small; each half's hit area extends 10px above and below it (the
+    // ::after) so the toggle meets the 44px tap minimum without growing. No overflow-hidden
+    // on the pill, or it would clip that hit area — the halves round their own corners.
+    <div className="inline-flex rounded-full border border-hair-strong text-[0.68rem]">
       {(['points', 'gross'] as const).map((m) => (
         <button
           key={m}
           type="button"
           onClick={() => setMode(m)}
-          className={`px-3 py-1.5 font-semibold uppercase tracking-[0.1em] ${
+          className={`relative px-3 py-1.5 font-semibold uppercase tracking-[0.1em] first:rounded-l-full last:rounded-r-full after:absolute after:inset-x-0 after:-inset-y-2.5 after:content-[''] ${
             mode === m ? 'bg-gold/20 text-gold-bright' : 'text-paper-faint'
           }`}
         >

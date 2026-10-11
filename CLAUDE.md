@@ -992,3 +992,16 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
   order vs the client deploy doesn't matter. pgTAP → **251** (`write_path.sql` plan 84).
 - Tests: `save-no-wait.test.ts` (1), +3 in `deletion-superseded`, +1 in `annualReport`. Full
   `vitest run` → **237**.
+
+## Minor review fixes (2026-10-10, branch `minor-fixes`) — don't regress
+
+- **Precache is AVIF-only for photos** (`vite.config.ts` `globIgnores: ['assets/**/*.{webp,jpg}']`):
+  5.1 MB → **1.8 MB**. The WebP/JPG fallbacks stay deployed for old browsers online; every trip
+  phone (iOS 16+) takes the AVIF `<source>`. This supersedes the 6b note that the glob precaches
+  every hero variant.
+- **anon/authenticated have no TRUNCATE / REFERENCES / TRIGGER** on `public` tables
+  (`20261010130000_revoke_truncate.sql`, incl. default privileges for `postgres`). TRUNCATE
+  ignores RLS. `rls_smoke.sql` asserts it (plan 34). pgTAP → **253**. **Kyle pushes it.**
+- **Tap targets**: Standings R1–R4 header links and both CourseDetail back links carry `tap`
+  (44px). The Scorecard Points/Gross pill stays visually small; each half's `::after` extends
+  10px above/below for a 56px hit area — so the pill must NOT get `overflow-hidden` back.

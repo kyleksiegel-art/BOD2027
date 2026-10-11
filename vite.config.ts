@@ -26,9 +26,11 @@ export default defineConfig({
         // Everything the SPA needs to boot and score with no network: the shell, the JS/CSS,
         // the fonts, the icons, and the hero. Content-addressed build output lives under
         // _assets/ (see build.assetsDir); stable public files under assets/.
-        // avif/webp cover the responsive hero variants; the browser precaches every variant
-        // so the one it picks for this device is available offline.
+        // Photos: AVIF only. Every phone on the trip (iOS 16+) picks the AVIF <source>, so the
+        // WebP and JPG fallbacks were ~3.3 MB of precache no device ever reads. They stay
+        // deployed for an older browser online; offline, that browser simply shows no photo.
         globPatterns: ['**/*.{js,css,html,woff2,svg,png,jpg,avif,webp,ico,webmanifest}'],
+        globIgnores: ['assets/**/*.{webp,jpg}'],
         // Room for the hero photo; nothing we ship approaches this.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // The SPA fallback: any navigation not in the precache resolves to the app shell,

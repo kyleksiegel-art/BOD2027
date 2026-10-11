@@ -13,7 +13,7 @@
 
 begin;
 
-select plan(32);
+select plan(34);
 
 -- pgTAP lives in the extensions schema on Supabase local.
 create extension if not exists pgtap with schema extensions;
@@ -55,12 +55,20 @@ select throws_ok($$ insert into public.settings            default values $$, '4
 select throws_ok($$ insert into public.scores default values $$,          '42501', null, 'anon INSERT scores denied');
 select throws_ok($$ update public.scores set picked_up = false $$,        '42501', null, 'anon UPDATE scores denied');
 select throws_ok($$ delete from public.scores $$,                         '42501', null, 'anon DELETE scores denied');
+-- TRUNCATE ignores RLS, so it must not be granted at all (20261010130000).
+select throws_ok($$ truncate public.scores $$,                            '42501', null, 'anon TRUNCATE scores denied');
 
 -- ── 3. anon cannot read the locked tables ────────────────────────────────────
 select throws_ok($$ select 1 from public.sessions     $$, '42501', null, 'anon SELECT sessions denied');
 select throws_ok($$ select 1 from public.pin_attempts $$, '42501', null, 'anon SELECT pin_attempts denied');
 
 reset role;
+
+select is(
+  (select count(*)::int from information_schema.role_table_grants
+    where table_schema = 'public' and grantee in ('anon', 'authenticated')
+      and privilege_type in ('TRUNCATE', 'REFERENCES', 'TRIGGER')),
+  0, 'no public table grants TRUNCATE / REFERENCES / TRIGGER to anon or authenticated');
 
 select * from finish();
 
