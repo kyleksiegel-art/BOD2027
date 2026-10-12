@@ -9,6 +9,7 @@ import { RoundsEditor } from '@/components/admin/RoundsEditor'
 import { SettingsEditor } from '@/components/admin/SettingsEditor'
 import { ItineraryEditor } from '@/components/admin/ItineraryEditor'
 import { LodgingEditor } from '@/components/admin/LodgingEditor'
+import { RadioCallCard } from '@/components/admin/RadioCallCard'
 import { Button, Report, useAdminAction } from '@/components/admin/kit'
 import { useAdmin } from '@/lib/data/selectors'
 import { useSession, lock } from '@/lib/auth/session'
@@ -100,6 +101,9 @@ export default function Admin() {
           signal and it syncs later.
         </p>
       ) : null}
+
+      {/* Works offline: it's the phone's own voice, not a server write. */}
+      <RadioCallCard />
 
       <nav className="mt-5 grid grid-cols-3 gap-2">
         {TABS.map((t) => (

@@ -1054,9 +1054,14 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   hole, the goodbye. Full names appear only in the round-1 opener and the finale.
 - `script(rand)` picks from line pools, so every tap is a different take; tests pass a fixed rand.
   Names only, never a pronoun (asserted). "CTP" → "closest to the pin".
+- **Admin has a Play/Stop "Radio call" card** above the tabs (`components/admin/RadioCallCard.tsx`),
+  behind the PIN so it stays secret, shown even offline (it's the phone's voice, not a server
+  write). Its sub-line is `RadioCallVM.label`: "Trip opener, first tee" · "Round 2 · first-tee
+  preview" · "Round 2 · live, through 12" · "Round 2 · the turn" · "Round 2 · round wrap" ·
+  "Trip finale".
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (11). Full `vitest run --dir src` → **248**.
+- Tests: `radioCall.test.ts` (12). Full `vitest run --dir src` → **249**.

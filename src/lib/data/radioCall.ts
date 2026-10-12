@@ -29,6 +29,8 @@ export type CallPhase = 'preview' | 'early' | 'front' | 'turn' | 'back' | 'closi
 export interface RadioCallVM {
   roundNumber: number
   phase: CallPhase
+  /** What this call covers right now, for the Admin card: "Round 2 · live, through 12". */
+  label: string
   /** The lines to read, one utterance each. Call again for a different take. */
   script: (rand?: () => number) => string[]
 }
@@ -130,9 +132,25 @@ function callFor(db: Db, focus: { roundNumber: number; preview: boolean }): Radi
     course: courseRef(detail.course.name),
     courseFull: detail.course.name,
   }
+  const isFinale = phase === 'final' && roundsAfter(ctx).length === 0
+  // Same test as tournamentOpener: the first round of the trip, nothing final yet.
+  const firstRound = Math.min(...db.rounds.filter((r) => r.status !== 'abandoned').map((r) => r.round_number))
+  const isOpener = phase === 'preview' && focus.roundNumber === firstRound && !db.rounds.some((r) => r.status === 'final')
+  const label = isFinale
+    ? 'Trip finale'
+    : isOpener
+      ? 'Trip opener, first tee'
+      : phase === 'preview'
+        ? `Round ${focus.roundNumber} · first-tee preview`
+        : phase === 'final'
+          ? `Round ${focus.roundNumber} · round wrap`
+          : phase === 'turn'
+            ? `Round ${focus.roundNumber} · the turn`
+            : `Round ${focus.roundNumber} · live, through ${complete}`
   return {
     roundNumber: focus.roundNumber,
     phase,
+    label,
     script: (rand = Math.random) => {
       const pick = <T,>(xs: T[]): T => xs[Math.min(xs.length - 1, Math.floor(rand() * xs.length))]
       const lines = phase === 'preview' ? previewCall(ctx, pick) : phase === 'final' ? finalCall(ctx, pick) : liveCall(ctx, phase, pick)

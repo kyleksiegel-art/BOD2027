@@ -107,6 +107,14 @@ describe('buildRadioCall', () => {
     expect(lines.join(' ')).not.toMatch(/Next up/)
   })
 
+  it('labels what the call covers, for the Admin card', () => {
+    const labels = [0, 9, 12, 18].map((t) => buildRadioCall(live(t), '2027-02-04')!.label)
+    expect(labels).toEqual(['Trip opener, first tee', 'Round 1 · the turn', 'Round 1 · live, through 12', 'Round 1 · round wrap'])
+    const db = reportDb(ROUND_ONE)
+    db.rounds = db.rounds.map((r) => (r.round_number === 1 ? r : { ...r, status: 'abandoned' as const }))
+    expect(buildRadioCall(db, '2027-02-04')!.label).toBe('Trip finale')
+  })
+
   it('names only, never a pronoun; nothing a voice trips on', () => {
     const all = [0, 2, 6, 9, 12, 16, 18].flatMap((t) => [0, 0.5, 0.99].flatMap((r) => buildRadioCall(live(t), '2027-02-04')!.script(() => r))).join(' ')
     expect(all).not.toMatch(/\b(he|his|him|she|her)\b/i)
