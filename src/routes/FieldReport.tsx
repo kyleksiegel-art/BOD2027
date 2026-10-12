@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
-import { useFieldStory, useRadioCall } from '@/lib/data/selectors'
+import { useFieldStory } from '@/lib/data/selectors'
+import { useRadioPlayer } from '@/hooks/useRadioPlayer'
 import type { StoryEntry } from '@/lib/data/fieldStory'
-import { speakLines, speechAvailable, stopSpeaking } from '@/lib/speech/speak'
 import { formatDay } from '@/lib/format'
 
 /**
@@ -70,25 +70,15 @@ export default function FieldReport() {
  * iOS only starts speech inside a tap, which the third tap is. Stops when the page unmounts.
  */
 function useSecretCall() {
-  const call = useRadioCall()
+  const player = useRadioPlayer()
   const taps = useRef<number[]>([])
-  const playing = useRef(false)
-  useEffect(() => stopSpeaking, [])
   return () => {
     const now = Date.now()
     taps.current = [...taps.current.filter((t) => now - t < 700), now]
     if (taps.current.length < 3) return
     taps.current = []
-    if (playing.current) {
-      playing.current = false
-      stopSpeaking()
-      return
-    }
-    if (!call || !speechAvailable()) return
-    playing.current = true
-    speakLines(call.script(), () => {
-      playing.current = false
-    })
+    if (player.playing) player.stop()
+    else player.playNow()
   }
 }
 

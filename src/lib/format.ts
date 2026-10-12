@@ -174,3 +174,9 @@ const clockFmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-
 export function formatClock(iso: string): string {
   return clockFmt.format(new Date(iso)).replace(/\s?[AP]M$/i, '')
 }
+
+const callTimeFmt = new Intl.DateTimeFormat('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: TZ })
+/** "Sat 2:14 PM": when a radio call played, in trip time. */
+export function formatCallTime(iso: string): string {
+  return callTimeFmt.format(new Date(iso)).replace(',', '')
+}

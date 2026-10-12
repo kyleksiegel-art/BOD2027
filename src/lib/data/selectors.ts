@@ -14,6 +14,7 @@ import type { StrokesCardVM } from './strokesCard'
 import { buildPlayerWeek } from './playerWeek'
 import type { PlayerWeekVM } from './playerWeek'
 import { buildRadioCall } from './radioCall'
+import { CALL_LOG_KEY, RECENT_KEY, type LoggedCall } from './callLog'
 import type { RadioCallVM } from './radioCall'
 import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -131,6 +132,17 @@ export function useFieldStory(): StoryVM | null | undefined {
 export function useRadioCall(): RadioCallVM | null | undefined {
   const data = useDbData()
   return useMemo(() => (data ? buildRadioCall(data) : undefined), [data])
+}
+
+/** This phone's radio call memory: calls played (newest first) and line templates heard lately. */
+export function useRadioMemory(): { calls: LoggedCall[]; recent: string[] } | undefined {
+  return useLiveQuery(async () => {
+    const [calls, recent] = await Promise.all([db.sync_meta.get(CALL_LOG_KEY), db.sync_meta.get(RECENT_KEY)])
+    return {
+      calls: Array.isArray(calls?.value) ? (calls!.value as LoggedCall[]) : [],
+      recent: Array.isArray(recent?.value) ? (recent!.value as string[]) : [],
+    }
+  }, [])
 }
 
 export interface PlayerCardVM {

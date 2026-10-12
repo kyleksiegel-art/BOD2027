@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildRadioCall } from './radioCall'
+import { buildRadioCall, signature } from './radioCall'
+import { logCall, readCallLog, readRecentSignatures, CALL_LOG_MAX } from './callLog'
+import { db as dexie } from '@/lib/db'
 import type { Db } from './compute'
 import { reportDb, ROUND_ONE } from '@/test/reportFixture'
 import { pickVoice } from '@/lib/speech/speak'
@@ -120,7 +122,45 @@ describe('buildRadioCall', () => {
     expect(all).not.toMatch(/\b(he|his|him|she|her)\b/i)
     expect(all).not.toMatch(/CTP|–|—|\.\s*\./)
     // Full names only where the field is introduced, respelled for the voice.
-    expect(all.replace(/Let's meet the field\.[^]*?Chris Den-oh-vee\./g, '')).not.toMatch(/Aronson|Air-un-sun|Siegel|See-gul|Hersh|Denove|Den-oh-vee/)
+    expect(all.replace(/Let's meet the field\.[^]*?Chris Den-oh-vee\./g, '').replace(/Adam Hersh, your defending champion\./g, '')).not.toMatch(/Aronson|Air-un-sun|Siegel|See-gul|Hersh|Denove|Den-oh-vee/)
+  })
+})
+
+describe('variety', () => {
+  it('a template keeps its signature whoever and whatever it is about', () => {
+    expect(signature("Chris has taken zeros on three straight holes. Thoughts and prayers.")).toBe(
+      signature("Adam has taken zeros on two straight holes. Thoughts and prayers."),
+    )
+    expect(signature('Chris leads by 3.')).not.toBe(signature('Chris is 3 clear.'))
+  })
+
+  it('steers clear of the lines it used last time', () => {
+    const vm = buildRadioCall(live(12), '2027-02-04')!
+    const a = vm.compose(() => 0)
+    const b = vm.compose(() => 0, new Set(a.used))
+    expect(a.used.length).toBeGreaterThan(5)
+    // Every pooled line of the second take is a different template from the first.
+    const repeated = b.used.filter((sig) => a.used.includes(sig))
+    expect(repeated).toEqual([])
+    // Same facts, though.
+    expect(b.lines.join(' ')).toMatch(/Chris/)
+  })
+
+  it('tells the history on the first tee', () => {
+    const lines = buildRadioCall(live(0), '2027-02-04')!.script(() => 0)
+    expect(lines).toContain('Adam Hersh, your defending champion.')
+    expect(lines.some((l) => /Jon and Chris tied for second, because Kyle kept the scores/.test(l))).toBe(true)
+  })
+})
+
+describe('callLog', () => {
+  it('keeps the last calls, newest first, and remembers the templates used', async () => {
+    await dexie.sync_meta.clear()
+    for (let i = 0; i < CALL_LOG_MAX + 3; i++) await logCall({ at: `2027-02-04T18:${String(i).padStart(2, '0')}:00Z`, label: `Call ${i}`, lines: [`Line ${i}`] }, [`sig-${i}`])
+    const log = await readCallLog()
+    expect(log).toHaveLength(CALL_LOG_MAX)
+    expect(log[0].label).toBe(`Call ${CALL_LOG_MAX + 2}`)
+    expect((await readRecentSignatures())[0]).toBe(`sig-${CALL_LOG_MAX + 2}`)
   })
 })
 
