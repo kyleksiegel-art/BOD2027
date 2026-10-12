@@ -92,6 +92,21 @@ describe('buildRadioCall', () => {
     expect(lines.some((l) => /Chris leads Kyle by 8|Chris on top, 8 ahead of Kyle/.test(l))).toBe(true)
   })
 
+  it('ends the trip after the last round: champion, standings, money, CTP king, the shits', () => {
+    const db = reportDb(ROUND_ONE, { ctp: { 6: 2, 8: 2, 14: 2, 16: 1 } })
+    db.rounds = db.rounds.map((r) => (r.round_number === 1 ? r : { ...r, status: 'abandoned' as const }))
+    db.settings = [PURSE]
+    const { phase, lines } = call(db)
+    expect(phase).toBe('final')
+    expect(lines[0]).toBe("That's it. 18 holes. The Board of Directors, twenty twenty-seven, is in the books.")
+    expect(lines).toContain('Chris Den-oh-vee is your champion!')
+    expect(lines).toContain('Final standings. Chris, 44. Kyle, 36. Jon, 31. Adam, 27.')
+    expect(lines).toContain('$600 to the champion. $200 to Kyle.')
+    expect(lines).toContain('And Adam Hersh! Last on the card, but with three closest to the pins, the closest to the pin king of Streamsong.')
+    expect(lines.join(' ')).toMatch(/And then there's the shits\./)
+    expect(lines.join(' ')).not.toMatch(/Next up/)
+  })
+
   it('names only, never a pronoun; nothing a voice trips on', () => {
     const all = [0, 2, 6, 9, 12, 16, 18].flatMap((t) => [0, 0.5, 0.99].flatMap((r) => buildRadioCall(live(t), '2027-02-04')!.script(() => r))).join(' ')
     expect(all).not.toMatch(/\b(he|his|him|she|her)\b/i)

@@ -1046,6 +1046,12 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   name (the only place surnames are said, respelled via `SAY_AS`: only Denove → Den-oh-vee; Kyle says
   Aronson and Siegel read fine as written), the four days, the whole purse. CTP is paid outside the app (never "pays nothing").
   `courseRef`: "the Red/Black/Blue" but plain "Bone Valley".
+  **After the last round of the trip, `finalCall` hands off to `tripFinale`**: "in the books",
+  the last round's final hole (from the story), the champion by FULL name (co-champions; a
+  tiebreak win quotes `StandingsVM.tiebreakNote`; one point / photo finish / statement margin
+  bands), final standings, $1st/$2nd (only when places are clean), round-by-round winners via
+  `resolveRoundWinnerIds`, the trip's CTP king (unique top count), the shits at the nineteenth
+  hole, the goodbye. Full names appear only in the round-1 opener and the finale.
 - `script(rand)` picks from line pools, so every tap is a different take; tests pass a fixed rand.
   Names only, never a pronoun (asserted). "CTP" → "closest to the pin".
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
@@ -1053,4 +1059,4 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (10). Full `vitest run` → **247**.
+- Tests: `radioCall.test.ts` (11). Full `vitest run --dir src` → **248**.

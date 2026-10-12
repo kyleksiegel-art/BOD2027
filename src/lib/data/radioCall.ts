@@ -1,4 +1,4 @@
-import { buildRoundDetail, buildStandings } from './compute'
+import { buildRoundDetail, buildStandings, resolveRoundWinnerIds } from './compute'
 import type { Db, PlayerRoundVM } from './compute'
 import { buildFieldStory, shotOf } from './fieldStory'
 import type { StoryEntry, StoryVM } from './fieldStory'
@@ -627,6 +627,7 @@ function previewCall(c: Ctx, pick: Pick): string[] {
 }
 
 function finalCall(c: Ctx, pick: Pick): string[] {
+  if (roundsAfter(c).length === 0) return tripFinale(c, pick)
   const out: string[] = [pick([`Here's how round ${c.roundNumber} went on ${c.course}.`, `The final word from ${c.course}, round ${c.roundNumber}.`])]
   const entries = c.story ? c.story.entries.slice().reverse() : []
   entries.forEach((e, i) => {
@@ -645,6 +646,91 @@ function finalCall(c: Ctx, pick: Pick): string[] {
     out.push(`Next up: ${course ? courseRef(course.name) : `round ${next.round_number}`}${tee ? `, at ${tee.replace(/ ET$/, '')}` : ''}.`)
   }
   out.push(pick(["That's the round.", "That's the round. Somebody's buying.", "That's the round. Hydrate. Stretch. Lie about it later."]))
+  return out
+}
+
+/**
+ * After the final putt of the trip (Kyle 2026-10-11): the champion, how the last round ended, the
+ * final standings, all the money, the closest-to-the-pin king, the shits, and the goodbye. Plays
+ * in place of the normal wrap when the last round of the trip is complete.
+ */
+function tripFinale(c: Ctx, pick: Pick): string[] {
+  const st = buildStandings(c.db)
+  const rows = st.rows
+  if (rows.length < 2) return []
+  const fullName = (id: string) => c.db.players.find((p) => p.id === id)?.name ?? 'Unknown'
+  const short = (id: string) => first(fullName(id))
+  const rounds = c.db.rounds.filter((r) => r.status !== 'abandoned').sort((a, b) => a.round_number - b.round_number)
+  const totalHoles = rounds.reduce((sum, r) => sum + (r.holes_counted ?? 18), 0)
+  const champs = rows.filter((r) => r.position === 1)
+  const runnerUp = rows.find((r) => r.position > 1) ?? null
+  const margin = runnerUp ? champs[0].total - runnerUp.total : 0
+  const out: string[] = []
+
+  out.push(
+    pick([
+      `That's it. ${totalHoles} holes. The Board of Directors, twenty twenty-seven, is in the books.`,
+      `And that, ladies and gentlemen, is the Board of Directors, twenty twenty-seven. ${totalHoles} holes, and it's over.`,
+    ]),
+  )
+
+  // How the last round finished: its final hole, as the Field Report told it.
+  const last = c.story?.entries.find((e) => e.kind === 'hole')
+  if (last) out.push(storyLine(last))
+
+  // The champion.
+  if (champs.length > 1) {
+    out.push(`We have co-champions! ${listOf(champs.map((r) => fullName(r.playerId)))} share the title, level after every tiebreaker.`)
+  } else {
+    const champ = champs[0]
+    out.push(pick([`${fullName(champ.playerId)} is your champion!`, `Your champion of the Board of Directors… ${fullName(champ.playerId)}!`]))
+    const how = st.tiebreakNote?.match(/leads on (.*)\.$/)?.[1]
+    if (margin === 0 && how) out.push(`Level on points with ${short(runnerUp!.playerId)}, and ${short(champ.playerId)} wins it on ${how}. You cannot make this up.`)
+    else if (margin === 1) out.push(`One point. ${totalHoles} holes, and it comes down to one point.`)
+    else if (margin <= 3) out.push(`${cap(words(margin))} points. A photo finish over ${totalHoles} holes.`)
+    else if (margin >= 10) out.push(`${margin} points clear. That wasn't a tournament, that was a statement.`)
+    else out.push(pick([`${short(champ.playerId)} wins it by ${margin}, and it was never really in doubt.`, `${short(champ.playerId)} wins it by ${margin}. Earned, every point of it.`]))
+  }
+
+  out.push(`Final standings. ${rows.map((r) => `${short(r.playerId)}, ${r.total}`).join('. ')}.`)
+
+  // The money: 1st and 2nd (only when the places are clean), then who took each round.
+  const purse = purseSettingsOf(c.db)
+  if (champs.length === 1 && runnerUp && purse.champFirstCents > 0 && rows.filter((r) => r.position === runnerUp.position).length === 1) {
+    out.push(`${dollars(purse.champFirstCents)} to the champion. ${dollars(purse.champSecondCents)} to ${short(runnerUp.playerId)}${margin <= 2 ? `, who will be thinking about ${margin === 1 ? 'that one point' : 'those points'} until next February` : ''}.`)
+  }
+  const roundWins = new Map<string, string[]>()
+  for (const r of rounds) {
+    if (r.status !== 'final' && r.round_number !== c.roundNumber) continue
+    const detail = buildRoundDetail(r.round_number, c.db)
+    if (!detail) continue
+    const { ids } = resolveRoundWinnerIds(detail)
+    if (ids.length !== 1) continue
+    const course = c.db.courses.find((x) => x.id === r.course_id)
+    roundWins.set(ids[0], [...(roundWins.get(ids[0]) ?? []), course ? courseRef(course.name) : `round ${r.round_number}`])
+  }
+  if (roundWins.size > 0 && rounds.length > 1) {
+    const parts = [...roundWins.entries()].map(([id, cs]) => `${short(id)} took ${listOf(cs)}`)
+    out.push(`Round by round: ${listOf(parts)}${purse.roundWinnerCents > 0 ? `, at ${dollars(purse.roundWinnerCents)} a round` : ''}.`)
+  }
+
+  // The closest-to-the-pin king of the week, paid at the nineteenth hole.
+  const ctp = new Map<string, number>()
+  for (const r of c.db.ctp_results) if (r.player_id) ctp.set(r.player_id, (ctp.get(r.player_id) ?? 0) + 1)
+  const ctpTop = [...ctp.entries()].sort((a, b) => b[1] - a[1])
+  if (ctpTop.length > 0 && (ctpTop.length === 1 || ctpTop[0][1] > ctpTop[1][1])) {
+    const [id, k] = ctpTop[0]
+    const isLast = rows[rows.length - 1].playerId === id
+    out.push(
+      isLast
+        ? `And ${fullName(id)}! Last on the card, but with ${plural(k, 'closest to the pin', 'closest to the pins')}, the closest to the pin king of Streamsong.`
+        : `${fullName(id)} is the closest to the pin king of Streamsong, with ${plural(k, 'closest to the pin', 'closest to the pins')}.`,
+    )
+  }
+  out.push("Somebody's settling up at the nineteenth hole tonight. And then there's the shits. We'll let the nineteenth hole sort that out.")
+
+  out.push(`${cap(plural(rounds.length, 'day'))}. ${cap(plural(rounds.length, 'course'))}. ${totalHoles} holes. Thank you, Streamsong. Thank you, gentlemen.`)
+  out.push(pick(["Same time next year? That's the week. Somebody's buying.", "Same time next year? That's the week, and that's the trip."]))
   return out
 }
 
