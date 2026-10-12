@@ -1,7 +1,9 @@
+import { useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { useFieldStory } from '@/lib/data/selectors'
+import { useRadioPlayer } from '@/hooks/useRadioPlayer'
 import type { StoryEntry } from '@/lib/data/fieldStory'
 import { formatDay } from '@/lib/format'
 
@@ -12,6 +14,7 @@ import { formatDay } from '@/lib/format'
  */
 export default function FieldReport() {
   const vm = useFieldStory()
+  const secretTap = useSecretCall()
 
   if (vm === undefined) {
     return (
@@ -25,7 +28,7 @@ export default function FieldReport() {
   return (
     <Page>
       <BackLink />
-      <div className="mt-4">
+      <div className="mt-4 select-none [touch-action:manipulation]" onClick={secretTap}>
         <PageHeader
           eyebrow="The Wire"
           title="Field Report"
@@ -59,6 +62,24 @@ export default function FieldReport() {
       )}
     </Page>
   )
+}
+
+/**
+ * The radio call's secret trigger (Kyle 2026-10-11, "bust this out without them knowing"): a
+ * triple tap on the page title starts the call; another triple tap stops it. No button, no hint.
+ * iOS only starts speech inside a tap, which the third tap is. Stops when the page unmounts.
+ */
+function useSecretCall() {
+  const player = useRadioPlayer()
+  const taps = useRef<number[]>([])
+  return () => {
+    const now = Date.now()
+    taps.current = [...taps.current.filter((t) => now - t < 700), now]
+    if (taps.current.length < 3) return
+    taps.current = []
+    if (player.playing) player.stop()
+    else player.playNow()
+  }
 }
 
 function StoryRow({ e }: { e: StoryEntry }) {

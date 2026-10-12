@@ -1025,3 +1025,58 @@ Four of the five bugs pinned in the 2026-09-28 review. No schema change.
 - **Home's live buttons are Enter scores + Field report** (Standings is a tab away); the board
   heading is "Standings" / "Final standings" so it fits one line at 375px. The Field Report's back
   link reads "‹ Home" when opened from that button (`state.from = 'home'`), else "‹ Standings".
+
+## Radio call (2026-10-11, branch `radio-call`) — the shape to reuse
+
+A broadcaster's update, read out loud by the phone's built-in voice (Web Speech API). Offline.
+**Secret on purpose** (Kyle: "bust this out without them knowing"): no button — a **triple tap
+on the Field Report's title** starts it, another stops it (`useSecretCall` in `FieldReport.tsx`,
+3 taps inside 700 ms). Don't add a visible button or a hint without Kyle saying so.
+
+- **`src/lib/data/radioCall.ts` `buildRadioCall(db, todayET?) → { phase, script(rand) }`** —
+  pure. Follows the live round; else the next round on its own date (first-tee preview, before
+  Start round); else the last final one. Phase by holes the WHOLE group has finished: `preview`
+  (0) · `early` 1–3 · `front` 4–8 · `turn` 9 · `back` 10–14 · `closing` 15–17 · `final`.
+  Segments: open → recent action (the Field Report's own last two hole lines) → stretch review
+  (front nine at the turn, last nine from the 12th) → color notes (zero runs, no-zero days, hot
+  three holes, net-par runs, fresh real eagles, pick-ups, CTPs won so far; one player each) →
+  round stakes (gap/holes-left bands + the round-winner $) → week stakes (lead changes today,
+  "winning the day but X leads the week", "if it ended now" $) → next hole (yardage off the
+  group's tee, par, stroke-index flavor, who gets a shot, par-3 CTP) → the finish → close.
+  Final: the whole story minus "pars all round" filler, the week, what's next.
+  **Round 1's preview is the trip opener** (`tournamentOpener`): the welcome, the field by FULL
+  name (the only place surnames are said, respelled via `SAY_AS`: only Denove → Den-oh-vee; Kyle says
+  Aronson and Siegel read fine as written), the four days, the whole purse. CTP is paid outside the app (never "pays nothing").
+  `courseRef`: "the Red/Black/Blue" but plain "Bone Valley".
+  **After the last round of the trip, `finalCall` hands off to `tripFinale`**: "in the books",
+  the last round's final hole (from the story), the champion by FULL name (co-champions; a
+  tiebreak win quotes `StandingsVM.tiebreakNote`; one point / photo finish / statement margin
+  bands), final standings, $1st/$2nd (only when places are clean), round-by-round winners via
+  `resolveRoundWinnerIds`, the trip's CTP king (unique top count), the shits at the nineteenth
+  hole, the goodbye. Full names appear only in the round-1 opener and the finale.
+- `script(rand)` picks from line pools, so every tap is a different take; tests pass a fixed rand.
+  Names only, never a pronoun (asserted). "CTP" → "closest to the pin".
+- **Admin has a Play/Stop "Radio call" card** above the tabs (`components/admin/RadioCallCard.tsx`),
+  behind the PIN so it stays secret, shown even offline (it's the phone's voice, not a server
+  write). Its sub-line is `RadioCallVM.label`: "Trip opener, first tee" · "Round 2 · first-tee
+  preview" · "Round 2 · live, through 12" · "Round 2 · the turn" · "Round 2 · round wrap" ·
+  "Trip finale".
+- **Variety without repeats.** Every pool holds ~4–8 takes (first entry = the original wording,
+  which the tests pin with `rand = () => 0`). `compose(rand, avoid)` skips templates in `avoid` and
+  returns the `used` ones; `signature(line)` masks numbers, number words and capitalized words so
+  a template matches whoever it was about. The phone remembers the last 160 used (`radio_recent`).
+- **Replay.** Every call played is logged word for word to `sync_meta['radio_calls']` (last 20,
+  `src/lib/data/callLog.ts`, never throws). Admin's card has an "Earlier calls (N)" list with
+  per-call replay. `useRadioPlayer` (`src/hooks/`) is the one player both triggers use; a token
+  stops a cancelled call's own onend from clearing the call that replaced it.
+- **Trip lore** (`LORE`, matched by surname): a LABEL only, in the round-1 "meet the field" line —
+  "Adam Hersh, inaugural champion", "Jon Aronson / Chris Denove, returning champion". Kyle
+  2026-10-11: "too much emphasis on the champion bit" — no backstory, no week or finale reactions.
+  Don't add more lore lines without asking.
+  Week lines no longer say "leads by 0" when a tiebreak splits a points tie.
+- `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
+  `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
+- `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
+- iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
+  Voices → English → a Premium one (per phone, one time).
+- Tests: `radioCall.test.ts` (16). Full `vitest run --dir src` → **253**.

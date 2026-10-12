@@ -1,0 +1,179 @@
+import { describe, expect, it } from 'vitest'
+import { buildRadioCall, signature } from './radioCall'
+import { logCall, readCallLog, readRecentSignatures, CALL_LOG_MAX } from './callLog'
+import { db as dexie } from '@/lib/db'
+import type { Db } from './compute'
+import { reportDb, ROUND_ONE } from '@/test/reportFixture'
+import { pickVoice } from '@/lib/speech/speak'
+
+const PURSE = { key: 'purse_amounts', value: { round_winner_cents: 5000, champ_first_cents: 60000, champ_second_cents: 20000 } }
+const first = () => 0 // always the first line of every pool
+
+/** The real Round 1, live with the whole group through `thru`. */
+function live(thru: number): Db {
+  const db = reportDb(ROUND_ONE, { status: 'in_progress', ctp: { 6: 2, 8: 2, 14: 2, 16: 1 } })
+  return { ...db, scores: db.scores.filter((s) => s.hole_number <= thru), settings: [PURSE] }
+}
+const call = (db: Db, today = '2027-02-04') => {
+  const vm = buildRadioCall(db, today)!
+  return { phase: vm.phase, lines: vm.script(first) }
+}
+
+describe('buildRadioCall', () => {
+  it('picks its segments by where the round is', () => {
+    expect([0, 2, 6, 9, 12, 16, 18].map((t) => call(live(t)).phase)).toEqual(['preview', 'early', 'front', 'turn', 'back', 'closing', 'final'])
+  })
+
+  it('previews the first tee: who gets shots, a clean slate, the 1st', () => {
+    const { lines } = call(live(0))
+    expect(lines).toContain('Chris gets eight shots and Kyle four, and Jon and Adam play off scratch.')
+    expect(lines.some((l) => /^First up, the 1st: a par 4\./.test(l))).toBe(true)
+    expect(lines).toContain('Kyle and Chris get a shot there.')
+  })
+
+  it('opens the whole trip on the first tee of round 1', () => {
+    const db = live(0)
+    db.settings = [{ key: 'purse_amounts', value: { buy_in_per_player_cents: 25000, champ_first_cents: 60000, champ_second_cents: 20000, round_winner_cents: 5000 } }]
+    const { lines } = call(db)
+    expect(lines[0]).toMatch(/welcome to the Board of Directors/)
+    expect(lines).toContain("Let's meet the field. Jon Aronson, returning champion. Kyle Siegel. Adam Hersh, inaugural champion. Chris Den-oh-vee, returning champion.")
+    expect(lines).toContain("Here's the road ahead: the Red today, the Blue on Friday, the Black on Saturday and Bone Valley on Sunday.")
+    expect(lines).toContain('$1000 on the line. $600 for the champion, $200 for second, and $50 to whoever wins each round. Plus closest to the pin and shits, settled at the nineteenth hole, like gentlemen.')
+    // Round 2's preview is not the trip opener.
+    const r2 = { ...reportDb(ROUND_ONE), settings: [PURSE] }
+    const second = r2.rounds.find((r) => r.round_number === 2)!
+    r2.round_players = [...r2.round_players, ...r2.round_players.map((rp) => ({ ...rp, round_id: second.id }))]
+    expect(call(r2, second.date).lines.join(' ')).not.toMatch(/meet the field/)
+  })
+
+  it('at the turn reviews the front nine and sets up the 10th', () => {
+    const { lines } = call(live(9))
+    expect(lines[0]).toMatch(/^That's the turn on the Red\./)
+    expect(lines).toContain('On the front nine, Chris has been the best player on property, with 25 points.')
+    expect(lines).toContain('Adam brought up the rear with 9.')
+    expect(lines).toContain("At the turn, it's Chris 25, Kyle 15, Jon 11, Adam 9.")
+    expect(lines).toContain('$50 on this round, and Chris has a hand on it.'.replace(/^/, "There's "))
+    expect(lines.some((l) => /^Up next, the 10th/.test(l))).toBe(true)
+  })
+
+  it('down the stretch: the last two holes, the last nine, the finish', () => {
+    const { lines } = call(live(16))
+    expect(lines).toContain("Last time through. On the 15th: Kyle and Chris make net birdies. Chris still leads by 10.")
+    expect(lines.some((l) => l.startsWith('Over the last nine holes'))).toBe(true)
+    expect(lines).toContain('Then the 18th, a par 5, to finish.')
+    // Only CTPs already won count.
+    expect(call(live(2)).lines.join(' ')).not.toMatch(/closest to the pins today/)
+  })
+
+  it('a half-finished hole puts the group on it', () => {
+    const db = live(12)
+    const r1 = reportDb(ROUND_ONE, { status: 'in_progress' })
+    db.scores = [...db.scores, ...r1.scores.filter((s) => s.hole_number === 13 && /^0000000[13]/.test(s.player_id))]
+    const { lines } = call(db)
+    expect(lines).toContain('On the 13th, Kyle and Chris are in. Jon and Adam still to post.')
+    expect(lines.some((l) => l.startsWith('The group is on the 13th'))).toBe(true)
+  })
+
+  it('wraps a final round with the week, the money and what is next', () => {
+    const db = { ...reportDb(ROUND_ONE, { ctp: { 6: 2 } }), settings: [PURSE] }
+    const { phase, lines } = call(db)
+    expect(phase).toBe('final')
+    expect(lines.some((l) => l.endsWith('Final tally: Chris 44, Kyle 36, Jon 31, Adam 27.'))).toBe(true)
+    expect(lines.join(' ')).not.toMatch(/Pars all round/)
+    expect(lines).toContain('If it ended right now, Chris takes home $600 and Kyle $200.')
+    expect(lines).toContain('Next up: the Blue.')
+  })
+
+  it("previews the next round on its morning once it's set up", () => {
+    const db = { ...reportDb(ROUND_ONE), settings: [PURSE] }
+    const r2 = db.rounds.find((r) => r.round_number === 2)!
+    db.round_players = [...db.round_players, ...db.round_players.map((rp) => ({ ...rp, round_id: r2.id }))]
+    expect(call(db, '2027-02-04').phase).toBe('final')
+    const { phase, lines } = call(db, r2.date)
+    expect(phase).toBe('preview')
+    expect(lines.some((l) => /Chris leads Kyle by 8|Chris on top, 8 ahead of Kyle/.test(l))).toBe(true)
+  })
+
+  it('ends the trip after the last round: champion, standings, money, CTP king, the shits', () => {
+    const db = reportDb(ROUND_ONE, { ctp: { 6: 2, 8: 2, 14: 2, 16: 1 } })
+    db.rounds = db.rounds.map((r) => (r.round_number === 1 ? r : { ...r, status: 'abandoned' as const }))
+    db.settings = [PURSE]
+    const { phase, lines } = call(db)
+    expect(phase).toBe('final')
+    expect(lines[0]).toBe("That's it. 18 holes. The Board of Directors, twenty twenty-seven, is in the books.")
+    expect(lines).toContain('Chris Den-oh-vee is your champion!')
+    expect(lines).toContain('Final standings. Chris, 44. Kyle, 36. Jon, 31. Adam, 27.')
+    expect(lines).toContain('$600 to the champion. $200 to Kyle.')
+    expect(lines).toContain('And Adam Hersh! Last on the card, but with three closest to the pins, the closest to the pin king of Streamsong.')
+    expect(lines.join(' ')).toMatch(/And then there's the shits\./)
+    expect(lines.join(' ')).not.toMatch(/Next up/)
+  })
+
+  it('labels what the call covers, for the Admin card', () => {
+    const labels = [0, 9, 12, 18].map((t) => buildRadioCall(live(t), '2027-02-04')!.label)
+    expect(labels).toEqual(['Trip opener, first tee', 'Round 1 · the turn', 'Round 1 · live, through 12', 'Round 1 · round wrap'])
+    const db = reportDb(ROUND_ONE)
+    db.rounds = db.rounds.map((r) => (r.round_number === 1 ? r : { ...r, status: 'abandoned' as const }))
+    expect(buildRadioCall(db, '2027-02-04')!.label).toBe('Trip finale')
+  })
+
+  it('names only, never a pronoun; nothing a voice trips on', () => {
+    const all = [0, 2, 6, 9, 12, 16, 18].flatMap((t) => [0, 0.5, 0.99].flatMap((r) => buildRadioCall(live(t), '2027-02-04')!.script(() => r))).join(' ')
+    expect(all).not.toMatch(/\b(he|his|him|she|her)\b/i)
+    expect(all).not.toMatch(/CTP|–|—|\.\s*\./)
+    // Full names only on the trip's first tee (the field and its history), never mid-round.
+    const midRound = [2, 6, 9, 12, 16, 18].flatMap((t) => buildRadioCall(live(t), '2027-02-04')!.script(() => 0.5)).join(' ')
+    expect(midRound).not.toMatch(/Aronson|Siegel|Hersh|Denove|Den-oh-vee/)
+  })
+})
+
+describe('variety', () => {
+  it('a template keeps its signature whoever and whatever it is about', () => {
+    expect(signature("Chris has taken zeros on three straight holes. Thoughts and prayers.")).toBe(
+      signature("Adam has taken zeros on two straight holes. Thoughts and prayers."),
+    )
+    expect(signature('Chris leads by 3.')).not.toBe(signature('Chris is 3 clear.'))
+  })
+
+  it('steers clear of the lines it used last time', () => {
+    const vm = buildRadioCall(live(12), '2027-02-04')!
+    const a = vm.compose(() => 0)
+    const b = vm.compose(() => 0, new Set(a.used))
+    expect(a.used.length).toBeGreaterThan(5)
+    // Every pooled line of the second take is a different template from the first.
+    const repeated = b.used.filter((sig) => a.used.includes(sig))
+    expect(repeated).toEqual([])
+    // Same facts, though.
+    expect(b.lines.join(' ')).toMatch(/Chris/)
+  })
+
+  it('labels the champions when the field is introduced, and nowhere else', () => {
+    const lines = buildRadioCall(live(0), '2027-02-04')!.script(() => 0)
+    expect(lines).toContain("Let's meet the field. Jon Aronson, returning champion. Kyle Siegel. Adam Hersh, inaugural champion. Chris Den-oh-vee, returning champion.")
+    const db = reportDb(ROUND_ONE)
+    db.rounds = db.rounds.map((r) => (r.round_number === 1 ? r : { ...r, status: 'abandoned' as const }))
+    const finale = buildRadioCall(db, '2027-02-04')!.script(() => 0).join(' ')
+    expect(finale).not.toMatch(/returning|inaugural|defend|crown/)
+  })
+})
+
+describe('callLog', () => {
+  it('keeps the last calls, newest first, and remembers the templates used', async () => {
+    await dexie.sync_meta.clear()
+    for (let i = 0; i < CALL_LOG_MAX + 3; i++) await logCall({ at: `2027-02-04T18:${String(i).padStart(2, '0')}:00Z`, label: `Call ${i}`, lines: [`Line ${i}`] }, [`sig-${i}`])
+    const log = await readCallLog()
+    expect(log).toHaveLength(CALL_LOG_MAX)
+    expect(log[0].label).toBe(`Call ${CALL_LOG_MAX + 2}`)
+    expect((await readRecentSignatures())[0]).toBe(`sig-${CALL_LOG_MAX + 2}`)
+  })
+})
+
+describe('pickVoice', () => {
+  const v = (name: string, lang = 'en-US', localService = true) => ({ name, lang, localService }) as SpeechSynthesisVoice
+  it('prefers Premium, then Enhanced, and never a novelty voice', () => {
+    expect(pickVoice([v('Samantha'), v('Zoe (Premium)'), v('Evan (Enhanced)')])!.name).toBe('Zoe (Premium)')
+    expect(pickVoice([v('Samantha'), v('Evan (Enhanced)')])!.name).toBe('Evan (Enhanced)')
+    expect(pickVoice([v('Zarvox'), v('Daniel', 'en-GB')])!.name).toBe('Daniel')
+    expect(pickVoice([v('Thomas', 'fr-FR')])).toBeNull()
+  })
+})
