@@ -1067,14 +1067,17 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   `src/lib/data/callLog.ts`, never throws). Admin's card has an "Earlier calls (N)" list with
   per-call replay. `useRadioPlayer` (`src/hooks/`) is the one player both triggers use; a token
   stops a cancelled call's own onend from clearing the call that replaced it.
-- **Trip lore** (`LORE`, matched by surname): Adam Hersh is the defending champion (opener line;
-  week lines when defending well or last; finale "defends the title" / "hands over the crown").
-  Jon and Chris tied for second last time because Kyle kept score: the opener says so, level week
-  lines say "this is why we have a tiebreaker", the finale calls out a repeat tie.
+- **Trip lore** (`LORE`, matched by surname; corrected by Kyle 2026-10-11): Adam Hersh won the
+  **inaugural** BOD. Jon Aronson and Chris Denove are the **defending co-champions**: they tied last
+  time because Kyle kept score and nobody caught the mistake, hence the tiebreaker. Kyle has never
+  won or finished better than third. The opener introduces all three facts; week lines react when
+  a co-champion / the inaugural champ / Kyle leads, the co-champions are one-two, or a co-champion
+  is last; the finale says "defends the title… nobody has to share it" / "wins it again" / "Kyle's
+  first title", the co-champions "hand over the crown" otherwise, and a repeat co-champion tie.
   Week lines no longer say "leads by 0" when a tiebreak splits a points tie.
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (16). Full `vitest run --dir src` → **253**.
+- Tests: `radioCall.test.ts` (17). Full `vitest run --dir src` → **254**.

@@ -121,8 +121,9 @@ describe('buildRadioCall', () => {
     const all = [0, 2, 6, 9, 12, 16, 18].flatMap((t) => [0, 0.5, 0.99].flatMap((r) => buildRadioCall(live(t), '2027-02-04')!.script(() => r))).join(' ')
     expect(all).not.toMatch(/\b(he|his|him|she|her)\b/i)
     expect(all).not.toMatch(/CTP|–|—|\.\s*\./)
-    // Full names only where the field is introduced, respelled for the voice.
-    expect(all.replace(/Let's meet the field\.[^]*?Chris Den-oh-vee\./g, '').replace(/Adam Hersh, your defending champion\./g, '')).not.toMatch(/Aronson|Air-un-sun|Siegel|See-gul|Hersh|Denove|Den-oh-vee/)
+    // Full names only on the trip's first tee (the field and its history), never mid-round.
+    const midRound = [2, 6, 9, 12, 16, 18].flatMap((t) => buildRadioCall(live(t), '2027-02-04')!.script(() => 0.5)).join(' ')
+    expect(midRound).not.toMatch(/Aronson|Siegel|Hersh|Denove|Den-oh-vee/)
   })
 })
 
@@ -148,8 +149,20 @@ describe('variety', () => {
 
   it('tells the history on the first tee', () => {
     const lines = buildRadioCall(live(0), '2027-02-04')!.script(() => 0)
-    expect(lines).toContain('Adam Hersh, your defending champion.')
-    expect(lines.some((l) => /Jon and Chris tied for second, because Kyle kept the scores/.test(l))).toBe(true)
+    expect(lines).toContain(
+      "Jon Aronson and Chris Den-oh-vee, your defending co-champions. They shared the title last time, because Kyle kept the scores and nobody caught the mistake until it was over. This year, there's a tiebreaker. And an app.",
+    )
+    expect(lines).toContain('Adam Hersh, our inaugural champion, wants the crown back.')
+    expect(lines).toContain('And Kyle Siegel, still looking for a first title. Best finish so far: third.')
+  })
+
+  it('hands over the crown, or defends it, in the finale', () => {
+    const db = reportDb(ROUND_ONE)
+    db.rounds = db.rounds.map((r) => (r.round_number === 1 ? r : { ...r, status: 'abandoned' as const }))
+    // Chris (a defending co-champion) wins the fixture's only round.
+    const lines = buildRadioCall(db, '2027-02-04')!.script(() => 0)
+    expect(lines).toContain('Chris defends the title! And this time, nobody has to share it.')
+    expect(lines.join(' ')).not.toMatch(/hand over the crown/)
   })
 })
 
