@@ -36,7 +36,7 @@ describe('buildRadioCall', () => {
     db.settings = [{ key: 'purse_amounts', value: { buy_in_per_player_cents: 25000, champ_first_cents: 60000, champ_second_cents: 20000, round_winner_cents: 5000 } }]
     const { lines } = call(db)
     expect(lines[0]).toMatch(/welcome to the Board of Directors/)
-    expect(lines).toContain("Let's meet the field. Jon Aronson. Kyle Siegel. Adam Hersh. Chris Den-oh-vee.")
+    expect(lines).toContain("Let's meet the field. Jon Aronson, returning champion. Kyle Siegel. Adam Hersh, inaugural champion. Chris Den-oh-vee, returning champion.")
     expect(lines).toContain("Here's the road ahead: the Red today, the Blue on Friday, the Black on Saturday and Bone Valley on Sunday.")
     expect(lines).toContain('$1000 on the line. $600 for the champion, $200 for second, and $50 to whoever wins each round. Plus closest to the pin and shits, settled at the nineteenth hole, like gentlemen.')
     // Round 2's preview is not the trip opener.
@@ -147,22 +147,13 @@ describe('variety', () => {
     expect(b.lines.join(' ')).toMatch(/Chris/)
   })
 
-  it('tells the history on the first tee', () => {
+  it('labels the champions when the field is introduced, and nowhere else', () => {
     const lines = buildRadioCall(live(0), '2027-02-04')!.script(() => 0)
-    expect(lines).toContain(
-      "Jon Aronson and Chris Den-oh-vee, your defending co-champions. They shared the title last time, because Kyle kept the scores and nobody caught the mistake until it was over. This year, there's a tiebreaker. And an app.",
-    )
-    expect(lines).toContain('Adam Hersh, our inaugural champion, wants the crown back.')
-    expect(lines).toContain('And Kyle Siegel, still looking for a first title. Best finish so far: third.')
-  })
-
-  it('hands over the crown, or defends it, in the finale', () => {
+    expect(lines).toContain("Let's meet the field. Jon Aronson, returning champion. Kyle Siegel. Adam Hersh, inaugural champion. Chris Den-oh-vee, returning champion.")
     const db = reportDb(ROUND_ONE)
     db.rounds = db.rounds.map((r) => (r.round_number === 1 ? r : { ...r, status: 'abandoned' as const }))
-    // Chris (a defending co-champion) wins the fixture's only round.
-    const lines = buildRadioCall(db, '2027-02-04')!.script(() => 0)
-    expect(lines).toContain('Chris defends the title! And this time, nobody has to share it.')
-    expect(lines.join(' ')).not.toMatch(/hand over the crown/)
+    const finale = buildRadioCall(db, '2027-02-04')!.script(() => 0).join(' ')
+    expect(finale).not.toMatch(/returning|inaugural|defend|crown/)
   })
 })
 

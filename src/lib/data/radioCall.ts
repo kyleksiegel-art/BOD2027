@@ -43,14 +43,12 @@ export interface RadioCallVM {
 type Hr = PlayerRoundVM['holeResults'][number]
 
 /**
- * Trip lore (Kyle 2026-10-11). Adam Hersh won the inaugural Board of Directors. Jon Aronson and
- * Chris Denove are the defending co-champions: they tied last time because Kyle kept the scores
- * and nobody caught the mistake until it was over, which is why this year has a tiebreaker. Kyle
- * has never won, and has never finished better than third. Matched by surname.
+ * Trip lore (Kyle 2026-10-11): one label each when the field is introduced, nothing more ("too
+ * much emphasis on the champion bit"). Adam Hersh won the inaugural Board of Directors; Jon
+ * Aronson and Chris Denove are the returning champions. Matched by surname.
  */
-const LORE = { inaugural: 'Hersh', coChampions: ['Aronson', 'Denove'], scorekeeper: 'Siegel', scorekeeperBest: 'third' }
+const LORE = { inaugural: 'Hersh', returning: ['Aronson', 'Denove'] }
 const surname = (name: string) => name.trim().split(/\s+/).slice(-1)[0] ?? ''
-const loreIds = (db: Db, surnames: string[]) => db.players.filter((p) => surnames.includes(surname(p.name)))
 
 interface Pl {
   id: string
@@ -666,7 +664,7 @@ function weekStakes(c: Ctx, pick: Pick, finished: boolean): string[] {
   const oldLeader = hadRounds && before[0].t > before[1].t ? before[0].r : null
 
   if (!lead || a.total === b.total) {
-    // Level on points: the tiebreaker exists because of last time (see LORE).
+    // Level on points: say who the tiebreaker favours.
     const how = lead ? st.tiebreakNote?.match(/leads on (.*)\.$/)?.[1] : null
     lines.push(
       how
@@ -675,7 +673,6 @@ function weekStakes(c: Ctx, pick: Pick, finished: boolean): string[] {
     )
     lines.push(
       pick([
-        'Level on points. Last time that happened, Kyle was keeping score and two people got the trophy. This time there\'s a tiebreaker.',
         'This is why we have a tiebreaker now.',
         'Somebody tell Kyle to check the math. Actually, the app has it.',
       ]),
@@ -701,28 +698,6 @@ function weekStakes(c: Ctx, pick: Pick, finished: boolean): string[] {
       )
     }
   }
-  // The history (LORE): who's on top and who's at the bottom, against what they've won before.
-  if (lead && !finished && c.roundNumber > 1) {
-    const co = loreIds(c.db, LORE.coChampions)
-    const [inaugural] = loreIds(c.db, [LORE.inaugural])
-    const [keeper] = loreIds(c.db, [LORE.scorekeeper])
-    const bottom = st.rows[st.rows.length - 1]
-    const lastAlone = st.rows.filter((r) => r.position === bottom.position).length === 1
-    if (co.length === 2 && co.every((p) => p.id === a.playerId || p.id === b.playerId)) {
-      lines.push(pick([`The defending co-champions, one and two again. Some things never change.`, `${first(co[0].name)} and ${first(co[1].name)}, top two again. Last time they couldn't be separated. This time somebody has to blink.`]))
-    } else if (co.some((p) => p.id === a.playerId)) {
-      const d = co.find((p) => p.id === a.playerId)!
-      lines.push(pick([`A defending co-champion on top. ${first(d.name)} looks right at home up there.`, `${first(d.name)} shared the title last time, and would like the whole thing this time.`]))
-    } else if (inaugural && inaugural.id === a.playerId) {
-      lines.push(pick([`The inaugural champion wants the crown back. ${first(inaugural.name)} leads.`, `${first(inaugural.name)} won the first one of these, and is playing like it.`]))
-    } else if (keeper && keeper.id === a.playerId) {
-      lines.push(pick([`Reminder: ${first(keeper.name)} has never finished better than ${LORE.scorekeeperBest}. ${first(keeper.name)} is currently first. Nobody panic.`, `${first(keeper.name)} is leading a Board of Directors. Uncharted territory.`]))
-    } else if (lastAlone && co.some((p) => p.id === bottom.playerId)) {
-      const d = co.find((p) => p.id === bottom.playerId)!
-      lines.push(pick([`As for the defending co-champions, ${first(d.name)} is dead last. Not the title defense anybody pictured.`, `${first(d.name)}, a defending co-champion, is bringing up the rear. Heavy is the head.`]))
-    }
-  }
-
   const purse = purseSettingsOf(c.db)
   const third = st.rows[2]
   if (lead && purse.champFirstCents > 0 && (after === 0 || finished) && (!third || third.position !== b.position)) {
@@ -833,23 +808,9 @@ function tournamentOpener(c: Ctx, pick: Pick, daypart: string): string[] | null 
     .filter((p): p is NonNullable<typeof p> => !!p)
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((p) => p.name)
-  if (field.length > 0) out.push(`Let's meet the field. ${field.map((n) => `${n}.`).join(' ')}`)
-  // The history (LORE): the inaugural champion, the co-champions, and the scorekeeper.
-  const [inaugural] = loreIds(c.db, [LORE.inaugural])
-  const co = loreIds(c.db, LORE.coChampions)
-  const [keeper] = loreIds(c.db, [LORE.scorekeeper])
-  if (co.length === 2) {
-    out.push(
-      keeper
-        ? pick([
-            `${co[0].name} and ${co[1].name}, your defending co-champions. They shared the title last time, because ${first(keeper.name)} kept the scores and nobody caught the mistake until it was over. This year, there's a tiebreaker. And an app.`,
-            `${co[0].name} and ${co[1].name} come in as defending co-champions, thanks to ${first(keeper.name)}'s scorekeeping. This year, there's a tiebreaker.`,
-          ])
-        : `${co[0].name} and ${co[1].name}, your defending co-champions.`,
-    )
-  }
-  if (inaugural) out.push(`${inaugural.name}, our inaugural champion, wants the crown back.`)
-  if (keeper) out.push(pick([`And ${keeper.name}, still looking for a first title. Best finish so far: ${LORE.scorekeeperBest}.`, `And ${keeper.name}, who has never finished better than ${LORE.scorekeeperBest}. There's a first time for everything.`]))
+  const tag = (name: string) =>
+    surname(name) === LORE.inaugural ? `${name}, inaugural champion.` : LORE.returning.includes(surname(name)) ? `${name}, returning champion.` : `${name}.`
+  if (field.length > 0) out.push(`Let's meet the field. ${field.map(tag).join(' ')}`)
 
   const weekday = (iso: string) => new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`))
   const stops = rounds.map((r, i) => {
@@ -998,15 +959,6 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
   } else {
     const champ = champs[0]
     out.push(pick([`${fullName(champ.playerId)} is your champion!`, `Your champion of the Board of Directors… ${fullName(champ.playerId)}!`, `Ladies and gentlemen, your champion: ${fullName(champ.playerId)}!`]))
-    // The title, defended or handed over (LORE).
-    const co = loreIds(c.db, LORE.coChampions)
-    const [inaugural] = loreIds(c.db, [LORE.inaugural])
-    const [keeper] = loreIds(c.db, [LORE.scorekeeper])
-    const defender = co.find((p) => p.id === champ.playerId)
-    if (defender) out.push(`${first(defender.name)} defends the title! And this time, nobody has to share it.`)
-    else if (inaugural && inaugural.id === champ.playerId) out.push(`${first(inaugural.name)} wins it again! A second title for the inaugural champion!`)
-    else if (keeper && keeper.id === champ.playerId) out.push(`${first(keeper.name)}'s first title! After never finishing better than ${LORE.scorekeeperBest}! The scorekeeper finally keeps the trophy!`)
-    if (!defender && co.length === 2) out.push(`The defending co-champions, ${first(co[0].name)} and ${first(co[1].name)}, hand over the crown.`)
     const how = st.tiebreakNote?.match(/leads on (.*)\.$/)?.[1]
     if (margin === 0 && how) out.push(`Level on points with ${short(runnerUp!.playerId)}, and ${short(champ.playerId)} wins it on ${how}. You cannot make this up.`)
     else if (margin === 1) out.push(`One point. ${totalHoles} holes, and it comes down to one point.`)
@@ -1016,16 +968,6 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
   }
 
   out.push(`Final standings. ${rows.map((r) => `${short(r.playerId)}, ${r.total}`).join('. ')}.`)
-  // Last time's co-champions, level again (LORE).
-  const [t1, t2] = LORE.coChampions.map((sn) => rows.find((r) => surname(fullName(r.playerId)) === sn))
-  if (t1 && t2 && t1.total === t2.total) {
-    out.push(
-      t1.position === t2.position
-        ? `And ${short(t1.playerId)} and ${short(t2.playerId)} are level again, just like last time. Even the tiebreaker couldn't split them. Kyle, this one isn't on you.`
-        : `And ${short(t1.playerId)} and ${short(t2.playerId)} finished level on points. Again. This time, the tiebreaker settles it.`,
-    )
-  }
-
   // The money: 1st and 2nd (only when the places are clean), then who took each round.
   const purse = purseSettingsOf(c.db)
   if (champs.length === 1 && runnerUp && purse.champFirstCents > 0 && rows.filter((r) => r.position === runnerUp.position).length === 1) {
