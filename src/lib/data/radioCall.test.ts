@@ -34,7 +34,7 @@ describe('buildRadioCall', () => {
     db.settings = [{ key: 'purse_amounts', value: { buy_in_per_player_cents: 25000, champ_first_cents: 60000, champ_second_cents: 20000, round_winner_cents: 5000 } }]
     const { lines } = call(db)
     expect(lines[0]).toMatch(/welcome to the Board of Directors/)
-    expect(lines).toContain("Let's meet the field. Jon Air-un-sun. Kyle See-gul. Adam Hersh. Chris Den-oh-vee.")
+    expect(lines).toContain("Let's meet the field. Jon Aronson. Kyle Siegel. Adam Hersh. Chris Den-oh-vee.")
     expect(lines).toContain("Here's the road ahead: the Red today, the Blue on Friday, the Black on Saturday and Bone Valley on Sunday.")
     expect(lines).toContain('$1000 on the line. $600 for the champion, $200 for second, and $50 to whoever wins each round. Plus closest to the pin and shits, settled at the nineteenth hole, like gentlemen.')
     // Round 2's preview is not the trip opener.

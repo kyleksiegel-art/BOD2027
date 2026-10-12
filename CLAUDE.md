@@ -1043,8 +1043,8 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   group's tee, par, stroke-index flavor, who gets a shot, par-3 CTP) → the finish → close.
   Final: the whole story minus "pars all round" filler, the week, what's next.
   **Round 1's preview is the trip opener** (`tournamentOpener`): the welcome, the field by FULL
-  name (the only place surnames are said, respelled via `SAY_AS`: Den-oh-vee, See-gul,
-  Air-un-sun), the four days, the whole purse. CTP is paid outside the app (never "pays nothing").
+  name (the only place surnames are said, respelled via `SAY_AS`: only Denove → Den-oh-vee; Kyle says
+  Aronson and Siegel read fine as written), the four days, the whole purse. CTP is paid outside the app (never "pays nothing").
   `courseRef`: "the Red/Black/Blue" but plain "Bone Valley".
 - `script(rand)` picks from line pools, so every tap is a different take; tests pass a fixed rand.
   Names only, never a pronoun (asserted). "CTP" → "closest to the pin".
