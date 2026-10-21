@@ -135,10 +135,10 @@ export const COURSE_EDITORIAL: Record<CourseSlug, CourseEditorial> = {
     // Bone Valley (David McLay Kidd) — hole detail not yet public, so no verified holes and
     // the page shows the "under wraps" note rather than guessed content.
     // Hero: public/assets/courses/bone/hero.jpg — Evan Schiller's Oct 2026 Instagram set
-    // (supplied by Kyle), cropped landscape from a 1080px portrait. The source tops out at
-    // 1080w, so hero-1600.* are copies of hero-1080.* to keep the shared srcset from 404ing.
+    // (supplied by Kyle), photo #10 (green, dune and ponds), cropped landscape from a 1080px
+    // portrait. The source tops out at 1080w, so hero-1600.* are copies of hero-1080.* to keep the shared srcset from 404ing.
     heroImage: 'bone',
-    heroAlt: 'Bone Valley — fairway, bunkers and sand dunes at golden hour',
+    heroAlt: 'Bone Valley — a green below a grassy dune, with ponds and dunes beyond',
     tagline: '',
     holesToKnow: [],
   },
