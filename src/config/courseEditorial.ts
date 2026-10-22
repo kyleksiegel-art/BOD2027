@@ -132,11 +132,14 @@ export const COURSE_EDITORIAL: Record<CourseSlug, CourseEditorial> = {
     ],
   },
   bone: {
-    // Bone Valley (David McLay Kidd) — scorecard + hole detail not yet public. No hero photo
-    // and no verified holes, so the page shows the accent-plate hero and the "under wraps"
-    // note rather than guessed content. Fill in once the official course guide is published.
-    heroImage: undefined,
-    heroAlt: 'Bone Valley — David McLay Kidd',
+    // Bone Valley (David McLay Kidd) — hole detail not yet public, so no verified holes and
+    // the page shows the "under wraps" note rather than guessed content.
+    // Hero: public/assets/courses/bone/hero.jpg — "16.jpg" (Brandon Petersen) from Streamsong's
+    // official Bone Valley media kit (streamsong.imagerelay.com, linked from the KemperSports
+    // announcement), resized from the 2400px viewer copy to 1600w. Picked by Kyle 2026-10-22
+    // over the Instagram shots, whose subjects ended up under the title on a phone.
+    heroImage: 'bone',
+    heroAlt: 'Bone Valley — a green framed by sand dunes, with the clubhouse on the ridge',
     tagline: '',
     holesToKnow: [],
   },

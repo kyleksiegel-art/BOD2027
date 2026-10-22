@@ -132,15 +132,15 @@ function CourseHero({
 function QuickFacts({ items }: { items: { label: string; value: string }[] }) {
   if (items.length === 0) return null
   return (
-    <div className="mt-6 flex flex-wrap gap-y-3 border-y border-hair py-3.5">
-      {items.map((f, i) => (
+    // Phones: three even columns, wrapping; each row's first cell drops the divider and indent
+    // so a wrapped row lines up under the first. sm+: one even row.
+    <div className="mt-6 grid grid-cols-3 gap-y-3 border-y border-hair py-3.5 sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none">
+      {items.map((f) => (
         <div
           key={f.label}
-          className={`flex min-w-[33%] flex-col px-3.5 sm:min-w-0 sm:flex-1 ${
-            i === 0 ? 'pl-0' : 'border-l border-hair'
-          }`}
+          className="flex min-w-0 flex-col border-l border-hair px-3 [&:nth-child(3n+1)]:border-l-0 [&:nth-child(3n+1)]:pl-0 [&:nth-child(3n)]:pr-0 sm:[&:nth-child(3n)]:pr-3 sm:[&:nth-child(3n+1)]:border-l sm:[&:nth-child(3n+1)]:pl-3 sm:first:!border-l-0 sm:first:!pl-0"
         >
-          <span className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
+          <span className="whitespace-nowrap text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-paper-faint">
             {f.label}
           </span>
           <span className="fx-serif-sm tnum mt-0.5 font-display text-[1.1rem] text-paper">
