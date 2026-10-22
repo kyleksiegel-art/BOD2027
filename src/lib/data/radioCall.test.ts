@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildRadioCall, signature } from './radioCall'
-import { logCall, readCallLog, readRecentSignatures, CALL_LOG_MAX } from './callLog'
+import { logCall, readCallLog, readRecentSignatures, removeLoggedCall, restoreLoggedCall, CALL_LOG_MAX } from './callLog'
 import { db as dexie } from '@/lib/db'
 import type { Db } from './compute'
 import { reportDb, ROUND_ONE } from '@/test/reportFixture'
@@ -165,6 +165,24 @@ describe('callLog', () => {
     expect(log).toHaveLength(CALL_LOG_MAX)
     expect(log[0].label).toBe(`Call ${CALL_LOG_MAX + 2}`)
     expect((await readRecentSignatures())[0]).toBe(`sig-${CALL_LOG_MAX + 2}`)
+  })
+
+  it('removes one call and leaves its templates on the recent list', async () => {
+    await dexie.sync_meta.clear()
+    await logCall({ at: '2027-02-04T18:00:00Z', label: 'Keep', lines: ['a'] }, ['sig-keep'])
+    await logCall({ at: '2027-02-04T18:05:00Z', label: 'Misfire', lines: ['b'] }, ['sig-misfire'])
+    await removeLoggedCall('2027-02-04T18:05:00Z')
+    expect((await readCallLog()).map((c) => c.label)).toEqual(['Keep'])
+    expect(await readRecentSignatures()).toContain('sig-misfire')
+  })
+
+  it('restores a removed call to its place', async () => {
+    await dexie.sync_meta.clear()
+    for (const m of ['00', '05', '10']) await logCall({ at: `2027-02-04T18:${m}:00Z`, label: m, lines: [m] }, [])
+    const [, middle] = await readCallLog()
+    await removeLoggedCall(middle.at)
+    await restoreLoggedCall(middle)
+    expect((await readCallLog()).map((c) => c.label)).toEqual(['10', '05', '00'])
   })
 })
 

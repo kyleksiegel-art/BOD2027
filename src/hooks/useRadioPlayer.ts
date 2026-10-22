@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRadioCall, useRadioMemory } from '@/lib/data/selectors'
-import { logCall, type LoggedCall } from '@/lib/data/callLog'
+import { logCall, removeLoggedCall, restoreLoggedCall, type LoggedCall } from '@/lib/data/callLog'
 import { speakLines, speechAvailable, stopSpeaking } from '@/lib/speech/speak'
 
 /**
@@ -13,6 +13,7 @@ export function useRadioPlayer() {
   const call = useRadioCall()
   const memory = useRadioMemory()
   const [playing, setPlaying] = useState<string | null>(null) // 'now', or the `at` of a replay
+  const [removed, setRemoved] = useState<LoggedCall | null>(null) // the last delete, for Undo
   const token = useRef(0)
   useEffect(() => stopSpeaking, [])
 
@@ -23,6 +24,12 @@ export function useRadioPlayer() {
     speakLines(lines, () => {
       if (token.current === mine) setPlaying(null)
     })
+  }
+
+  const stop = () => {
+    token.current++
+    stopSpeaking()
+    setPlaying(null)
   }
 
   return {
@@ -40,10 +47,17 @@ export function useRadioPlayer() {
       if (!speechAvailable()) return
       speak(c.at, c.lines)
     },
-    stop() {
-      token.current++
-      stopSpeaking()
-      setPlaying(null)
+    stop,
+    removed,
+    remove(c: LoggedCall) {
+      if (playing === c.at) stop()
+      setRemoved(c)
+      void removeLoggedCall(c.at)
+    },
+    undoRemove() {
+      if (!removed) return
+      setRemoved(null)
+      void restoreLoggedCall(removed)
     },
   }
 }
