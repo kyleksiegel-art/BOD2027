@@ -16,8 +16,8 @@
 // COPY: hole-level facts are verified against reliable sources before being written here
 // (Streamsong official course material, architect/course descriptions, reputable golf
 // publications). Do not invent strategy or course features. For a course whose hole data
-// is not yet public (Bone Valley), holesToKnow is left empty and the page shows a tasteful
-// "still under wraps" note instead of guessed content.
+// is not yet public, leave holesToKnow empty and the page shows a tasteful "still under
+// wraps" note instead of guessed content.
 
 export type CourseSlug = 'red' | 'black' | 'blue' | 'bone'
 
@@ -132,15 +132,38 @@ export const COURSE_EDITORIAL: Record<CourseSlug, CourseEditorial> = {
     ],
   },
   bone: {
-    // Bone Valley (David McLay Kidd) — hole detail not yet public, so no verified holes and
-    // the page shows the "under wraps" note rather than guessed content.
+    // Bone Valley (David McLay Kidd). Holes verified 2026-10-22 against preview-round and
+    // design coverage: 1st — Forbes/Erik Matuszewski (via Yahoo) + GolfLink; 14th — Golfweek
+    // Forecaddie (via Yahoo, Kidd quoted) + travelinggolfer.tv; 17th — Golf Course
+    // Architecture issue 84. Tagline: Forbes (smallest greens, Kidd on attacking vs defensive
+    // golf) + GolfLink ("smaller, flatter greens", kicker slopes and backstops).
     // Hero: public/assets/courses/bone/hero.jpg — "16.jpg" (Brandon Petersen) from Streamsong's
     // official Bone Valley media kit (streamsong.imagerelay.com, linked from the KemperSports
     // announcement), resized from the 2400px viewer copy to 1600w. Picked by Kyle 2026-10-22
     // over the Instagram shots, whose subjects ended up under the title on a phone.
     heroImage: 'bone',
     heroAlt: 'Bone Valley — a green framed by sand dunes, with the clubhouse on the ridge',
-    tagline: '',
-    holesToKnow: [],
+    tagline:
+      'Generous fairways, but the smallest, flattest greens at Streamsong — where the other three reward defense, Kidd wants you attacking, using kicker slopes and backstops to feed the ball in.',
+    holesToKnow: [
+      {
+        hole: 1,
+        title: 'Aim at the windmill.',
+        description:
+          "A testing opener: tall sand dunes line the right side, and bailing out there can leave a blind approach. A pond fronts the green, with Streamsong's windmill behind it as the backdrop and your aiming point.",
+      },
+      {
+        hole: 14,
+        title: 'Through the ridgeline.',
+        description:
+          'A reachable par 5 played through a giant ridgeline Kidd cut a hole through, into a soft green. His own comparison is Lahinch or Ballybunion — the clearest taste of the course’s Irish-links feel.',
+      },
+      {
+        hole: 17,
+        title: 'Come in from the right.',
+        description:
+          'A sandy waste area runs down the left into big dunes by the green, and three fairway bunkers sit where longer hitters land. Approach from the right to stay clear of a menacing bunker left of the green, and let the ground game run it on.',
+      },
+    ],
   },
 }
