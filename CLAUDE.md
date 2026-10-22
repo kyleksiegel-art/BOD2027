@@ -1069,6 +1069,13 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   `src/lib/data/callLog.ts`, never throws). Admin's card has an "Earlier calls (N)" list with
   per-call replay. `useRadioPlayer` (`src/hooks/`) is the one player both triggers use; a token
   stops a cancelled call's own onend from clearing the call that replaced it.
+  **Swipe a row left to delete it** (Kyle 2026-10-22, for misfires): a short swipe opens a Delete
+  button, past half the row deletes outright (`SwipeToDelete` in `RadioCallCard.tsx`,
+  `removeLoggedCall`). Its templates stay on `radio_recent`, so a deleted take doesn't come back.
+  **Undo**: the last delete shows a "Deleted … · Undo" bar under the Earlier calls toggle until the
+  next delete or leaving Admin (`useRadioPlayer().removed` / `undoRemove`, `restoreLoggedCall`
+  puts it back in time order). The section stays up while there's an Undo, even with 0 calls left.
+  The offset lives in a ref too: a fast flick's release lands before the last move's render.
 - **Trip lore** (`LORE`, matched by surname): a LABEL only, in the round-1 "meet the field" line —
   "Adam Hersh, inaugural champion", "Jon Aronson / Chris Denove, returning champion". Kyle
   2026-10-11: "too much emphasis on the champion bit" — no backstory, no week or finale reactions.

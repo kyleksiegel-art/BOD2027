@@ -53,3 +53,27 @@ export async function logCall(call: LoggedCall, used: string[]): Promise<void> {
     // Best effort: the call already played.
   }
 }
+
+/**
+ * Drop one call from the replay list (Admin's swipe-to-remove). Its templates stay on the recent
+ * list, so a take Kyle didn't like still won't come straight back.
+ */
+export async function removeLoggedCall(at: string): Promise<void> {
+  try {
+    const log = await readCallLog()
+    await db.sync_meta.put({ key: CALL_LOG_KEY, value: log.filter((c) => c.at !== at) })
+  } catch {
+    // Best effort.
+  }
+}
+
+/** Put a removed call back where it was (Undo). The log stays newest first and capped. */
+export async function restoreLoggedCall(call: LoggedCall): Promise<void> {
+  try {
+    const log = (await readCallLog()).filter((c) => c.at !== call.at)
+    const next = [...log, call].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+    await db.sync_meta.put({ key: CALL_LOG_KEY, value: next.slice(0, CALL_LOG_MAX) })
+  } catch {
+    // Best effort.
+  }
+}
