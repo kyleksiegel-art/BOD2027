@@ -466,8 +466,13 @@ export default function Enter() {
           ) : null}
 
           {/* Save. Nothing reaches the database without this tap — which is also what keeps
-              a defaulted par from being recorded just by paging past a hole. */}
-          <div className="mt-5">
+              a defaulted par from being recorded just by paging past a hole. Pinned just above
+              the tab bar while it would otherwise be below the fold (four rows plus the CTP
+              picker don't fit most phones), then rests in place once scrolled to. */}
+          <div
+            className="sticky z-10 -mx-5 mt-5 border-t border-hair bg-ground/95 px-5 pt-3 pb-1 backdrop-blur-sm"
+            style={{ bottom: 'var(--tabbar-h, 0px)' }}
+          >
             <button
               type="button"
               disabled={!dirty || !allEntered || write.status === 'saving'}

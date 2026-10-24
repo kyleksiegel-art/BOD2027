@@ -1,10 +1,26 @@
+import { useLayoutEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { TABS } from '@/config/nav'
 
 /** Persistent bottom tab bar — the primary navigation for one-handed cart use. */
 export function BottomTabBar() {
+  // Publish the bar's height (safe-area padding included) as --tabbar-h, so anything pinned
+  // to the bottom of a page — Enter's Save bar — sits just above it instead of under it.
+  const ref = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const root = document.documentElement
+    const publish = () => root.style.setProperty('--tabbar-h', `${el.offsetHeight}px`)
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   return (
     <nav
+      ref={ref}
       className="sticky bottom-0 z-20 border-t border-hair bg-ground/95 backdrop-blur-sm"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Primary"
