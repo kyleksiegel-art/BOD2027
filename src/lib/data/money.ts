@@ -16,6 +16,7 @@ import {
   buildRoundDetail,
   buildStandings,
   resolveRoundWinnerIds,
+  roundScoresIn,
   type Db,
   type RoundDetailVM,
   type StandingsVM,
@@ -67,6 +68,8 @@ export interface RoundMoneyVM {
   roundPurseCents: number // this round's winner payout (0 if abandoned)
   roundWinner: WinnerVM | null // resolved winner(s), or null if not yet decided
   frozen: boolean // the round is final — the server has frozen these figures
+  /** in_progress with scores still coming in: its roundWinner is only the current leader. */
+  live: boolean
 }
 
 export interface PlayerMoneyVM {
@@ -237,6 +240,7 @@ export function buildMoney(dbData: Db): MoneyVM {
       roundPurseCents: roundPurse,
       roundWinner,
       frozen: status === 'final',
+      live: status === 'in_progress' && !(detail && roundScoresIn(detail)),
     }
   })
 
