@@ -18,7 +18,15 @@ export default function Money() {
 
   return (
     <Page>
-      <PageHeader eyebrow="The Purse" title="Money" meta="All figures derive from the current purse settings" />
+      <PageHeader
+        eyebrow="The Purse"
+        title="Money"
+        meta={
+          money.settleable
+            ? 'Every round is final.'
+            : 'If it ended now. Nothing is settled until every round is final.'
+        }
+      />
 
       {!money.hasMoney ? (
         <div className="mt-8 rounded-lg border border-hair bg-ground-2/40 p-5">
@@ -41,6 +49,9 @@ export default function Money() {
 }
 
 function PotSummary({ money }: { money: MoneyVM }) {
+  // Until the last round is final, the overall places are a snapshot, not a result. "now"
+  // is short enough to keep the label and the name on one line at phone width.
+  const settled = money.settleable
   return (
     <section className="mt-8">
       <div className="rounded-lg border border-hair-strong bg-ground-2 p-5">
@@ -56,7 +67,7 @@ function PotSummary({ money }: { money: MoneyVM }) {
             // A tie for 1st pools 1st + 2nd and splits it (audit F-016): one line, not a
             // "2nd place" line with no name. The per-player figures are exact in the ledger.
             <PotLine
-              label={`1st & 2nd (shared ${money.firstPlace!.playerIds.length} ways)`}
+              label={`1st & 2nd${settled ? '' : ' now'} (shared ${money.firstPlace!.playerIds.length} ways)`}
               value={money.champFirstCents + money.champSecondCents}
               winner={money.firstPlace}
               highlight
@@ -64,12 +75,16 @@ function PotSummary({ money }: { money: MoneyVM }) {
           ) : (
             <>
               <PotLine
-                label="1st place overall"
+                label={settled ? '1st place overall' : '1st place now'}
                 value={money.champFirstCents}
                 winner={money.firstPlace}
                 highlight
               />
-              <PotLine label="2nd place overall" value={money.champSecondCents} winner={money.secondPlace} />
+              <PotLine
+                label={settled ? '2nd place overall' : '2nd place now'}
+                value={money.champSecondCents}
+                winner={money.secondPlace}
+              />
             </>
           )}
           <PotLine
@@ -151,7 +166,8 @@ function RoundCard({ r }: { r: RoundMoneyVM }) {
       ) : (
         <div className="mt-3 flex items-baseline justify-between gap-3 text-[0.9rem]">
           <span className="text-paper-dim">
-            Round winner
+            {/* While scores are still coming in it's a leader, not a winner. */}
+            {r.live ? 'Leading' : 'Round winner'}
             {r.roundWinner ? (
               <span className="ml-2 text-paper">{r.roundWinner.names.join(' & ')}</span>
             ) : (
@@ -168,7 +184,7 @@ function RoundCard({ r }: { r: RoundMoneyVM }) {
 function Ledger({ money }: { money: MoneyVM }) {
   return (
     <section className="mt-8">
-      <span className="eyebrow block">Per player</span>
+      <span className="eyebrow block">{money.settleable ? 'Per player' : 'Per player, if it ended now'}</span>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-[0.85rem]">
           <thead>

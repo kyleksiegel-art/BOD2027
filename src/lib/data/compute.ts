@@ -500,7 +500,7 @@ export function buildStandings(dbData: Db): StandingsVM {
       thruMin: started.length > 0 ? Math.min(...started.map((p) => p.thru)) : 0,
       thruMax: playing.length > 0 ? Math.max(...playing.map((p) => p.thru)) : 0,
       started: started.length > 0,
-      allComplete: playing.length > 0 && playing.every((p) => p.thru >= liveDetail.holesCounted),
+      allComplete: roundScoresIn(liveDetail),
     }
   }
 
@@ -558,11 +558,22 @@ export function buildStandings(dbData: Db): StandingsVM {
 }
 
 // ── Rounds list ──────────────────────────────────────────────────────────────
+/**
+ * Every playing player is through the counted holes: "Scores in", the state between Live and
+ * Final. One rule, so the badge, the standings line and the table can't disagree.
+ */
+export function roundScoresIn(detail: Pick<RoundDetailVM, 'players' | 'holesCounted'>): boolean {
+  const playing = detail.players.filter((p) => p.status === 'playing')
+  return playing.length > 0 && playing.every((p) => p.thru >= detail.holesCounted)
+}
+
 export interface RoundListItemVM {
   round: RoundRow
   course: CourseRow
   leaderName: string | null // current leader for in_progress/final rounds
   playerCount: number
+  /** in_progress with every score entered — shown as "Scores in", not "Live". */
+  scoresIn: boolean
 }
 
 export function buildRoundsList(dbData: Db): RoundListItemVM[] {
@@ -598,6 +609,7 @@ export function buildRoundsList(dbData: Db): RoundListItemVM[] {
         round,
         course,
         leaderName,
+        scoresIn: round.status === 'in_progress' && detail !== null && roundScoresIn(detail),
         playerCount: dbData.round_players.filter((rp) => rp.round_id === round.id && rp.status === 'playing').length,
       }
     })

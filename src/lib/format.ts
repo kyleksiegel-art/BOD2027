@@ -80,7 +80,7 @@ export function composeEtTimestamp(dateOnly: string, hhmm: string): string | nul
 
 const ROUND_STATUS_LABEL: Record<string, string> = {
   upcoming: 'Upcoming',
-  in_progress: 'In progress',
+  in_progress: 'Live',
   final: 'Final',
   abandoned: 'Abandoned',
 }
@@ -119,7 +119,7 @@ export function formatPosition(position: number, tie: boolean): string {
   return tie ? `T${position}` : String(position)
 }
 
-/** A player's live-round line: "+17 today · thru 12", "E today · thru 10", "+21 today · F", "Not started". */
+/** A player's live-round line: "+17 today · thru 12", "E today · thru 10", "+21 today · thru 18", "Not started". */
 export function formatLiveLine(live: {
   status: 'playing' | 'did_not_play'
   todayPoints: number
@@ -129,8 +129,7 @@ export function formatLiveLine(live: {
   if (live.status === 'did_not_play') return 'Did not play'
   if (live.thru === 0) return 'Not started'
   const pts = live.todayPoints === 0 ? 'E' : `+${live.todayPoints}`
-  const where = live.complete ? 'F' : `thru ${live.thru}`
-  return `${pts} today · ${where}`
+  return `${pts} today · thru ${live.thru}`
 }
 
 /**

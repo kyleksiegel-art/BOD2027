@@ -16,7 +16,7 @@ export default function Rounds() {
         <p className="mt-8 animate-pulse text-paper-faint">Loading…</p>
       ) : (
         <ul className="mt-4">
-          {rounds.map(({ round, course, leaderName, playerCount }) => (
+          {rounds.map(({ round, course, leaderName, playerCount, scoresIn }) => (
             <li
               key={round.id}
               className="round"
@@ -38,7 +38,7 @@ export default function Rounds() {
                     {round.tee_time ? ` · ${formatTeeTime(round.tee_time)}` : ''}
                   </span>
                   <span className="mt-0.5">
-                    <StatusBadge status={round.status} />
+                    <StatusBadge status={round.status} scoresIn={scoresIn} />
                   </span>
                 </span>
                 <span className="flex flex-col items-end gap-1 text-right">
