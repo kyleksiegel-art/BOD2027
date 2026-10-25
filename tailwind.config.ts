@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import plugin from 'tailwindcss/plugin'
 
 /**
  * Design tokens are declared as CSS custom properties in src/index.css and
@@ -33,5 +34,9 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `short:` — height, not width. Enter tightens its spacing on shorter phones so the hole,
+    // every player and Save fit one screen; taller phones keep the roomier default.
+    plugin(({ addVariant }) => addVariant('short', '@media (max-height: 860px)')),
+  ],
 } satisfies Config

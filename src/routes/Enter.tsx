@@ -7,6 +7,7 @@ import { canClaimCtp, useEnterHole, usePendingHoles, useRoundChoices } from '@/l
 import type { EnterDraft } from '@/lib/data/compute'
 import { saveCells, saveCtp, subscribeWriteState, getWriteState } from '@/lib/data/mutations'
 import { loadEnterDrafts, putEnterDraft } from '@/lib/data/drafts'
+import { courseShortName } from '@/lib/format'
 
 function useWriteState() {
   return useSyncExternalStore(subscribeWriteState, getWriteState, getWriteState)
@@ -26,6 +27,7 @@ export default function Enter() {
   // hasn't finished, not on the 1st. Reset to null whenever the round changes.
   const [hole, setHole] = useState<number | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [roundsOpen, setRoundsOpen] = useState(false)
   // Which hole was most recently saved, so an untouched hole doesn't claim "Saved".
   const [justSaved, setJustSaved] = useState<number | null>(null)
 
@@ -254,39 +256,60 @@ export default function Enter() {
   }
 
   return (
-    <Page>
-      <PageHeader eyebrow="Hole by Hole" title="Enter Scores" meta={vm.course.name} />
+    <Page className="pt-3">
+      {/* Compact masthead. Enter is the screen used 72 times a round, so the hole, all four
+          players and Save get the room: the round picker folds behind one tap (mid-round
+          nobody switches rounds) instead of a page title plus four always-on chips. */}
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="eyebrow">Enter scores</h1>
+        <button
+          type="button"
+          onClick={() => setRoundsOpen((o) => !o)}
+          aria-expanded={roundsOpen}
+          aria-label={`Round ${vm.round.round_number}, ${vm.course.name}. Change round`}
+          className="tap flex items-center gap-1.5 text-[0.95rem] text-paper"
+        >
+          <span className="font-semibold">R{vm.round.round_number}</span>
+          <span className="text-paper-dim">· {courseShortName(vm.course.name)}</span>
+          <span aria-hidden className="text-[0.8rem] text-paper-faint">{roundsOpen ? '▴' : '▾'}</span>
+        </button>
+      </header>
 
       {/* Round picker */}
-      <div className="mt-5 grid grid-cols-4 gap-2">
-        {rounds.map((r) => (
-          <button
-            key={r.roundNumber}
-            type="button"
-            onClick={() => {
-              if (r.roundNumber === roundNumber) return
-              setRoundNumber(r.roundNumber)
-              // Opens on that round's current hole once its data is in. Its drafts are
-              // reloaded from Dexie by the round effect; blank the refs meanwhile so one
-              // round's edits never overlay another's.
-              setHole(null)
-              draftsRef.current = {}
-              ctpRef.current = {}
-              draftsRoundRef.current = null
-              setDrafts({})
-              setCtpDrafts({})
-            }}
-            className={`tap rounded-md border px-2 py-2 text-[0.78rem] leading-tight ${
-              r.roundNumber === roundNumber
-                ? 'border-gold bg-gold/15 text-paper'
-                : 'border-hair text-paper-dim'
-            }`}
-          >
-            <span className="block font-semibold">R{r.roundNumber}</span>
-            <span className="block truncate text-[0.7rem] text-paper-faint">{r.courseName}</span>
-          </button>
-        ))}
-      </div>
+      {roundsOpen ? (
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {rounds.map((r) => (
+            <button
+              key={r.roundNumber}
+              type="button"
+              onClick={() => {
+                setRoundsOpen(false)
+                if (r.roundNumber === roundNumber) return
+                setRoundNumber(r.roundNumber)
+                // Opens on that round's current hole once its data is in. Its drafts are
+                // reloaded from Dexie by the round effect; blank the refs meanwhile so one
+                // round's edits never overlay another's.
+                setHole(null)
+                draftsRef.current = {}
+                ctpRef.current = {}
+                draftsRoundRef.current = null
+                setDrafts({})
+                setCtpDrafts({})
+              }}
+              className={`tap rounded-md border px-1 py-2 text-[0.78rem] leading-tight ${
+                r.roundNumber === roundNumber
+                  ? 'border-gold bg-gold/15 text-paper'
+                  : 'border-hair text-paper-dim'
+              }`}
+            >
+              <span className="block font-semibold">R{r.roundNumber}</span>
+              <span className="block truncate text-[0.75rem] text-paper-faint">
+                {courseShortName(r.courseName)}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {/* Pre-flight: without a round_players row a device cannot compute strokes received,
           so it cannot score that player at all — offline least of all. Loud, not subtle. */}
@@ -350,7 +373,7 @@ export default function Enter() {
       {canEdit && vm.hole ? (
         <>
           {/* Hole header */}
-          <div className="mt-5 flex items-center justify-between gap-2 border-y border-hair py-3">
+          <div className="mt-3 flex items-center justify-between gap-2 border-y border-hair py-3 short:py-1.5">
             <button
               type="button"
               aria-label="Previous hole"
@@ -430,12 +453,17 @@ export default function Enter() {
           {/* Closest to pin — only on the par 3s, scored in the same flow as the hole and
               saved by the same tap. Reported on the round page and recap; entered here. */}
           {ctpEligible ? (
-            <div className="mt-3 rounded-lg border border-hair bg-ground-2 p-3">
+            <div className="mt-3 rounded-lg border border-hair bg-ground-2 p-3 short:mt-2 short:p-2">
               <div className="flex items-baseline justify-between">
                 <span className="eyebrow">Closest to pin</span>
                 <span className="text-[0.72rem] text-paper-faint">par or better to claim</span>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+              {/* One row, first names: a second row of buttons pushed Save off a phone screen.
+                  An over-par player is struck through and can't be tapped. */}
+              <div
+                className="mt-3 grid gap-2 short:mt-2"
+                style={{ gridTemplateColumns: `repeat(${playing.length + 1}, minmax(0, 1fr))` }}
+              >
                 {playing.map((p) => {
                   const sel = ctpCurrent === p.playerId
                   const canClaim = canClaimCtp(p, vm.hole!.par)
@@ -446,18 +474,18 @@ export default function Enter() {
                       aria-pressed={sel}
                       disabled={!canClaim && !sel}
                       onClick={() => setCtpDraft(p.playerId)}
-                      className={`tap rounded-md border px-3 text-[0.85rem] ${
+                      aria-label={canClaim ? p.name : `${p.name}, over par`}
+                      className={`tap truncate rounded-md border px-1 text-[0.85rem] leading-tight ${
                         sel && !canClaim
-                          ? 'border-gold-bright text-gold-bright font-semibold'
+                          ? 'border-gold-bright text-gold-bright font-semibold line-through'
                           : sel
                             ? 'border-gold bg-gold-fill text-paper font-semibold'
                             : canClaim
                               ? 'border-hair-strong text-paper'
-                              : 'border-hair text-paper-faint'
+                              : 'border-hair text-paper-faint line-through'
                       }`}
                     >
-                      {p.name}
-                      {canClaim ? null : <span className="font-normal"> · over par</span>}
+                      {p.name.split(/\s+/)[0]}
                     </button>
                   )
                 })}
@@ -465,7 +493,7 @@ export default function Enter() {
                   type="button"
                   aria-pressed={ctpCurrent === null}
                   onClick={() => setCtpDraft(null)}
-                  className={`tap rounded-md border px-3 text-[0.85rem] ${
+                  className={`tap rounded-md border px-1 text-[0.85rem] leading-tight ${
                     ctpCurrent === null
                       ? 'border-gold bg-gold-fill text-paper font-semibold'
                       : 'border-hair-strong text-paper-dim'
@@ -482,7 +510,7 @@ export default function Enter() {
               the tab bar while it would otherwise be below the fold (four rows plus the CTP
               picker don't fit most phones), then rests in place once scrolled to. */}
           <div
-            className="sticky z-10 -mx-5 mt-5 border-t border-hair bg-ground/95 px-5 pt-3 pb-1 backdrop-blur-sm"
+            className="sticky z-10 -mx-5 mt-5 border-t border-hair bg-ground/95 px-5 pt-3 pb-1 backdrop-blur-sm short:mt-3 short:pt-2"
             style={{ bottom: 'var(--tabbar-h, 0px)' }}
           >
             <button
