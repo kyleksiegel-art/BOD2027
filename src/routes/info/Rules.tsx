@@ -72,8 +72,10 @@ export default function Rules() {
           <strong className="font-semibold text-paper">{Math.round(allowance * 100)}% allowance</strong>
           . No playing handicap exceeds{' '}
           <strong className="font-semibold text-paper">{cap}</strong> — the cap is applied last.
-          Strokes fall on holes by the course’s stroke index. Each player’s handicap index is set
-          and locked in before the first round, and the same index is used for every round.
+          Strokes fall on holes by the course’s stroke index. Each player’s handicap index is agreed
+          before the first round, and the same index is used for every round. If an index is
+          corrected during the trip, every round is rescored with the new one, finished rounds
+          included.
         </p>
         <p>
           We <strong className="font-semibold text-paper">play off the low handicap</strong>: in
@@ -127,7 +129,7 @@ export default function Rules() {
           </li>
           <li>
             <strong className="font-semibold text-paper">Countback</strong> on the latest counting
-            round — in the order Round 3, then 4, 2, 1 — summing Stableford points over holes 10–18,
+            round — Round 4, then 3, 2, 1 — summing Stableford points over holes 10–18,
             then 13–18, then 16–18, then the 18th. Higher points win each stage.
           </li>
         </ol>

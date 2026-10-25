@@ -186,7 +186,7 @@ Course-handicap hand calculations verified against the resort's published rating
 
 ### Deferred requirements / open items
 
-- **Overall countback preference order** is parameterized (`DEFAULT_COUNTBACK_ROUND_ORDER = [3,4,2,1]`, the brief's literal text). Per Kyle's Phase 3 instruction, the positional-vs-re-pin-to-Black decision is left as a note (see handoff). Changing it is a one-line edit to that constant.
+- **Overall countback preference order** is parameterized (`DEFAULT_COUNTBACK_ROUND_ORDER`, `[3,4,2,1]` at the time; `[4,3,2,1]` since 2026-10-24). Per Kyle's Phase 3 instruction, the positional-vs-re-pin-to-Black decision is left as a note (see handoff). Changing it is a one-line edit to that constant.
 - Shortened round that reached hole 10 but not 18: the standard windows are clamped to the counted end (documented in `countbackHoleStages`). The brief only specifies the <hole-10 fallback; this is a reasonable extension, tested only for the full-18 and <hole-10 cases the brief names.
 - `money.ts` is the pure engine only; wiring to `settings`/`round_money` and the Money UI is Phase 7.
 

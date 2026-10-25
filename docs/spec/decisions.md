@@ -847,3 +847,21 @@ Playing / Did not play select per player and the payload is built from the saved
 `fn_require_session`'s 28000 on `rpc_upsert_round_player` used to count as a retryable error
 (8 attempts → dead letter) while the editor said "Tees saved." Now it costs no attempt, clears the
 dead local session so the PIN gate re-prompts, and the change waits for the next online unlock.
+
+### Countback is latest-round-first: Round 4, then 3, 2, 1 (2026-10-24, Kyle)
+
+The overall countback order was `[3, 4, 2, 1]`. The brief put Round 3 first only because Bone
+Valley's stroke index might still be placeholder data, and that reason ended when the real card
+was published on 2026-09-09. Kyle: change it to 4, 3, 2, 1. `DEFAULT_COUNTBACK_ROUND_ORDER` is
+now `[4, 3, 2, 1]`; the brief carries a marked amendment and the Rules page says the same. An
+unplayed round sums 0 for everyone and falls through, so mid-trip this reads as "the latest
+round played". Supersedes the positional `[3, 4, 2, 1]` call in §"Overall tiebreaker is a real
+decide-the-champion chain".
+
+### Rules no longer claims the index is "locked" (2026-10-24, Kyle)
+
+Rules said each index is "set and locked in before the first round". The app reads the index
+live from `players`, for every round including final ones, and nothing locks it; locking was
+always a pre-trip process (the audit ruling: keep the live index, lock it by agreement). The
+sentence now says the index is agreed before the first round and that a correction rescores
+every round, finished ones included. No code change.

@@ -12,14 +12,12 @@
 import type { RoundStatus } from './types'
 
 /**
- * Preference order for the overall countback. The brief specifies "Round 3, then 4, 2,
- * 1", with the rationale that Round 3 should be a course with a trustworthy (non-
- * placeholder) stroke index. This is PARAMETERIZED, not hard-coded, because the tee-
- * sheet swap (R2=Black, R3=Blue) means the literal order no longer maps to the original
- * "Black first" reasoning. See docs/spec/handoff.md — the final call is a one-line change
- * to this default.
+ * Preference order for the overall countback: the latest round first. The brief once put
+ * Round 3 ahead of Round 4 only because Bone Valley's stroke index might be placeholder
+ * data; its real card is published (2026-09-09), so the order is plain latest-first
+ * (Kyle, 2026-10-24). An unplayed round sums 0 for everyone and falls through to the next.
  */
-export const DEFAULT_COUNTBACK_ROUND_ORDER: readonly number[] = [3, 4, 2, 1]
+export const DEFAULT_COUNTBACK_ROUND_ORDER: readonly number[] = [4, 3, 2, 1]
 
 // ---------------------------------------------------------------------------
 // Step 2 — holes won outright
