@@ -1077,9 +1077,12 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   puts it back in time order). The section stays up while there's an Undo, even with 0 calls left.
   The offset lives in a ref too: a fast flick's release lands before the last move's render.
 - **Trip lore** (`LORE`, matched by surname): a LABEL only, in the round-1 "meet the field" line —
-  "Adam Hersh, inaugural champion", "Jon Aronson / Chris Denove, returning champion". Kyle
+  "Returning co-champions, Jon Aronson and Chris Denove. Kyle Siegel. Adam Hersh, inaugural
+  champion." — in that order (Kyle 2026-10-24). Kyle
   2026-10-11: "too much emphasis on the champion bit" — no backstory, no week or finale reactions.
-  Don't add more lore lines without asking.
+  Don't add more lore lines without asking. **2026-10-24 (Kyle, "let the radio call have some fun,
+  all calls"):** the opener's lines, the field intro (incl. a Kyle-the-app-builder tag via
+  `LORE.builder`) and most pools got funnier takes; champion labels still only in the opener.
   Week lines no longer say "leads by 0" when a tiebreak splits a points tie.
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
