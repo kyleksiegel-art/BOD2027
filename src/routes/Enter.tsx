@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { PlayerEntryRow } from '@/components/enter/PlayerEntryRow'
-import { useEnterHole, usePendingHoles, useRoundChoices } from '@/lib/data/selectors'
+import { canClaimCtp, useEnterHole, usePendingHoles, useRoundChoices } from '@/lib/data/selectors'
 import type { EnterDraft } from '@/lib/data/compute'
 import { saveCells, saveCtp, subscribeWriteState, getWriteState } from '@/lib/data/mutations'
 import { loadEnterDrafts, putEnterDraft } from '@/lib/data/drafts'
@@ -187,6 +187,11 @@ export default function Enter() {
   const playing = vm.players.filter((p) => p.status === 'playing')
   const stillNeed = playing.filter((p) => p.gross === null && !p.pickedUp).map((p) => p.name)
   const allEntered = playing.length > 0 && stillNeed.length === 0
+
+  // Closest to pin needs par or better. Over-par players can't be picked, and a pick whose
+  // score later goes over par blocks Save until it's changed, so a bogey is never a CTP.
+  const ctpPick = ctpEligible && ctpCurrent ? playing.find((p) => p.playerId === ctpCurrent) : undefined
+  const ctpBlocked = ctpPick !== undefined && vm.hole !== null && !canClaimCtp(ctpPick, vm.hole.par)
 
   /** A stepper tap. `stored` is the value on screen; an unsaved edit outranks it. */
   function step(playerId: string, delta: number, stored: number) {
@@ -433,19 +438,26 @@ export default function Enter() {
               <div className="mt-3 flex flex-wrap gap-2">
                 {playing.map((p) => {
                   const sel = ctpCurrent === p.playerId
+                  const canClaim = canClaimCtp(p, vm.hole!.par)
                   return (
                     <button
                       key={p.playerId}
                       type="button"
                       aria-pressed={sel}
+                      disabled={!canClaim && !sel}
                       onClick={() => setCtpDraft(p.playerId)}
                       className={`tap rounded-md border px-3 text-[0.85rem] ${
-                        sel
-                          ? 'border-gold bg-gold-fill text-paper font-semibold'
-                          : 'border-hair-strong text-paper'
+                        sel && !canClaim
+                          ? 'border-gold-bright text-gold-bright font-semibold'
+                          : sel
+                            ? 'border-gold bg-gold-fill text-paper font-semibold'
+                            : canClaim
+                              ? 'border-hair-strong text-paper'
+                              : 'border-hair text-paper-faint'
                       }`}
                     >
                       {p.name}
+                      {canClaim ? null : <span className="font-normal"> · over par</span>}
                     </button>
                   )
                 })}
@@ -475,7 +487,7 @@ export default function Enter() {
           >
             <button
               type="button"
-              disabled={!dirty || !allEntered || write.status === 'saving'}
+              disabled={!dirty || !allEntered || ctpBlocked || write.status === 'saving'}
               onClick={() => void saveHole()}
               className="tap w-full rounded-md bg-gold-fill px-4 py-3 font-semibold text-paper disabled:bg-transparent disabled:text-paper-faint disabled:outline disabled:outline-1 disabled:outline-hair"
             >
@@ -485,9 +497,11 @@ export default function Enter() {
                   ? justSaved === hole
                     ? 'Saved'
                     : 'No changes'
-                  : allEntered
-                    ? `Save hole ${hole}`
-                    : `All ${playing.length} scores needed`}
+                  : !allEntered
+                    ? `All ${playing.length} scores needed`
+                    : ctpBlocked
+                      ? 'Change closest to pin'
+                      : `Save hole ${hole}`}
             </button>
 
             <div className="mt-2 min-h-[1.25rem] text-[0.82rem] tnum" aria-live="polite">
@@ -500,6 +514,11 @@ export default function Enter() {
                 // The hole can't be saved until the whole group is in — say who's left.
                 <span className="text-gold-bright">
                   Enter every score to save — still need {stillNeed.join(', ')}.
+                </span>
+              ) : dirty && ctpBlocked ? (
+                <span className="text-gold-bright">
+                  {ctpPick!.name} is over par here, so can’t take the CTP. Pick someone else or No
+                  winner.
                 </span>
               ) : dirtyHoles.length > 1 ? (
                 <span className="text-gold-bright">

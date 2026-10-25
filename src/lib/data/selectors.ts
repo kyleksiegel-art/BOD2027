@@ -79,6 +79,9 @@ function useDbData(): Db | undefined {
   }, [])
 }
 
+// Pure rule the Enter screen needs at render time; re-exported so screens stay off compute.ts.
+export { canClaimCtp } from './compute'
+
 /** Read a single settings value from Dexie (e.g. the assigned-index footnote). */
 export function useSetting<T = unknown>(key: string): T | undefined {
   return useLiveQuery(async () => {

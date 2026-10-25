@@ -630,6 +630,15 @@ export interface EnterHoleVM {
   ctpWinnerId: string | null | undefined
 }
 
+/**
+ * Closest to pin needs par or better (gross) on the hole to claim it. A pick-up can't; a
+ * player with no score yet still can, since the pick may come before the scores.
+ */
+export function canClaimCtp(player: Pick<EnterPlayerVM, 'gross' | 'pickedUp'>, par: number): boolean {
+  if (player.pickedUp) return false
+  return player.gross === null || player.gross <= par
+}
+
 export interface EnterVM {
   round: RoundRow
   course: CourseRow
