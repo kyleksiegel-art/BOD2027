@@ -1,27 +1,19 @@
-import { useLayoutEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { TABS } from '@/config/nav'
+import { usePublishedHeight } from '@/hooks/usePublishedHeight'
 
-/** Persistent bottom tab bar — the primary navigation for one-handed cart use. */
+/**
+ * Persistent bottom tab bar — the primary navigation for one-handed cart use. Fixed to the
+ * screen, not sticky: see Layout. Its height is published as --tabbar-h, which the shell
+ * reserves at the bottom and Enter's Save bar sits on top of.
+ */
 export function BottomTabBar() {
-  // Publish the bar's height (safe-area padding included) as --tabbar-h, so anything pinned
-  // to the bottom of a page — Enter's Save bar — sits just above it instead of under it.
-  const ref = useRef<HTMLElement>(null)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const root = document.documentElement
-    const publish = () => root.style.setProperty('--tabbar-h', `${el.offsetHeight}px`)
-    publish()
-    const ro = new ResizeObserver(publish)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+  const ref = usePublishedHeight<HTMLElement>('--tabbar-h')
 
   return (
     <nav
       ref={ref}
-      className="sticky bottom-0 z-20 border-t border-hair bg-ground/95 backdrop-blur-sm"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-hair bg-ground/95 backdrop-blur-sm"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Primary"
     >

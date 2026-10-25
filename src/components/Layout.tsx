@@ -9,8 +9,16 @@ import { useSyncEngine } from '@/lib/sync/engine'
 import { ensurePersistedIfUnlocked } from '@/lib/auth/session'
 
 /**
- * App shell: persistent top bar + bottom tab bar with the routed page between. The bars are
- * sticky and the DOCUMENT is the only scroller — `<main>` must never become one.
+ * App shell: persistent top bar + bottom tab bar with the routed page between. The DOCUMENT is
+ * the only scroller — `<main>` must never become one.
+ *
+ * The bars are `position: fixed`, NOT sticky (Kyle 2026-10-25, screen recording: "I can't see
+ * the whole screen anymore"). A sticky bar is placed relative to the page, so on iOS it travels
+ * with the page when it rubber-bands, and on a page that barely overflows (Enter, once it fit
+ * one screen) any drag left the tab bar floating mid-screen with blank space under it and the
+ * top bar gone. Fixed bars stay on the screen; the shell reserves their measured heights
+ * (--topbar-h / --tabbar-h, published by the bars) as padding so nothing hides beneath them,
+ * and `overscroll-behavior-y: none` on <html> (index.css) stops the bounce itself.
  *
  * `overflow-x: clip`, NOT `hidden` (Kyle 2026-09-07, "the field report scroll isn't working on
  * my phone"): per CSS Overflow 3, `visible` on one axis computes to `auto` when the other axis
@@ -34,7 +42,10 @@ export function Layout() {
   }, [])
 
   return (
-    <div className="flex min-h-[100dvh] flex-col">
+    <div
+      className="flex min-h-[100dvh] flex-col"
+      style={{ paddingTop: 'var(--topbar-h, 0px)', paddingBottom: 'var(--tabbar-h, 0px)' }}
+    >
       <TopBar />
       <DevCrash where="shell" />
       <PwaUpdatePrompt />
