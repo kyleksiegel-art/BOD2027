@@ -5,7 +5,7 @@ import { Leaderboard } from '@/components/round/Leaderboard'
 import { Scorecard } from '@/components/round/Scorecard'
 import { RoundRecap } from '@/components/round/RoundRecap'
 import { RoundReport } from '@/components/round/RoundReport'
-import { useRoundDetail, useRoundRecap, useRoundReport, usePendingScoreCells } from '@/lib/data/selectors'
+import { roundScoresIn, useRoundDetail, useRoundRecap, useRoundReport, usePendingScoreCells } from '@/lib/data/selectors'
 import { courseSlug, formatDay, formatTeeTime } from '@/lib/format'
 
 export default function RoundDetail() {
@@ -49,7 +49,7 @@ export default function RoundDetail() {
           {course.name}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <StatusBadge status={round.status} />
+          <StatusBadge status={round.status} scoresIn={roundScoresIn(vm)} />
           <span className="tnum text-[0.85rem] text-paper-dim">
             {formatDay(round.date)}
             {round.tee_time ? ` · ${formatTeeTime(round.tee_time)}` : ''}

@@ -18,7 +18,7 @@ function LiveStatus({ live }: { live: StandingsLiveRound }) {
     return (
       <div className="mt-3 inline-flex items-center gap-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-paper-faint">
         <span className="h-2 w-2 rounded-full bg-paper-faint" aria-hidden />
-        Round {live.roundNumber} complete · scores in
+        Round {live.roundNumber} · scores in
       </div>
     )
   }
@@ -77,6 +77,8 @@ export default function Standings() {
 
   const { rows, roundColumns, liveRound, hasCountingRound, tiebreakNote } = standings
   const live = liveRound !== null
+  // Every score in but not finalized: same column, quieter mark, "scores in" not "live".
+  const scoresIn = liveRound?.allComplete ?? false
   const hasUpcoming = roundColumns.some((c) => c.status === 'upcoming')
 
   return (
@@ -187,18 +189,18 @@ export default function Standings() {
                             to={`/rounds/${c.roundNumber}`}
                             state={{ from: 'standings' }}
                             className="tap inline-flex flex-col items-end justify-center rounded-sm outline-none hover:text-gold focus-visible:ring-2 focus-visible:ring-gold-fill/60"
-                            aria-label={`Round ${c.roundNumber}${isLive ? ', live' : ''}`}
+                            aria-label={`Round ${c.roundNumber}${isLive ? (scoresIn ? ', scores in' : ', live') : ''}`}
                           >
                             <span>
                               R{c.roundNumber}
                               {isLive && (
-                                <span className="ml-0.5 text-[0.6rem] text-gold-bright">●</span>
+                                <span className={`ml-0.5 text-[0.6rem] ${scoresIn ? 'text-paper-faint' : 'text-gold-bright'}`}>●</span>
                               )}
                               {c.status === 'upcoming' && (
                                 <span className="ml-0.5 align-super text-[0.6rem] text-paper-faint">·</span>
                               )}
                             </span>
-                            {isLive && (
+                            {isLive && !scoresIn && (
                               <span className="block text-[0.55rem] font-semibold tracking-[0.14em] text-gold">
                                 LIVE
                               </span>
@@ -234,11 +236,16 @@ export default function Standings() {
             </div>
             {(live || hasUpcoming) && (
               <p className="mt-3 text-[0.72rem] leading-relaxed text-paper-faint">
-                {live && (
-                  <>
-                    <span className="text-gold-bright">●</span> live — counted as it currently stands.
-                  </>
-                )}
+                {live &&
+                  (scoresIn ? (
+                    <>
+                      <span className="text-paper-faint">●</span> scores in — counted, awaiting sign-off.
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-gold-bright">●</span> live — counted as it currently stands.
+                    </>
+                  ))}
                 {live && hasUpcoming ? ' ' : ''}
                 {hasUpcoming && (
                   <>
