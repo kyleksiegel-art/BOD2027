@@ -1101,7 +1101,14 @@ export interface ItineraryVM {
   isEmpty: boolean
 }
 
-/** `todayET` is injectable for tests; in the app it defaults to the ET date of now. */
+/**
+ * `todayET` is injectable for tests; in the app it defaults to the ET date of now.
+ *
+ * Each round's tee time joins its day as a "golf" entry, built from `rounds` rather than typed
+ * into the itinerary, so moving a tee time in the Rounds editor moves it here too. It slots in
+ * by time among that day's entries without disturbing their admin order, and is skipped on a
+ * day that already has a golf item of its own (no doubles).
+ */
 export function buildItinerary(dbData: Db, todayET: string = etDateString(new Date())): ItineraryVM {
   const items = (dbData.itinerary_items ?? []).slice()
   const byDay = new Map<string, ItineraryItemRow[]>()
@@ -1110,6 +1117,24 @@ export function buildItinerary(dbData: Db, todayET: string = etDateString(new Da
     list.push(it)
     byDay.set(it.day, list)
   }
+
+  const coursesById = new Map(dbData.courses.map((c) => [c.id, c]))
+  const teeTimesByDay = new Map<string, ItineraryEntryVM[]>()
+  for (const r of dbData.rounds) {
+    if (!r.tee_time) continue
+    if ((byDay.get(r.date) ?? []).some((it) => it.category === 'golf')) continue
+    const entry: ItineraryEntryVM = {
+      id: `tee-${r.id}`,
+      time: formatTeeTime(r.tee_time),
+      category: 'golf',
+      title: `Tee time · ${coursesById.get(r.course_id)?.name ?? 'Course'}`,
+      detail: `Round ${r.round_number}`,
+      location: null,
+    }
+    teeTimesByDay.set(r.date, [...(teeTimesByDay.get(r.date) ?? []), entry])
+    if (!byDay.has(r.date)) byDay.set(r.date, [])
+  }
+  const teeStartById = new Map(dbData.rounds.map((r) => [`tee-${r.id}`, r.tee_time ?? '']))
 
   const days: ItineraryDayVM[] = [...byDay.keys()]
     .sort()
@@ -1133,6 +1158,17 @@ export function buildItinerary(dbData: Db, todayET: string = etDateString(new Da
             location: it.location,
           }),
         )
+      // Slot each tee time in before the first entry that starts later. Untimed entries stay
+      // where the admin put them (they read as "all day" and sort first by convention).
+      const startById = new Map(byDay.get(day)!.map((it) => [it.id, it.start_time]))
+      for (const tee of teeTimesByDay.get(day) ?? []) {
+        const teeMs = Date.parse(teeStartById.get(tee.id)!)
+        const at = entries.findIndex((e) => {
+          const s = startById.get(e.id) ?? (e.id.startsWith('tee-') ? teeStartById.get(e.id) : null)
+          return s ? Date.parse(s) > teeMs : false
+        })
+        entries.splice(at === -1 ? entries.length : at, 0, tee)
+      }
       return { day, label: formatDayLong(day), isToday: day === todayET, entries }
     })
 
