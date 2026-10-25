@@ -82,7 +82,7 @@ export default function RoundDetail() {
           {recap ? <RoundRecap vm={recap} /> : <Leaderboard vm={vm} />}
           {/* The report is an addition under the recap, only once the round is final. */}
           {report && <RoundReport vm={report} />}
-          <Scorecard vm={vm} pending={pendingCells} />
+          <Scorecard vm={vm} pending={pendingCells} editable={round.status === 'in_progress'} />
         </>
       )}
     </Page>
