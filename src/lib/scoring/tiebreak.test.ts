@@ -98,15 +98,15 @@ describe('resolveCountback — step 3', () => {
   })
 
   it('honours the round preference order (an earlier round decides before a later one)', () => {
-    // Round 3 favours a (barely); round 4 favours b heavily. Order [3,4,2,1] → 3 decides → a.
+    // Round 4 favours b (barely); round 3 favours a heavily. Order [4,3,2,1] → 4 decides → b.
     const c = ctx([
-      round(3, 'final', 18, { a: { 18: 1 }, b: {} }),
-      round(4, 'final', 18, { a: {}, b: { 18: 5 } }),
+      round(3, 'final', 18, { a: { 18: 5 }, b: {} }),
+      round(4, 'final', 18, { a: {}, b: { 18: 1 } }),
     ])
     const r = resolveCountback(['a', 'b'], c)
     expect(r.resolved).toBe(true)
-    expect(r.order[0]).toBe('a')
-    expect(r.decidedBy?.roundNumber).toBe(3)
+    expect(r.order[0]).toBe('b')
+    expect(r.decidedBy?.roundNumber).toBe(4)
   })
 
   it('skips abandoned rounds; if every round is abandoned it is an unbreakable tie', () => {
