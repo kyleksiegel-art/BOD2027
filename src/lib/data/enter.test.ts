@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildEnterHole, type Db } from './compute'
+import { buildEnterHole, canClaimCtp, type Db } from './compute'
 import type {
   PlayerRow,
   CourseRow,
@@ -98,5 +98,18 @@ describe('buildEnterHole firstOpenHole', () => {
 
   it('is the 1st when no round_players exist yet', () => {
     expect(buildEnterHole(1, 1, makeDb([], []))!.firstOpenHole).toBe(1)
+  })
+})
+
+describe('canClaimCtp', () => {
+  it('needs gross par or better on the hole; a pick-up cannot claim', () => {
+    expect(canClaimCtp({ gross: 2, pickedUp: false }, 3)).toBe(true)
+    expect(canClaimCtp({ gross: 3, pickedUp: false }, 3)).toBe(true)
+    expect(canClaimCtp({ gross: 4, pickedUp: false }, 3)).toBe(false)
+    expect(canClaimCtp({ gross: null, pickedUp: true }, 3)).toBe(false)
+  })
+
+  it('lets a player with no score yet be picked, since the pick may come first', () => {
+    expect(canClaimCtp({ gross: null, pickedUp: false }, 3)).toBe(true)
   })
 })
