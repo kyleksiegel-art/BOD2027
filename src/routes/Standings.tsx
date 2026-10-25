@@ -129,7 +129,7 @@ export default function Standings() {
                     <span className="truncate text-[1.05rem] text-paper">{r.name}</span>
                     {liveLine && (
                       <span
-                        className={`tnum text-[0.72rem] text-paper-faint ${
+                        className={`tnum text-[0.78rem] text-paper-faint ${
                           r.live?.thru === 0 || r.live?.status === 'did_not_play' ? 'italic' : ''
                         }`}
                       >
@@ -146,7 +146,7 @@ export default function Standings() {
                       {r.total}
                     </span>
                     <span
-                      className={`tnum text-[0.66rem] font-semibold uppercase tracking-[0.08em] ${
+                      className={`tnum text-[0.75rem] font-semibold uppercase tracking-[0.08em] ${
                         isLeader ? 'text-gold' : 'text-paper-faint'
                       }`}
                     >
