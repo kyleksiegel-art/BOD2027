@@ -103,7 +103,7 @@ export function PlayerEntryRow({
                 </button>
               )}
               <div
-                className={`text-[0.7rem] tnum ${unsaved ? 'text-gold-bright' : 'text-paper-faint'}`}
+                className={`text-[0.78rem] tnum ${unsaved ? 'text-gold-bright' : 'text-paper-faint'}`}
               >
                 {player.pickedUp || entered ? (
                   <>
