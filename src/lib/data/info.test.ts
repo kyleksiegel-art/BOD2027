@@ -76,6 +76,39 @@ describe('buildItinerary', () => {
   it('is empty with no items', () => {
     expect(buildItinerary(emptyDb(), '2027-02-04').isEmpty).toBe(true)
   })
+
+  describe('tee times from the rounds', () => {
+    const courses = [
+      { id: RED, name: 'Streamsong Red' },
+      { id: BONE, name: 'Bone Valley' },
+    ] as unknown as CourseRow[]
+    const rounds = [
+      { id: R1, round_number: 1, date: '2027-02-04', course_id: RED, tee_time: '2027-02-04T13:10:00-05:00' },
+      { id: R4, round_number: 4, date: '2027-02-07', course_id: BONE, tee_time: '2027-02-07T08:28:00-05:00' },
+    ] as unknown as RoundRow[]
+    const dinners: ItineraryItemRow[] = [
+      { id: 'd1', day: '2027-02-04', sort_order: 1, start_time: '2027-02-04T19:30:00-05:00', category: 'meal', title: 'Dinner', detail: null, location: null },
+      { id: 'a1', day: '2027-02-04', sort_order: 0, start_time: null, category: 'travel', title: 'Arrive', detail: null, location: null },
+    ]
+
+    it('slots the tee time in by time, keeping all-day items first, and adds a day that had nothing', () => {
+      const vm = buildItinerary(emptyDb({ courses, rounds, itinerary_items: dinners }), '2027-02-01')
+      expect(vm.days.map((d) => d.day)).toEqual(['2027-02-04', '2027-02-07'])
+      expect(vm.days[0].entries.map((e) => e.title)).toEqual(['Arrive', 'Tee time · Streamsong Red', 'Dinner'])
+      const tee = vm.days[0].entries[1]
+      expect(tee).toMatchObject({ category: 'golf', time: '1:10 PM ET', detail: 'Round 1' })
+      expect(vm.days[1].entries.map((e) => e.title)).toEqual(['Tee time · Bone Valley'])
+      expect(vm.days[1].entries[0].time).toBe('8:28 AM ET')
+    })
+
+    it('skips a day that already has a golf item, and a round with no tee time', () => {
+      const typed: ItineraryItemRow = { id: 'g1', day: '2027-02-04', sort_order: 0, start_time: '2027-02-04T13:10:00-05:00', category: 'golf', title: 'Red tee time', detail: null, location: null }
+      const noTee = rounds.map((r) => (r.round_number === 4 ? { ...r, tee_time: null } : r))
+      const vm = buildItinerary(emptyDb({ courses, rounds: noTee, itinerary_items: [typed] }), '2027-02-01')
+      expect(vm.days.map((d) => d.day)).toEqual(['2027-02-04'])
+      expect(vm.days[0].entries.map((e) => e.title)).toEqual(['Red tee time'])
+    })
+  })
 })
 
 describe('buildLodging', () => {

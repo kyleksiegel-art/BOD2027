@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Page } from '@/components/Page'
 import { PageHeader } from '@/components/PageHeader'
 import { PlayerEntryRow } from '@/components/enter/PlayerEntryRow'
@@ -21,11 +21,14 @@ const EMPTY: Record<string, EnterDraft> = {}
 export default function Enter() {
   const rounds = useRoundChoices()
   const write = useWriteState()
+  // A scorecard cell on the round page links here with the round and hole to fix. Without
+  // it (the Enter tab) the defaults below apply: the live round, the group's current hole.
+  const jump = useLocation().state as { round?: number; hole?: number } | null
 
-  const [roundNumber, setRoundNumber] = useState<number | null>(null)
+  const [roundNumber, setRoundNumber] = useState<number | null>(jump?.round ?? null)
   // null until the round's data is in: the screen then opens on the first hole the group
   // hasn't finished, not on the 1st. Reset to null whenever the round changes.
-  const [hole, setHole] = useState<number | null>(null)
+  const [hole, setHole] = useState<number | null>(jump?.hole ?? null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [roundsOpen, setRoundsOpen] = useState(false)
   // Which hole was most recently saved, so an untouched hole doesn't claim "Saved".

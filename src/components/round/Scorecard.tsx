@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import type { RoundDetailVM, PlayerRoundVM } from '@/lib/data/compute'
 import type { HoleResult, HoleInfo } from '@/lib/scoring'
 
@@ -14,7 +15,16 @@ import type { HoleResult, HoleInfo } from '@/lib/scoring'
  * (circle = net birdie/eagle, square = net bogey or worse), picked-up ("PU") marks, and
  * strokes-received pips. Holes beyond a shortened round's cutoff are struck through.
  */
-export function Scorecard({ vm, pending }: { vm: RoundDetailVM; pending?: Set<string> }) {
+export function Scorecard({
+  vm,
+  pending,
+  editable = false,
+}: {
+  vm: RoundDetailVM
+  pending?: Set<string>
+  /** Live round: each player's hole cell opens that hole on Enter, to fix a score. */
+  editable?: boolean
+}) {
   const [mode, setMode] = useState<'points' | 'gross'>('points')
   const pendingCells = pending ?? EMPTY_PENDING
   if (!vm.holes) return null
@@ -60,6 +70,7 @@ export function Scorecard({ vm, pending }: { vm: RoundDetailVM; pending?: Set<st
                 cutoff={vm.holesCounted}
                 mode={mode}
                 pending={pendingCells}
+                editRound={editable ? vm.round.round_number : null}
               />
             ))}
           </tbody>
@@ -167,6 +178,7 @@ function PlayerRow({
   cutoff,
   mode,
   pending,
+  editRound,
 }: {
   player: PlayerRoundVM
   holes: HoleInfo[]
@@ -175,6 +187,7 @@ function PlayerRow({
   cutoff: number
   mode: 'points' | 'gross'
   pending: Set<string>
+  editRound: number | null
 }) {
   const name = shortName(player.name)
   if (player.status === 'did_not_play') {
@@ -206,11 +219,43 @@ function PlayerRow({
           cutoff={cutoff}
           mode={mode}
           unsynced={pending.has(`${player.playerId}|${h.holeNumber}`)}
+          edit={editRound === null ? null : { round: editRound, label: `${name}, hole ${h.holeNumber}` }}
         />
       ))}
       <td className={`${SUB} font-semibold text-paper-dim`}>{nineVal}</td>
       <td className={`${SUB} font-display text-[0.95rem] font-semibold text-gold-bright`}>{totVal}</td>
     </tr>
+  )
+}
+
+/**
+ * A score cell. On a live round the whole cell is a link to that hole on Enter. It's narrower
+ * than 44px at nine columns, but the full cell height is the target and it's a secondary path;
+ * Enter's own hole picker is still there.
+ */
+function Cell({
+  edit,
+  hole,
+  className,
+  children,
+}: {
+  edit: { round: number; label: string } | null
+  hole: number
+  className: string
+  children: ReactNode
+}) {
+  if (!edit) return <td className={className}>{children}</td>
+  return (
+    <td className={`${className} p-0`}>
+      <Link
+        to="/enter"
+        state={{ round: edit.round, hole }}
+        aria-label={`${edit.label}. Edit on Enter`}
+        className="flex min-h-[2.5rem] items-center justify-center"
+      >
+        {children}
+      </Link>
+    </td>
   )
 }
 
@@ -230,13 +275,16 @@ function ScoreCell({
   cutoff,
   mode,
   unsynced,
+  edit,
 }: {
   hole: HoleInfo
   result: HoleResult | undefined
   cutoff: number
   mode: 'points' | 'gross'
   unsynced: boolean
+  edit: { round: number; label: string } | null
 }) {
+
   // A subtle amber underdot: this cell is entered on this phone but not yet on the server.
   const syncMark = unsynced ? (
     <span
@@ -254,23 +302,23 @@ function ScoreCell({
     )
   }
   if (!result || !result.completed) {
-    return <td className={`${CELL} text-paper-faint`}>·</td>
+    return <Cell edit={edit} hole={hole.holeNumber} className={`${CELL} text-paper-faint`}>·</Cell>
   }
   if (result.pickedUp) {
     return (
-      <td className={CELL}>
+      <Cell edit={edit} hole={hole.holeNumber} className={CELL}>
         <span className="relative inline-flex items-center justify-center">
           <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-paper-faint">PU</span>
           {syncMark}
         </span>
-      </td>
+      </Cell>
     )
   }
 
   const value = mode === 'points' ? result.points : result.grossStrokes
   const pips = result.strokesReceived
   return (
-    <td className={CELL}>
+    <Cell edit={edit} hole={hole.holeNumber} className={CELL}>
       <span className="relative inline-flex items-center justify-center">
         {pips > 0 && (
           <span className="absolute -top-1.5 right-0 leading-none text-[0.5rem] text-gold" aria-hidden>
@@ -284,7 +332,7 @@ function ScoreCell({
         </span>
         {syncMark}
       </span>
-    </td>
+    </Cell>
   )
 }
 
