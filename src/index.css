@@ -41,6 +41,9 @@
   html {
     background: var(--ground);
     -webkit-text-size-adjust: 100%;
+    /* No rubber-band bounce: on iOS it dragged the page (and anything not fixed) past its end,
+       showing a blank band. The bars are fixed; see Layout. */
+    overscroll-behavior-y: none;
   }
 
   body {

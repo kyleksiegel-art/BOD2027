@@ -603,6 +603,12 @@ horizontal clipping and leaves `overflow-y: visible`, so the document stays the 
   from Home to Rules has horizontal overflow at 375px.
 - Anything that needs its own horizontal scroll (the scorecard table, the round-by-round table)
   keeps its **own** `overflow-x-auto` wrapper. That is the right place for it — never the shell.
+- **The top and tab bars are `position: fixed`, not sticky** (Kyle 2026-10-25, screen recording on
+  his iPhone). Once Enter fit one screen the page overflowed by ~2px, and on iOS a drag
+  rubber-banded the document and took the sticky bars with it: tab bar floating mid-screen,
+  blank band below, top bar gone. Each bar publishes its height (`usePublishedHeight` →
+  `--topbar-h` / `--tabbar-h`), the shell reserves both as padding, and `<html>` has
+  `overscroll-behavior-y: none`. Enter's Save bar is still sticky, at `bottom: var(--tabbar-h)`.
 
 ## Phase 9 — Polish (2026-09-07, branch `phase-9-polish`) — the shape to reuse
 
