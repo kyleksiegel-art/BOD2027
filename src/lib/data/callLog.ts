@@ -40,15 +40,45 @@ export async function readRecentSignatures(): Promise<string[]> {
   }
 }
 
+/**
+ * The broadcast voice's audio for a logged call (Kyle 2026-11-08), one `sync_meta` row per call
+ * keyed by its `at`, so a replay plays the same take again without signal or another ElevenLabs
+ * charge. Pruned in `logCall` to the calls still in the log.
+ */
+export const AUDIO_KEY_PREFIX = 'radio_audio:'
+const audioKey = (at: string) => `${AUDIO_KEY_PREFIX}${at}`
+
+export async function saveCallAudio(at: string, audio: Blob): Promise<void> {
+  try {
+    await db.sync_meta.put({ key: audioKey(at), value: audio })
+  } catch {
+    // Best effort: the replay just fetches the voice again, or uses the phone's.
+  }
+}
+
+export async function readCallAudio(at: string): Promise<Blob | null> {
+  try {
+    const row = await db.sync_meta.get(audioKey(at))
+    return row?.value instanceof Blob ? row.value : null
+  } catch {
+    return null
+  }
+}
+
 /** Record a call that just played: newest first in the log, its templates onto the recent list. */
 export async function logCall(call: LoggedCall, used: string[]): Promise<void> {
   try {
     const [log, recent] = await Promise.all([readCallLog(), readRecentSignatures()])
     const nextRecent = [...used, ...recent.filter((s) => !used.includes(s))].slice(0, RECENT_MAX)
+    const nextLog = [call, ...log].slice(0, CALL_LOG_MAX)
     await db.sync_meta.bulkPut([
-      { key: CALL_LOG_KEY, value: [call, ...log].slice(0, CALL_LOG_MAX) },
+      { key: CALL_LOG_KEY, value: nextLog },
       { key: RECENT_KEY, value: nextRecent },
     ])
+    // Audio for calls that fell off the log (or were deleted) goes too.
+    const keep = new Set(nextLog.map((c) => audioKey(c.at)))
+    const stale = (await db.sync_meta.where('key').startsWith(AUDIO_KEY_PREFIX).primaryKeys()).filter((k) => !keep.has(k))
+    if (stale.length > 0) await db.sync_meta.bulkDelete(stale)
   } catch {
     // Best effort: the call already played.
   }

@@ -42,12 +42,6 @@ export interface RadioCallVM {
 
 type Hr = PlayerRoundVM['holeResults'][number]
 
-/**
- * Trip lore (Kyle 2026-10-11): one label each when the field is introduced, nothing more ("too
- * much emphasis on the champion bit"). Adam Hersh won the inaugural Board of Directors; Jon
- * Aronson and Chris Denove are the returning champions; Kyle Siegel built the app. Matched by surname.
- */
-const LORE = { inaugural: 'Hersh', returning: ['Aronson', 'Denove'], builder: 'Siegel' }
 const surname = (name: string) => name.trim().split(/\s+/).slice(-1)[0] ?? ''
 
 interface Pl {
@@ -363,7 +357,7 @@ function openLine(c: Ctx, phase: CallPhase, pick: Pick): string {
       `${cap(words(left))} holes left on ${c.course}. Hands are shaking. Grips are tightening.`,
       `We're in the home stretch on ${c.course}. ${cap(words(left))} to play, and you can feel it.`,
       `${cap(words(left))} holes left on ${c.course}. This is where legends are made, or where excuses are born.`,
-      `It's crunch time on ${c.course}. ${cap(words(left))} to play. Somebody hold my beer.`,
+      `It's crunch time on ${c.course}. ${cap(words(left))} to play. Somebody hold my beer. [laughs]`,
       `The finish line is in sight on ${c.course}. ${cap(words(left))} holes left, and nobody is safe.`,
       `${cap(words(left))} to play on ${c.course}. Here's where it stands.`,
       `Coming down the stretch on ${c.course}, ${words(left)} holes left.`,
@@ -461,7 +455,7 @@ function stretchReview(c: Ctx, phase: CallPhase, pick: Pick): string[] {
     const quip = cold.z >= 3 ? pick([
             ` Somebody get ${cold.p.first} a drink.`,
             ` ${cold.p.first} would like to speak to a manager.`,
-            ' It has not been pretty.',
+            ' [sighs] It has not been pretty.',
             ` ${cold.p.first} has been searching for answers, and also golf balls.`,
             ' We will not be showing the highlights.',
             ` The good news for ${cold.p.first}: it can't get much worse. The bad news: it has before.`,
@@ -539,7 +533,7 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
         text: pick([
           `${p.first} has taken zeros on ${words(zr)} straight holes. Thoughts and prayers.`,
           `That's ${words(zr)} zeros in a row for ${p.first}. The walk to the next tee has gone very quiet.`,
-          `${p.first} has blanked ${words(zr)} straight. Someone hide the sharp objects.`,
+          `${p.first} has blanked ${words(zr)} straight. [sighs] Someone hide the sharp objects.`,
           `${cap(words(zr))} straight zeros for ${p.first}. At this point the scorecard is just a suggestion.`,
           `${p.first} has gone ${words(zr)} holes without a point. Search parties have been organized.`,
           `${p.first}: ${words(zr)} holes, zero points. The golf ball has filed a missing persons report.`,
@@ -611,7 +605,7 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
             `${last3} points in three holes for ${p.first}. Heating up doesn't cover it.`,
             `${p.first} is in the zone. ${last3} points over the last three.`,
             `Get the fire extinguisher. ${p.first} has ${last3} points in the last three holes.`,
-            `${last3} points in three holes for ${p.first}. Nobody say anything. Nobody touch anything.`,
+            `${last3} points in three holes for ${p.first}. [whispers] Nobody say anything. Nobody touch anything.`,
             `${p.first} has ${last3} points over the last three holes.`,
             `A strong run from ${p.first}: ${last3} points in the last three.`,
             `${p.first} has rattled off ${last3} points in three holes. Hide the scorecard from the handicap committee.`,
@@ -631,7 +625,7 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
         rank: 3,
         text: pick([
           `${p.first} has made net par on four straight holes. Boring. Brutally effective.`,
-          `Four straight net pars for ${p.first}. Like watching paint dry, and the paint is winning.`,
+          `Four straight net pars for ${p.first}. Like watching paint dry, [laughs] and the paint is winning.`,
           `${p.first} is grinding: net par, net par, net par, net par.`,
           `Four net pars in a row for ${p.first}. Not flashy, but the accountant in all of us approves.`,
           `${p.first} has gone net par four straight times. The fans are asleep. The scorecard is thrilled.`,
@@ -657,10 +651,10 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
                 `Let's talk about that real ${kind} from ${p.first} on the ${ordinalOf(q)}. Frame that scorecard.`,
                 `We have to go back to the ${ordinalOf(q)}: a real ${kind} from ${p.first}. Not net. Real.`,
                 `A real ${kind} for ${p.first} on the ${ordinalOf(q)}. Somebody get a photo of that card.`,
-                `Stop everything. ${p.first} made a real ${kind} on the ${ordinalOf(q)}.`,
+                `Stop everything. [excited] ${p.first} made a real ${kind} on the ${ordinalOf(q)}.`,
                 `A real ${kind} for ${p.first} on the ${ordinalOf(q)}. The drinks are on ${p.first}. That's the rule now.`,
                 `The shot of the day so far: a real ${kind} from ${p.first} on the ${ordinalOf(q)}.`,
-                `Hold the phone. A real ${kind} for ${p.first} on the ${ordinalOf(q)}.`,
+                `Hold the phone. [excited] A real ${kind} for ${p.first} on the ${ordinalOf(q)}.`,
                 `${p.first} just made a real ${kind} on the ${ordinalOf(q)}. No strokes. No asterisk.`,
                 `The ${ordinalOf(q)} belongs to ${p.first}: a real ${kind}. Somebody alert the local paper.`,
                 `A real ${kind}, ${p.first}, the ${ordinalOf(q)}. Say it again. A real ${kind}.`,
@@ -830,7 +824,7 @@ function roundStakes(c: Ctx, pick: Pick): string[] {
         pick([
           `${L} leads by ${b.gap} with ${words(left)} to play. Somebody start engraving.`,
           `${L} is ${b.gap} clear with ${words(left)} left. The rest are playing for pride, and there isn't much of that left either.`,
-          `${L} by ${b.gap} with ${words(left)} to go. This one is over, unless it isn't.`,
+          `${L} by ${b.gap} with ${words(left)} to go. This one is over, [laughs] unless it isn't.`,
           `${b.gap} points with ${words(left)} left. ${L} could walk in from here.`,
           `${L} by ${b.gap}, ${words(left)} to play. The only thing that can stop ${L} now is a lightning delay.`,
           `${L} leads by ${b.gap} with ${words(left)} to play. It would take something special to catch ${L}.`,
@@ -1070,123 +1064,114 @@ function liveCall(c: Ctx, phase: CallPhase, pick: Pick): string[] {
 }
 
 /**
- * The very first tee of the trip (Kyle 2026-10-11): the welcome, the field by full name, the
- * four days, and the whole purse. Only before the first round has a point on the board.
+ * The very first tee of the trip: ONE fixed script (Kyle 2026-11-08, picked off two drafts: the
+ * big-event telecast), with the field, shots, tee time, the 1st hole, the courses and the money
+ * filled in from the data. It is the whole Round 1 preview, before anything is final.
+ *
+ * Lore, matched by surname (Kyle): Jon Aronson and Chris Denove are the returning co-champions,
+ * Adam Hersh the inaugural champion, Kyle Siegel built the app and has never finished better than
+ * third. WOLF_ORDER is Round 1's side game tee order, oldest to youngest (Kyle).
  */
-function tournamentOpener(c: Ctx, pick: Pick, daypart: string): string[] | null {
+const WOLF_ORDER = ['Aronson', 'Denove', 'Hersh', 'Siegel']
+
+function tournamentOpener(c: Ctx): string[] | null {
   const rounds = c.db.rounds.filter((r) => r.status !== 'abandoned').sort((a, b) => a.round_number - b.round_number)
   if (rounds[0]?.round_number !== c.roundNumber || rounds.some((r) => r.status === 'final')) return null
+  const roster = c.players.map((p) => ({ p, name: c.db.players.find((x) => x.id === p.id)?.name ?? p.first }))
+  const bySurname = (s: string) => roster.find((r) => surname(r.name) === s)
+  const totalHoles = rounds.reduce((n, r) => n + (r.holes_counted ?? 18), 0)
+
   const out: string[] = [
-    pick([
-      `Good ${daypart}, everybody, and welcome to the Board of Directors. Streamsong, twenty twenty-seven.`,
-      `Good ${daypart}, and welcome to Streamsong for the Board of Directors, twenty twenty-seven.`,
-      `Good ${daypart}, and welcome to the Board of Directors, twenty twenty-seven, coming to you live, on foot, from somewhere in the dunes of central Florida.`,
-      `Good ${daypart} from Streamsong, where the dunes are big, the greens are fast and the handicaps are, let's say, under review. Welcome to the Board of Directors, twenty twenty-seven.`,
-      `The Board of Directors, twenty twenty-seven, is now in session. Good ${daypart}, and welcome to Streamsong.`,
-      `Good ${daypart}, and welcome to the Board of Directors, twenty twenty-seven, live from Streamsong.`,
-      `Welcome to Streamsong, everybody, and good ${daypart}. The Board of Directors, twenty twenty-seven, starts now.`,
-      `Good ${daypart}, golf fans. The Board of Directors is back, and this year it's at Streamsong.`,
-      `From the sand dunes of central Florida, good ${daypart}, and welcome to the Board of Directors, twenty twenty-seven.`,
-      `Good ${daypart}. The clubs are cleaned, the excuses are polished, and the Board of Directors, twenty twenty-seven, is underway at Streamsong.`,
-    ]),
-    pick([
-      `${cap(words(rounds.length))} rounds. ${cap(words(rounds.length))} courses. ${cap(words(rounds.length))} days. And ${words(c.players.length)} men who have been talking about this trip for months.`,
-      `${cap(words(rounds.length))} rounds in ${words(rounds.length)} days, ${words(c.players.length)} men, and one group chat that has not shut up since last year.`,
-      `${cap(words(rounds.length))} rounds. ${cap(words(rounds.length))} days. Zero mulligans. Officially.`,
-      `${cap(words(rounds.length))} courses, ${words(rounds.length)} days, and roughly a thousand excuses, most of them already rehearsed.`,
-      `${cap(words(rounds.length))} rounds, ${words(rounds.length)} days, ${words(c.players.length)} friends, and one trophy.`,
-      `${cap(words(rounds.length))} days of golf, ${words(c.players.length)} men, and a whole lot of walking.`,
-      `${cap(words(rounds.length))} rounds on foot, ${words(rounds.length)} days in the dunes, and ${words(c.players.length)} men who think this is their year.`,
-      `${cap(words(rounds.length))} rounds. ${cap(words(c.players.length))} players. One champion. No mulligans.`,
-    ]),
+    '[excited] From the dunes of central Florida, this is Streamsong, and this, ladies and gentlemen, is the Board of Directors, twenty twenty-seven!',
+    `[calmly] ${cap(words(rounds.length))} days. ${cap(words(rounds.length))} courses. ${totalHoles} holes, walked every step of the way. One champion.${
+      roster.length > 1 ? ` And ${words(roster.length - 1)} very long flights home.` : ''
+    }`,
   ]
-  const field = c.players
-    .map((p) => c.db.players.find((x) => x.id === p.id))
-    .filter((p): p is NonNullable<typeof p> => !!p)
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map((p) => p.name)
-  // Returning co-champions first, then everyone else, then the inaugural champion (Kyle 2026-10-24).
-  const returning = field.filter((n) => LORE.returning.includes(surname(n)))
-  const inaugural = field.filter((n) => surname(n) === LORE.inaugural)
-  const rest = field.filter((n) => !returning.includes(n) && !inaugural.includes(n))
-  const intro = [
-    ...(returning.length > 1
-      ? [
-          pick([
-            `Returning co-champions, ${listOf(returning)}.`,
-            `The returning co-champions, ${listOf(returning)}. One title, two mantels.`,
-            `Back to defend half a title each, the returning co-champions, ${listOf(returning)}.`,
-            `Returning co-champions, ${listOf(returning)}, who shared the title last time thanks to some creative scorekeeping. The app has a tiebreaker now.`,
-            `Sharing the crown from last time, the returning co-champions, ${listOf(returning)}.`,
-            `The defending co-champions, ${listOf(returning)}. One trophy, two claims.`,
-            `Returning co-champions ${listOf(returning)}, who have been splitting the bragging rights ever since.`,
-            `The returning co-champions, ${listOf(returning)}. This year, the app breaks ties.`,
-          ]),
-        ]
-      : returning.map((n) => `Returning champion, ${n}.`)),
-    ...rest.map((n) =>
-      surname(n) !== LORE.builder ? `${n}.` : pick([
-        `${n}.`,
-        `${n}, still chasing a first title.`,
-        `${n}, who built the app that's keeping score. The commissioners have reviewed the code. Allegedly.`,
-        `${n}, the man with the spreadsheet.`,
-        `${n}, commissioner of the scorecard.`,
-        `${n}, who swears the app is impartial.`,
-        `${n}, who has never finished better than third, and has a plan to fix that.`,
-        `${n}, builder of the app, and therefore not to be trusted.`,
-      ]),
-    ),
-    ...inaugural.map((n) =>
-      pick([
-        `${n}, inaugural champion.`,
-        `And the inaugural champion, ${n}. The original. Accept no substitutes.`,
-        `${n}, inaugural champion, and owner of the only title nobody had to share.`,
-        `And the first man ever to win this thing, ${n}, inaugural champion.`,
-        `${n}, the inaugural champion, and the original name on the trophy.`,
-        `And ${n}, inaugural champion, who never lets anybody forget it.`,
-        `${n}, who won the very first one, outright.`,
-        `And the man who started it all, ${n}, inaugural champion.`,
-      ]),
-    ),
-  ]
-  if (field.length > 0) out.push(`Let's meet the field. ${intro.join(' ')}`)
+
+  // The field, in the order the jokes build: the co-champions, the inaugural champion, Kyle last.
+  type R = (typeof roster)[number]
+  const intros: Record<string, (r: R) => string> = {
+    Aronson: (r) => `${r.name}. Returning co-champion, elder statesman, and the man who will remind you of both before the first tee.`,
+    Denove: (r) =>
+      `${r.name}. The other half of that co-championship. ${
+        r.p.strokes > 0 ? `${cap(plural(r.p.strokes, 'shot'))} today, and a fresh set of excuses already loaded.` : 'A fresh set of excuses already loaded.'
+      } [laughs]`,
+    Hersh: (r) => `${r.name}. Inaugural champion. Won the very first one outright and has never once let anyone forget it.`,
+    Siegel: (r) =>
+      `${r.name}. Built the app, wrote the rules, keeps the scores, and has never finished better than third. [sarcastic] No conflict of interest whatsoever.`,
+  }
+  const known = WOLF_ORDER.map(bySurname).filter((r): r is R => !!r)
+  const field = [...known, ...roster.filter((r) => !known.includes(r))]
+  if (field.length > 0) {
+    out.push("Let's run down the field.")
+    field.forEach((r, i) => {
+      const line = intros[surname(r.name)]?.(r) ?? `${r.name}.`
+      out.push(i === field.length - 1 && field.length > 1 ? `And ${line}` : line)
+    })
+  }
+
+  out.push(
+    'The format is net Stableford. Points on every hole, two for a net par, more for better, and a blow-up costs you a zero, not the trip. Points add up across all four rounds.',
+  )
 
   const weekday = (iso: string) => new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${iso}T12:00:00Z`))
+  const DAY = 86_400_000
   const stops = rounds.map((r, i) => {
     const course = c.db.courses.find((x) => x.id === r.course_id)
     const name = course ? courseRef(course.name) : `round ${r.round_number}`
-    return i === 0 ? `${name} today` : `${name} on ${weekday(r.date)}`
+    if (i === 0) return `${cap(name)} today.`
+    if (i === rounds.length - 1)
+      return course && courseShortName(course.name) === 'Bone Valley'
+        ? `And ${weekday(r.date)}, the brand-new Bone Valley, where the course is fresh and so are the scorecards.`
+        : `And ${weekday(r.date)}, ${name}.`
+    if (i === 1 && Date.parse(r.date) - Date.parse(rounds[0].date) === DAY) return `${cap(name)} tomorrow.`
+    return `${cap(name)} on ${weekday(r.date)}.`
   })
-  if (stops.length > 1)
-    out.push(
-      pick([
-        `Here's the road ahead: ${listOf(stops)}.`,
-        `On the docket: ${listOf(stops)}. Pace yourselves.`,
-        `The itinerary, for those who didn't read it: ${listOf(stops)}.`,
-        `The schedule: ${listOf(stops)}. Ibuprofen sold separately.`,
-        `The road map: ${listOf(stops)}.`,
-        `What's ahead: ${listOf(stops)}. Hydrate accordingly.`,
-        `The plan: ${listOf(stops)}. Stretch first.`,
-        `On the schedule: ${listOf(stops)}.`,
-      ]),
-    )
+  if (stops.length > 1) out.push(stops.join(' '))
 
   const purse = purseSettingsOf(c.db)
   const pot = purse.buyInPerPlayerCents * c.players.length
   if (purse.champFirstCents > 0) {
     out.push(
-      `${pot > 0 ? `${dollars(pot)} on the line. ` : ''}${dollars(purse.champFirstCents)} for the champion, ${dollars(purse.champSecondCents)} for second${
-        purse.roundWinnerCents > 0 ? `, and ${dollars(purse.roundWinnerCents)} to whoever wins each round` : ''
-      }. ${pick([
-        'Plus closest to the pin and shits, settled at the nineteenth hole, like gentlemen.',
-        'Closest to the pin and shits are settled in cash at the nineteenth hole, as tradition demands.',
-        'Closest to the pin and shits are handled off the books, at the bar, with witnesses.',
-        'Closest to the pin and shits are settled separately, at the nineteenth hole.',
-        'Closest to the pin and shits get paid in cash, after the golf, over a drink.',
-        'Closest to the pin and shits are off the books, and settled like gentlemen at the bar.',
-      ])}`,
+      `${pot > 0 ? `${dollars(pot)} in the pot. ` : ''}${dollars(purse.champFirstCents)} to the champion, ${dollars(purse.champSecondCents)} to the runner-up${
+        purse.roundWinnerCents > 0 ? `, and ${dollars(purse.roundWinnerCents)} to the winner of every round` : ''
+      }. Closest to the pin and shits are settled the old-fashioned way: [whispers] cash, at the bar, nobody asks.`,
     )
   }
+
+  // Wolf, by age: only when the whole field is in the known order.
+  if (known.length === roster.length && known.length >= 2) {
+    const [lead, ...after] = known.map((r) => r.p.first)
+    const youngest = after.pop()!
+    out.push(
+      `Today's side game is Wolf, by age. ${lead} tees off first, ${after.map((n) => `then ${n}, `).join('')}and ${youngest}, the youngest, goes last and gets to watch everyone else make the mistakes first.`,
+    )
+  }
+
+  const tee = c.detail.round.tee_time
+  if (tee && c.detail.round.status === 'upcoming') out.push(`Tee time, ${formatTeeTime(tee)!.replace(/ ET$/, '')}.`)
+
+  const byStrokes = c.players.slice().sort((a, b) => b.strokes - a.strokes)
+  const getting = byStrokes.filter((p) => p.strokes > 0)
+  const scratch = byStrokes.filter((p) => p.strokes === 0)
+  if (getting.length > 0) {
+    const parts = getting.map((p, i) => `${p.first} ${i === 0 ? `gets ${plural(p.strokes, 'shot')}` : words(p.strokes)}`)
+    if (scratch.length > 0) parts.push(`${listOf(scratch.map((p) => p.first))} ${scratch.length === 1 ? 'plays' : 'play'} it straight`)
+    out.push(`${parts.join(', ')}.`)
+  }
+
+  out.push('Nobody has a point. Nobody has a zero. Nobody has an excuse. [pause] Yet.')
+
+  const first = c.holes.find((h) => h.holeNumber === 1)
+  if (first) {
+    const y = teeYardage(c, 1)
+    const shot = c.players.filter((p) => (p.holes.get(1)?.strokesReceived ?? 0) >= 1)
+    const who =
+      shot.length === 0 ? 'no shots given' : shot.length === c.players.length ? 'a shot for everybody' : `a shot for ${listOf(shot.map((p) => p.first))}`
+    out.push(`The 1st hole: a ${y ? `${y}-yard ` : ''}par ${first.par}, and ${who}.`)
+  }
+
+  out.push("[excited] The Board is in session. Gentlemen, let's play!")
   return out
 }
 
@@ -1195,8 +1180,10 @@ function previewCall(c: Ctx, pick: Pick): string[] {
   const tee = c.detail.round.tee_time
   const hour = tee ? Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/New_York' }).format(new Date(tee))) : 12
   const daypart = hour < 12 ? 'morning' : 'afternoon'
-  const opener = tournamentOpener(c, pick, daypart)
-  const out: string[] = opener ?? [
+  // The trip's first tee is its own fixed script, the whole preview.
+  const opener = tournamentOpener(c)
+  if (opener) return opener
+  const out: string[] = [
     pick([
       `Good ${daypart}, and welcome to Streamsong for round ${c.roundNumber}, ${c.courseFull}.`,
       `Good ${daypart} from ${c.courseFull}, where round ${c.roundNumber} is about to get underway.`,
@@ -1354,7 +1341,7 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
     out.push(`We have co-champions! ${listOf(champs.map((r) => fullName(r.playerId)))} share the title, level after every tiebreaker.`)
   } else {
     const champ = champs[0]
-    out.push(pick([`${fullName(champ.playerId)} is your champion!`, `Your champion of the Board of Directors… ${fullName(champ.playerId)}!`, `Ladies and gentlemen, your champion: ${fullName(champ.playerId)}!`, `Pop the champagne, or at least the light beer. ${fullName(champ.playerId)} is your champion!`, `And the champion of the Board of Directors, twenty twenty-seven: ${fullName(champ.playerId)}!`, `${fullName(champ.playerId)}, champion!`, `Raise a glass. ${fullName(champ.playerId)} is your champion!`, `The new champion of the Board of Directors: ${fullName(champ.playerId)}!`]))
+    out.push(pick([`${fullName(champ.playerId)} is your champion!`, `Your champion of the Board of Directors… ${fullName(champ.playerId)}!`, `Ladies and gentlemen, your champion: [excited] ${fullName(champ.playerId)}!`, `Pop the champagne, or at least the light beer. ${fullName(champ.playerId)} is your champion!`, `And the champion of the Board of Directors, twenty twenty-seven: ${fullName(champ.playerId)}!`, `${fullName(champ.playerId)}, champion!`, `Raise a glass. ${fullName(champ.playerId)} is your champion!`, `The new champion of the Board of Directors: ${fullName(champ.playerId)}!`]))
     const how = st.tiebreakNote?.match(/leads on (.*)\.$/)?.[1]
     if (margin === 0 && how) out.push(`Level on points with ${short(runnerUp!.playerId)}, and ${short(champ.playerId)} wins it on ${how}. You cannot make this up.`)
     else if (margin === 1) out.push(`One point. ${totalHoles} holes, and it comes down to one point.`)

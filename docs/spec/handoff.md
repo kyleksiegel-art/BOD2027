@@ -1,12 +1,17 @@
-# Handoff — 2026-11-08 (radio call: more lines)
-- Branch `radio-call-more-lines`: every line pool in `src/lib/data/radioCall.ts` doubled (~290 new
-  takes) — openers, recent-action lead-ins, stretch review, colour notes, round/week stakes, next
-  hole, sign-offs, trip opener, previews, round wrap, finale. Blank "no quip" entries doubled too,
-  so quips stay as rare as before.
-- New takes are appended after the originals; `rand = () => 0` still picks the original wording.
-- Fixed single lines (strokes line, tee time, "Big news on the week", most of the finale) unchanged.
-- Rules kept: first names (full names only in opener/finale), no pronouns, walking not carts, CTP
-  paid outside the app, no em dashes. Diff scanned for pronouns/CTP/dashes: clean.
-- `vitest run --dir src` → 262, `npm run build` clean. Not listened to on a phone.
-- Discussed, not built: Claude-written calls via an Edge Function, fed the call log so nothing repeats.
-- Pre-trip checklist (late January, real phones) unchanged from the 2026-10-10 handoff.
+# Handoff — 2026-11-08 (radio call: broadcast voice)
+- Branch `radio-call-broadcast-voice`: the radio call reads in an ElevenLabs voice when there's
+  signal; the phone's own voice otherwise. Templates still write every word.
+- New Edge Function `supabase/functions/radio-voice` (open to anon, 6,000-char cap, 503 until
+  configured). **Kyle to do:** ElevenLabs account, pick a voice, then
+  `supabase secrets set ELEVENLABS_API_KEY=… ELEVENLABS_VOICE_ID=…` and
+  `supabase functions deploy radio-voice`. Set a usage limit in the ElevenLabs dashboard.
+- Client: `src/lib/speech/broadcast.ts` + `useRadioPlayer` (prime audio/speech in the tap, 15 s
+  timeout, fallback). Audio saved per call in `sync_meta` for replays, pruned with the log.
+- ~10 lines carry v3 cues ([excited], [laughs]…); stripped for the phone voice and on screen.
+- Round 1 opener is now ONE fixed script (Kyle's pick): telecast welcome, field jabs, net Stableford,
+  Wolf by age (Jon, Chris, Adam, Kyle). **Open:** Kyle says ElevenLabs is on model v4; get its API id.
+- Merged earlier today: PR #62, every radio line pool doubled.
+- `vitest run --dir src` → 266, `npm run build` clean. Desktop browser: fallback path and a faked
+  voice response both verified. **Not verified on an iPhone or against the real ElevenLabs API.**
+- Pre-trip checklist (late January, real phones) unchanged; add: one radio call with signal
+  (broadcast voice) and one in airplane mode (phone voice).

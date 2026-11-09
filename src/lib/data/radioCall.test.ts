@@ -26,24 +26,37 @@ describe('buildRadioCall', () => {
 
   it('previews the first tee: who gets shots, a clean slate, the 1st', () => {
     const { lines } = call(live(0))
-    expect(lines).toContain('Chris gets eight shots and Kyle four, and Jon and Adam play off scratch.')
-    expect(lines.some((l) => /^First up, the 1st: a par 4\./.test(l))).toBe(true)
-    expect(lines).toContain('Kyle and Chris get a shot there.')
+    expect(lines).toContain('Chris gets eight shots, Kyle four, Jon and Adam play it straight.')
+    expect(lines).toContain('Nobody has a point. Nobody has a zero. Nobody has an excuse. [pause] Yet.')
+    expect(lines).toContain('The 1st hole: a par 4, and a shot for Kyle and Chris.')
   })
 
   it('opens the whole trip on the first tee of round 1', () => {
     const db = live(0)
     db.settings = [{ key: 'purse_amounts', value: { buy_in_per_player_cents: 25000, champ_first_cents: 60000, champ_second_cents: 20000, round_winner_cents: 5000 } }]
     const { lines } = call(db)
-    expect(lines[0]).toMatch(/welcome to the Board of Directors/)
-    expect(lines).toContain("Let's meet the field. Returning co-champions, Jon Aronson and Chris Den-oh-vee. Kyle Siegel. Adam Hersh, inaugural champion.")
-    expect(lines).toContain("Here's the road ahead: the Red today, the Blue on Friday, the Black on Saturday and Bone Valley on Sunday.")
-    expect(lines).toContain('$1000 on the line. $600 for the champion, $200 for second, and $50 to whoever wins each round. Plus closest to the pin and shits, settled at the nineteenth hole, like gentlemen.')
+    // One fixed script (Kyle 2026-11-08), the data filled in.
+    expect(lines[0]).toBe('[excited] From the dunes of central Florida, this is Streamsong, and this, ladies and gentlemen, is the Board of Directors, twenty twenty-seven!')
+    expect(lines).toContain("Let's run down the field.")
+    expect(lines.filter((l) => /^(And )?(Jon Aronson|Chris Den-oh-vee|Adam Hersh|Kyle Siegel)\./.test(l)).map((l) => l.split('.')[0])).toEqual([
+      'Jon Aronson',
+      'Chris Den-oh-vee',
+      'Adam Hersh',
+      'And Kyle Siegel',
+    ])
+    expect(lines).toContain('Chris Den-oh-vee. The other half of that co-championship. Eight shots today, and a fresh set of excuses already loaded. [laughs]')
+    expect(lines.some((l) => l.startsWith('The format is net Stableford.'))).toBe(true)
+    expect(lines).toContain('The Red today. The Blue tomorrow. The Black on Saturday. And Sunday, the brand-new Bone Valley, where the course is fresh and so are the scorecards.')
+    expect(lines).toContain('$1000 in the pot. $600 to the champion, $200 to the runner-up, and $50 to the winner of every round. Closest to the pin and shits are settled the old-fashioned way: [whispers] cash, at the bar, nobody asks.')
+    expect(lines).toContain("Today's side game is Wolf, by age. Jon tees off first, then Chris, then Adam, and Kyle, the youngest, goes last and gets to watch everyone else make the mistakes first.")
+    expect(lines[lines.length - 1]).toBe("[excited] The Board is in session. Gentlemen, let's play!")
+    // The same script every time.
+    expect(buildRadioCall(db, '2027-02-04')!.script(() => 0.99)).toEqual(lines)
     // Round 2's preview is not the trip opener.
     const r2 = { ...reportDb(ROUND_ONE), settings: [PURSE] }
     const second = r2.rounds.find((r) => r.round_number === 2)!
     r2.round_players = [...r2.round_players, ...r2.round_players.map((rp) => ({ ...rp, round_id: second.id }))]
-    expect(call(r2, second.date).lines.join(' ')).not.toMatch(/meet the field/)
+    expect(call(r2, second.date).lines.join(' ')).not.toMatch(/run down the field|Wolf/)
   })
 
   it('at the turn reviews the front nine and sets up the 10th', () => {
@@ -149,7 +162,8 @@ describe('variety', () => {
 
   it('labels the champions when the field is introduced, and nowhere else', () => {
     const lines = buildRadioCall(live(0), '2027-02-04')!.script(() => 0)
-    expect(lines).toContain("Let's meet the field. Returning co-champions, Jon Aronson and Chris Den-oh-vee. Kyle Siegel. Adam Hersh, inaugural champion.")
+    expect(lines.some((l) => l.includes('Returning co-champion'))).toBe(true)
+    expect(lines.some((l) => l.includes('Inaugural champion'))).toBe(true)
     const db = reportDb(ROUND_ONE)
     db.rounds = db.rounds.map((r) => (r.round_number === 1 ? r : { ...r, status: 'abandoned' as const }))
     const finale = buildRadioCall(db, '2027-02-04')!.script(() => 0).join(' ')
