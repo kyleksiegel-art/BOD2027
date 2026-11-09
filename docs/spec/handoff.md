@@ -8,6 +8,8 @@
 - Client: `src/lib/speech/broadcast.ts` + `useRadioPlayer` (prime audio/speech in the tap, 15 s
   timeout, fallback). Audio saved per call in `sync_meta` for replays, pruned with the log.
 - ~10 lines carry v3 cues ([excited], [laughs]…); stripped for the phone voice and on screen.
+- Round 1 opener is now ONE fixed script (Kyle's pick): telecast welcome, field jabs, net Stableford,
+  Wolf by age (Jon, Chris, Adam, Kyle). **Open:** Kyle says ElevenLabs is on model v4; get its API id.
 - Merged earlier today: PR #62, every radio line pool doubled.
 - `vitest run --dir src` → 266, `npm run build` clean. Desktop browser: fallback path and a faked
   voice response both verified. **Not verified on an iPhone or against the real ElevenLabs API.**

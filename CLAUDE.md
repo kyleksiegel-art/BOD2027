@@ -1050,9 +1050,14 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   "winning the day but X leads the week", "if it ended now" $) → next hole (yardage off the
   group's tee, par, stroke-index flavor, who gets a shot, par-3 CTP) → the finish → close.
   Final: the whole story minus "pars all round" filler, the week, what's next.
-  **Round 1's preview is the trip opener** (`tournamentOpener`): the welcome, the field by FULL
-  name (the only place surnames are said, respelled via `SAY_AS`: only Denove → Den-oh-vee; Kyle says
-  Aronson and Siegel read fine as written), the four days, the whole purse. CTP is paid outside the app (never "pays nothing").
+  **Round 1's preview is ONE fixed script** (`tournamentOpener`, Kyle 2026-11-08, chosen off two
+  drafts: the big-event telecast). It replaces the whole round-1 preview, no pool picks: welcome,
+  days/courses/holes, the field by FULL name in `WOLF_ORDER` (Aronson, Denove, Hersh, Siegel,
+  oldest to youngest, Kyle) each with a lore jab, net Stableford explained, the schedule ("tomorrow"
+  for the next day, "the brand-new Bone Valley" last), the purse, **Wolf by age** (only when the
+  whole field is in `WOLF_ORDER`), tee time, shots, "[pause] Yet.", the 1st hole, the send-off.
+  Names, shots, money, yardage and dates come from the data. Surnames respelled via `SAY_AS` (only
+  Denove → Den-oh-vee). CTP is paid outside the app (never "pays nothing").
   `courseRef`: "the Red/Black/Blue" but plain "Bone Valley".
   **After the last round of the trip, `finalCall` hands off to `tripFinale`**: "in the books",
   the last round's final hole (from the story), the champion by FULL name (co-champions; a
@@ -1082,14 +1087,11 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   next delete or leaving Admin (`useRadioPlayer().removed` / `undoRemove`, `restoreLoggedCall`
   puts it back in time order). The section stays up while there's an Undo, even with 0 calls left.
   The offset lives in a ref too: a fast flick's release lands before the last move's render.
-- **Trip lore** (`LORE`, matched by surname): a LABEL only, in the round-1 "meet the field" line —
-  "Returning co-champions, Jon Aronson and Chris Denove. Kyle Siegel. Adam Hersh, inaugural
-  champion." — in that order (Kyle 2026-10-24). Kyle
-  2026-10-11: "too much emphasis on the champion bit" — no backstory, no week or finale reactions.
-  Don't add more lore lines without asking. **2026-10-24 (Kyle, "let the radio call have some fun,
-  all calls"):** the opener's lines, the field intro (incl. a Kyle-the-app-builder tag via
-  `LORE.builder`) and most pools got funnier takes; champion labels still only in the opener.
-  Week lines no longer say "leads by 0" when a tiebreak splits a points tie.
+- **Trip lore** now lives only in the fixed opener's per-surname intros (`tournamentOpener`):
+  Jon elder statesman + returning co-champion, Chris the other half (+ today's shots), Adam
+  inaugural champion, Kyle built the app / never better than third. Champion labels stay out of
+  every other call and the finale. Don't add more lore lines without asking. Week lines never
+  say "leads by 0" when a tiebreak splits a points tie.
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
@@ -1105,7 +1107,7 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   → play; any failure → `speakLines`. `voice` state drives the Admin card's sub-line. Audio is
   saved per call in `sync_meta['radio_audio:<at>']` (`callLog.ts`), pruned in `logCall` to the
   calls still in the log, so replays need no signal or credits.
-- **Performance cues** (`[excited]`, `[laughs]`, `[sighs]`, `[whispers]`, `[sarcastic]`) sit in
+- **Performance cues** (`[excited]`, `[laughs]`, `[sighs]`, `[whispers]`, `[sarcastic]`, plus `[calmly]`/`[pause]` in the opener) sit in
   ~10 non-first pool entries (the first stays the pinned original). `stripCues` removes them for
   the phone voice and on screen; `broadcast.test.ts` fails on any cue outside that set.
 - **Not yet verified on an iPhone**: the primed-element playback after the await, and the

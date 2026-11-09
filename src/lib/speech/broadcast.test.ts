@@ -8,7 +8,7 @@ import type { Db } from '@/lib/data/compute'
 import { reportDb, ROUND_ONE } from '@/test/reportFixture'
 
 // The cues the ElevenLabs v3 voice acts out. Anything else in brackets would be read aloud.
-const CUES = new Set(['excited', 'laughs', 'sighs', 'whispers', 'sarcastic'])
+const CUES = new Set(['excited', 'laughs', 'sighs', 'whispers', 'sarcastic', 'calmly', 'pause'])
 
 describe('stripCues', () => {
   it('drops performance cues for the phone voice and the screen, and nothing else', () => {
