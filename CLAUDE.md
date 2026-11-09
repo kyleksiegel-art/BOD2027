@@ -1067,7 +1067,7 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   write). Its sub-line is `RadioCallVM.label`: "Trip opener, first tee" · "Round 2 · first-tee
   preview" · "Round 2 · live, through 12" · "Round 2 · the turn" · "Round 2 · round wrap" ·
   "Trip finale".
-- **Variety without repeats.** Every pool holds ~4–8 takes (first entry = the original wording,
+- **Variety without repeats.** Every pool holds ~8–20 takes, doubled 2026-11-08 (first entry = the original wording; new takes are appended, never inserted,
   which the tests pin with `rand = () => 0`). `compose(rand, avoid)` skips templates in `avoid` and
   returns the `used` ones; `signature(line)` masks numbers, number words and capitalized words so
   a template matches whoever it was about. The phone remembers the last 160 used (`radio_recent`).
@@ -1095,4 +1095,4 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (16). Full `vitest run --dir src` → **253**.
+- Tests: `radioCall.test.ts` (16). Full `vitest run --dir src` → **262**.
