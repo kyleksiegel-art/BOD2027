@@ -38,10 +38,15 @@ export interface StoryVM {
   entries: StoryEntry[] // newest first
 }
 
-/** The round the Field Report follows: the live one, else the most recent final one. */
+/**
+ * The round the Field Report follows: the latest live one with a saved score, else the most
+ * recent final one. A round that has been started but has no scores yet is skipped, so starting
+ * the next round early never blanks a story that is still being written (Kyle 2026-11-09).
+ */
 function pickRound(dbData: Db): number | null {
   const rounds = dbData.rounds.slice().sort((a, b) => a.round_number - b.round_number)
-  const live = rounds.filter((r) => r.status === 'in_progress').pop()
+  const scored = new Set(dbData.scores.map((s) => s.round_id))
+  const live = rounds.filter((r) => r.status === 'in_progress' && scored.has(r.id)).pop()
   if (live) return live.round_number
   const final = rounds.filter((r) => r.status === 'final').pop()
   return final ? final.round_number : null

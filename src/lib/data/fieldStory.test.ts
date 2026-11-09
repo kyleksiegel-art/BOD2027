@@ -50,6 +50,14 @@ describe('buildFieldStory', () => {
     expect(all).not.toMatch(/Aronson|Siegel|Hersh|Denove|—/)
   })
 
+  it('skips a round that was started but has no scores yet', () => {
+    const db = reportDb(ROUND_ONE, { status: 'in_progress' })
+    db.rounds = [...db.rounds, { ...db.rounds[0], id: 'e0000000-0000-4000-8000-000000000002', round_number: 2 }]
+    const vm = buildFieldStory(db)!
+    expect(vm.roundNumber).toBe(1)
+    expect(vm.entries.length).toBeGreaterThan(0)
+  })
+
   it('is null before any hole is saved', () => {
     const db = reportDb(ROUND_ONE, { status: 'in_progress' })
     db.scores = []

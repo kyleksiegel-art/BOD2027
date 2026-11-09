@@ -955,7 +955,7 @@ with the old line-per-player wire, and chose **story only** (2026-10-02). `wire.
 (label as the marker, the scoreline-only turn entry skipped). The old "Field Report (2026-09-07)"
 section above describes the removed wire.
 
-- **`src/lib/data/fieldStory.ts` `buildFieldStory(db) → StoryVM`**: follows the live round, else
+- **`src/lib/data/fieldStory.ts` `buildFieldStory(db) → StoryVM`**: follows the latest live round **with a saved score** (a started-but-empty round is skipped, 2026-11-09), else
   the latest final one (its own `pickRound`); `StoryVM` carries the header fields (`live`,
   `complete`, `roundThru`, `courseName`, `dateIso`). A hole counts only when EVERY playing player has it;
   the next hole, if some are in, is a `partial` entry ("Kyle and Chris in: …. Jon and Adam still
