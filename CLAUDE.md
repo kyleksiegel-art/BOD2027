@@ -1093,6 +1093,23 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
+- **Broadcast voice (2026-11-08, branch `radio-call-broadcast-voice`).** The templates still
+  write every call; ElevenLabs only *voices* it. `supabase/functions/radio-voice` takes
+  `{ lines }`, packs them into ≤2,500-char requests, returns one MP3 (`mp3_44100_96`); 503 when
+  `ELEVENLABS_API_KEY`/`ELEVENLABS_VOICE_ID` aren't set, 6,000-char cap per call. **Open to anon
+  on purpose** (the triple tap has no PIN; Kyle accepted the spend risk, capped by the plan).
+  `src/lib/speech/broadcast.ts`: one shared `<audio>` element, primed in the tap with a generated
+  silent WAV (`primeAudio`) because iOS only starts audio in a gesture and the voice lands
+  seconds later; `primeSpeech()` (silent utterance) likewise keeps the phone-voice fallback
+  allowed after the await. `useRadioPlayer`: saved audio → fetch (15 s, `BROADCAST_TIMEOUT_MS`)
+  → play; any failure → `speakLines`. `voice` state drives the Admin card's sub-line. Audio is
+  saved per call in `sync_meta['radio_audio:<at>']` (`callLog.ts`), pruned in `logCall` to the
+  calls still in the log, so replays need no signal or credits.
+- **Performance cues** (`[excited]`, `[laughs]`, `[sighs]`, `[whispers]`, `[sarcastic]`) sit in
+  ~10 non-first pool entries (the first stays the pinned original). `stripCues` removes them for
+  the phone voice and on screen; `broadcast.test.ts` fails on any cue outside that set.
+- **Not yet verified on an iPhone**: the primed-element playback after the await, and the
+  speech fallback after it. Desktop verified both paths with a faked function response.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (16). Full `vitest run --dir src` → **262**.
+- Tests: `radioCall.test.ts` (16), `broadcast.test.ts` (4). Full `vitest run --dir src` → **266**.

@@ -264,6 +264,21 @@ environment (they point at the **hosted** Supabase project, not localhost). The 
 Function and its secrets are deployed to Supabase separately (`supabase functions deploy
 pin-verify` and `supabase secrets set …`), not to Netlify.
 
+### Radio call broadcast voice (optional)
+
+The radio call reads in an ElevenLabs voice when the `radio-voice` Edge Function is deployed
+and configured; otherwise, and whenever there's no signal, the phone's own voice reads it.
+ElevenLabs only voices the app's own text. The key stays on Supabase, never in the app.
+
+```bash
+supabase secrets set ELEVENLABS_API_KEY='...' ELEVENLABS_VOICE_ID='...'
+supabase functions deploy radio-voice
+```
+
+`ELEVENLABS_MODEL_ID` is optional (default `eleven_v3`, which acts out the `[excited]`-style
+cues in a few lines). Each call is capped at 6,000 characters; the ElevenLabs plan's monthly
+limit caps the rest. Set a usage limit in the ElevenLabs dashboard too.
+
 **Install / update needs a real HTTPS origin** — service workers do not run on plain
 `localhost` over the network. Do the pre-trip check on the deploy preview or production:
 install to the iOS home screen, confirm the update prompt appears on a new deploy, and

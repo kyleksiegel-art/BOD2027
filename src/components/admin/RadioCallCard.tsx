@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useRadioPlayer } from '@/hooks/useRadioPlayer'
 import { formatCallTime } from '@/lib/format'
+import { stripCues } from '@/lib/speech/speak'
 
 const REVEAL = 88 // px — the Delete button behind a row
 
@@ -106,7 +107,7 @@ function PlayIcon({ playing }: { playing: boolean }) {
 /**
  * Admin's radio call (Kyle 2026-10-11): the same call the Field Report's secret triple tap plays,
  * behind the PIN so it stays a surprise, plus the calls this phone has played, to hear again word
- * for word. The phone's own voice, so it works offline.
+ * for word. The broadcast voice with signal, the phone's own voice without (useRadioPlayer).
  */
 export function RadioCallCard() {
   const player = useRadioPlayer()
@@ -119,7 +120,13 @@ export function RadioCallCard() {
       <div className="flex items-center justify-between gap-3 p-3">
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[0.95rem] font-semibold text-paper">Radio call</span>
-          <span className="truncate text-[0.78rem] text-paper-faint">{player.call.label}</span>
+          <span className="truncate text-[0.78rem] text-paper-faint">
+            {player.playing && player.voice === 'loading'
+              ? 'Getting the broadcast voice…'
+              : player.playing && player.voice === 'phone'
+                ? 'No broadcast voice, using the phone’s'
+                : player.call.label}
+          </span>
         </span>
         <button
           type="button"
@@ -165,7 +172,7 @@ export function RadioCallCard() {
                         <div className="flex items-center justify-between gap-3 px-3 py-2">
                           <span className="flex min-w-0 flex-col gap-0.5">
                             <span className="tnum text-[0.85rem] text-paper">{formatCallTime(c.at)} · {c.label}</span>
-                            <span className="truncate text-[0.75rem] text-paper-faint">{c.lines[0]}</span>
+                            <span className="truncate text-[0.75rem] text-paper-faint">{stripCues(c.lines[0] ?? '')}</span>
                           </span>
                           <button
                             type="button"

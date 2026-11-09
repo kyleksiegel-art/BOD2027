@@ -22,6 +22,29 @@ export function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice 
   return english.slice().sort((a, b) => score(b) - score(a))[0]
 }
 
+/**
+ * The broadcast voice's performance cues ("[excited]", "[laughs]") are acted out by ElevenLabs
+ * and never said. The phone's voice would read them aloud, and nobody should see them on screen.
+ */
+export function stripCues(text: string): string {
+  return text.replace(/\s*\[[a-z][a-z ]*\]\s*/gi, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Call inside the tap when the real speech may start after an await (the broadcast voice's
+ * fallback): a silent utterance unlocks speech for the page on iOS. Never throws.
+ */
+export function primeSpeech(): void {
+  try {
+    if (!speechAvailable()) return
+    const u = new SpeechSynthesisUtterance(' ')
+    u.volume = 0
+    window.speechSynthesis.speak(u)
+  } catch {
+    // Best effort.
+  }
+}
+
 /** Read `lines` in order. `onDone` fires once, when the last line ends or speech is stopped. */
 export function speakLines(lines: string[], onDone: () => void): void {
   const synth = window.speechSynthesis
@@ -33,7 +56,8 @@ export function speakLines(lines: string[], onDone: () => void): void {
     finished = true
     onDone()
   }
-  lines.forEach((text, i) => {
+  lines.forEach((line, i) => {
+    const text = stripCues(line)
     const u = new SpeechSynthesisUtterance(text)
     if (voice) {
       u.voice = voice

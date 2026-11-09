@@ -363,7 +363,7 @@ function openLine(c: Ctx, phase: CallPhase, pick: Pick): string {
       `${cap(words(left))} holes left on ${c.course}. Hands are shaking. Grips are tightening.`,
       `We're in the home stretch on ${c.course}. ${cap(words(left))} to play, and you can feel it.`,
       `${cap(words(left))} holes left on ${c.course}. This is where legends are made, or where excuses are born.`,
-      `It's crunch time on ${c.course}. ${cap(words(left))} to play. Somebody hold my beer.`,
+      `It's crunch time on ${c.course}. ${cap(words(left))} to play. Somebody hold my beer. [laughs]`,
       `The finish line is in sight on ${c.course}. ${cap(words(left))} holes left, and nobody is safe.`,
       `${cap(words(left))} to play on ${c.course}. Here's where it stands.`,
       `Coming down the stretch on ${c.course}, ${words(left)} holes left.`,
@@ -461,7 +461,7 @@ function stretchReview(c: Ctx, phase: CallPhase, pick: Pick): string[] {
     const quip = cold.z >= 3 ? pick([
             ` Somebody get ${cold.p.first} a drink.`,
             ` ${cold.p.first} would like to speak to a manager.`,
-            ' It has not been pretty.',
+            ' [sighs] It has not been pretty.',
             ` ${cold.p.first} has been searching for answers, and also golf balls.`,
             ' We will not be showing the highlights.',
             ` The good news for ${cold.p.first}: it can't get much worse. The bad news: it has before.`,
@@ -539,7 +539,7 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
         text: pick([
           `${p.first} has taken zeros on ${words(zr)} straight holes. Thoughts and prayers.`,
           `That's ${words(zr)} zeros in a row for ${p.first}. The walk to the next tee has gone very quiet.`,
-          `${p.first} has blanked ${words(zr)} straight. Someone hide the sharp objects.`,
+          `${p.first} has blanked ${words(zr)} straight. [sighs] Someone hide the sharp objects.`,
           `${cap(words(zr))} straight zeros for ${p.first}. At this point the scorecard is just a suggestion.`,
           `${p.first} has gone ${words(zr)} holes without a point. Search parties have been organized.`,
           `${p.first}: ${words(zr)} holes, zero points. The golf ball has filed a missing persons report.`,
@@ -611,7 +611,7 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
             `${last3} points in three holes for ${p.first}. Heating up doesn't cover it.`,
             `${p.first} is in the zone. ${last3} points over the last three.`,
             `Get the fire extinguisher. ${p.first} has ${last3} points in the last three holes.`,
-            `${last3} points in three holes for ${p.first}. Nobody say anything. Nobody touch anything.`,
+            `${last3} points in three holes for ${p.first}. [whispers] Nobody say anything. Nobody touch anything.`,
             `${p.first} has ${last3} points over the last three holes.`,
             `A strong run from ${p.first}: ${last3} points in the last three.`,
             `${p.first} has rattled off ${last3} points in three holes. Hide the scorecard from the handicap committee.`,
@@ -631,7 +631,7 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
         rank: 3,
         text: pick([
           `${p.first} has made net par on four straight holes. Boring. Brutally effective.`,
-          `Four straight net pars for ${p.first}. Like watching paint dry, and the paint is winning.`,
+          `Four straight net pars for ${p.first}. Like watching paint dry, [laughs] and the paint is winning.`,
           `${p.first} is grinding: net par, net par, net par, net par.`,
           `Four net pars in a row for ${p.first}. Not flashy, but the accountant in all of us approves.`,
           `${p.first} has gone net par four straight times. The fans are asleep. The scorecard is thrilled.`,
@@ -657,10 +657,10 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
                 `Let's talk about that real ${kind} from ${p.first} on the ${ordinalOf(q)}. Frame that scorecard.`,
                 `We have to go back to the ${ordinalOf(q)}: a real ${kind} from ${p.first}. Not net. Real.`,
                 `A real ${kind} for ${p.first} on the ${ordinalOf(q)}. Somebody get a photo of that card.`,
-                `Stop everything. ${p.first} made a real ${kind} on the ${ordinalOf(q)}.`,
+                `Stop everything. [excited] ${p.first} made a real ${kind} on the ${ordinalOf(q)}.`,
                 `A real ${kind} for ${p.first} on the ${ordinalOf(q)}. The drinks are on ${p.first}. That's the rule now.`,
                 `The shot of the day so far: a real ${kind} from ${p.first} on the ${ordinalOf(q)}.`,
-                `Hold the phone. A real ${kind} for ${p.first} on the ${ordinalOf(q)}.`,
+                `Hold the phone. [excited] A real ${kind} for ${p.first} on the ${ordinalOf(q)}.`,
                 `${p.first} just made a real ${kind} on the ${ordinalOf(q)}. No strokes. No asterisk.`,
                 `The ${ordinalOf(q)} belongs to ${p.first}: a real ${kind}. Somebody alert the local paper.`,
                 `A real ${kind}, ${p.first}, the ${ordinalOf(q)}. Say it again. A real ${kind}.`,
@@ -830,7 +830,7 @@ function roundStakes(c: Ctx, pick: Pick): string[] {
         pick([
           `${L} leads by ${b.gap} with ${words(left)} to play. Somebody start engraving.`,
           `${L} is ${b.gap} clear with ${words(left)} left. The rest are playing for pride, and there isn't much of that left either.`,
-          `${L} by ${b.gap} with ${words(left)} to go. This one is over, unless it isn't.`,
+          `${L} by ${b.gap} with ${words(left)} to go. This one is over, [laughs] unless it isn't.`,
           `${b.gap} points with ${words(left)} left. ${L} could walk in from here.`,
           `${L} by ${b.gap}, ${words(left)} to play. The only thing that can stop ${L} now is a lightning delay.`,
           `${L} leads by ${b.gap} with ${words(left)} to play. It would take something special to catch ${L}.`,
@@ -1128,7 +1128,7 @@ function tournamentOpener(c: Ctx, pick: Pick, daypart: string): string[] | null 
       surname(n) !== LORE.builder ? `${n}.` : pick([
         `${n}.`,
         `${n}, still chasing a first title.`,
-        `${n}, who built the app that's keeping score. The commissioners have reviewed the code. Allegedly.`,
+        `${n}, who built the app that's keeping score. The commissioners have reviewed the code. [sarcastic] Allegedly.`,
         `${n}, the man with the spreadsheet.`,
         `${n}, commissioner of the scorecard.`,
         `${n}, who swears the app is impartial.`,
@@ -1354,7 +1354,7 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
     out.push(`We have co-champions! ${listOf(champs.map((r) => fullName(r.playerId)))} share the title, level after every tiebreaker.`)
   } else {
     const champ = champs[0]
-    out.push(pick([`${fullName(champ.playerId)} is your champion!`, `Your champion of the Board of Directors… ${fullName(champ.playerId)}!`, `Ladies and gentlemen, your champion: ${fullName(champ.playerId)}!`, `Pop the champagne, or at least the light beer. ${fullName(champ.playerId)} is your champion!`, `And the champion of the Board of Directors, twenty twenty-seven: ${fullName(champ.playerId)}!`, `${fullName(champ.playerId)}, champion!`, `Raise a glass. ${fullName(champ.playerId)} is your champion!`, `The new champion of the Board of Directors: ${fullName(champ.playerId)}!`]))
+    out.push(pick([`${fullName(champ.playerId)} is your champion!`, `Your champion of the Board of Directors… ${fullName(champ.playerId)}!`, `Ladies and gentlemen, your champion: [excited] ${fullName(champ.playerId)}!`, `Pop the champagne, or at least the light beer. ${fullName(champ.playerId)} is your champion!`, `And the champion of the Board of Directors, twenty twenty-seven: ${fullName(champ.playerId)}!`, `${fullName(champ.playerId)}, champion!`, `Raise a glass. ${fullName(champ.playerId)} is your champion!`, `The new champion of the Board of Directors: ${fullName(champ.playerId)}!`]))
     const how = st.tiebreakNote?.match(/leads on (.*)\.$/)?.[1]
     if (margin === 0 && how) out.push(`Level on points with ${short(runnerUp!.playerId)}, and ${short(champ.playerId)} wins it on ${how}. You cannot make this up.`)
     else if (margin === 1) out.push(`One point. ${totalHoles} holes, and it comes down to one point.`)
