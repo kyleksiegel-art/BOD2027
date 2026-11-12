@@ -58,7 +58,9 @@ describe('buildRadioCall', () => {
 
   it('down the stretch: the last two holes, the last nine, the finish', () => {
     const { lines } = call(live(16))
-    expect(lines).toContain("Last time through. On the 15th: Kyle and Chris make net birdies. Chris still leads by 10.")
+    // The last two holes are called, not read out: the quiet 15th is skipped, the 16th had a winner.
+    expect(lines).toContain('Last time through. Chris wins the 16th outright with a net birdie. The lead grows to 11.')
+    expect(lines.join(' ')).not.toMatch(/On the 15th:/)
     expect(lines.some((l) => l.startsWith('Over the last nine holes'))).toBe(true)
     expect(lines).toContain('Then the 18th, a par 5, to finish.')
     // Only CTPs already won count.
@@ -78,10 +80,33 @@ describe('buildRadioCall', () => {
     const db = { ...reportDb(ROUND_ONE, { ctp: { 6: 2 } }), settings: [PURSE] }
     const { phase, lines } = call(db)
     expect(phase).toBe('final')
-    expect(lines.some((l) => l.endsWith('Final tally: Chris 44, Kyle 36, Jon 31, Adam 27.'))).toBe(true)
-    expect(lines.join(' ')).not.toMatch(/Pars all round/)
+    expect(lines).toContain('Final scores: Chris 44, Kyle 36, Jon 31, Adam 27.')
+    expect(lines.join(' ')).not.toMatch(/Pars all round|On the \d+(st|nd|rd|th):/)
     expect(lines).toContain('If it ended right now, Chris takes home $600 and Kyle $200.')
     expect(lines).toContain('Next up: the Blue.')
+  })
+
+  it('calls the wrap like a highlights show: result, money, play of the day, the field, a blooper', () => {
+    const db = { ...reportDb(ROUND_ONE, { ctp: { 6: 2, 8: 2, 14: 2, 16: 1 } }), settings: [PURSE] }
+    const { lines } = call(db)
+    expect(lines.slice(1, 11)).toEqual([
+      "Chris wins round 1, and it wasn't close. 44 points, 8 clear of Kyle.",
+      'Final scores: Chris 44, Kyle 36, Jon 31, Adam 27.',
+      "That's $50 to Chris.",
+      'Chris took the lead on the 2nd and never gave it back. It got as big as 12 after the 11th.',
+      "Play of the day. The par-5 7th. Chris makes a real eagle, while the other three walk off with nothing. No strokes. No asterisk. Chris's lead went from 3 to 7 on one hole. That was the round.",
+      'Honorable mention: Jon, with a real eagle on the last. Too late to matter, but it will come up at dinner. Repeatedly.',
+      "Kyle finishes second on 36. Kyle actually won the back nine with 21, but gave Chris a 10-point head start at the turn. You can't do that.",
+      '11 going out, 20 coming home. Somebody tell Jon the round starts on the 1st.'.replace(/^/, 'Jon is third on 31. '),
+      'Adam brings up the rear on 27. But Adam won three closest to the pins. Last on the card, first to the cash.',
+      "From the blooper reel. Chris went 17 holes without a zero, then took one on the last with the round already won. We're calling it a victory lap.",
+    ])
+    // Every take names all four players and the winner's money.
+    for (const r of [0.3, 0.6, 0.99]) {
+      const take = buildRadioCall(db, '2027-02-04')!.script(() => r).join(' ')
+      for (const name of ['Chris', 'Kyle', 'Jon', 'Adam']) expect(take).toContain(name)
+      expect(take).toMatch(/\$50/)
+    }
   })
 
   it("previews the next round on its morning once it's set up", () => {

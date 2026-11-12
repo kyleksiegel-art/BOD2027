@@ -1090,9 +1090,19 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   all calls"):** the opener's lines, the field intro (incl. a Kyle-the-app-builder tag via
   `LORE.builder`) and most pools got funnier takes; champion labels still only in the opener.
   Week lines no longer say "leads by 0" when a tiebreak splits a points tie.
+- **Commentary, not a readout (Kyle 2026-11-11, branch `radio-call-sportscast`).** The round wrap
+  is a highlights show (`wrapShow`): result by margin band + final scores + the round-winner $ →
+  how it was won (comeback / led from the Nth / left it late, off the winner's hole-by-hole margin)
+  → play of the day (real eagle > birdie-for-net-eagle > net eagle; + honorable mention) → one line
+  on every non-winner with a hook (won the back nine, CTPs, slow start, fade, zeros, real birdies;
+  no hook kind twice) → one blooper (winner's lone zero on the last, a 3+ zero run, a hole that
+  zeroed 3+, pick-ups) → week, next up, sign-off. It no longer reads the Field Report's lines.
+  Live calls' "recent action" is `holeCall` per hole (lead change, tie broken, leader's zero, hole
+  won outright, gap moved 2+); a quiet hole is skipped and two quiet holes share one line. Only a
+  half-finished hole and the trip finale's last hole still read the story's own line.
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (16). Full `vitest run --dir src` → **262**.
+- Tests: `radioCall.test.ts` (17). Full `vitest run --dir src` → **264**.
