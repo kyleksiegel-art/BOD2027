@@ -82,6 +82,19 @@
     font-size: 16px;
   }
 
+  /* iOS Safari gives time/date inputs a native appearance with its own minimum width, which
+     ignores `width: 100%` and spills out of its box (the tee-time field ran under its Save
+     button on Kyle's phone). Without the native appearance it sizes like any other input;
+     the picker still opens. */
+  input[type='time'],
+  input[type='date'],
+  input[type='datetime-local'] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+  }
+
   /* Respect reduced-motion for the countdown and any future transitions. */
   @media (prefers-reduced-motion: reduce) {
     *,

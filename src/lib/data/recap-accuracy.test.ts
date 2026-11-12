@@ -90,3 +90,17 @@ describe('scores in vs final', () => {
     }
   })
 })
+
+describe('live headline', () => {
+  // Kyle birdies the 2nd and leads alone from there. Cut the round off after N holes.
+  const through = (n: number) => {
+    const db = makeDb('in_progress')
+    db.scores = db.scores.filter((s) => s.hole_number <= n)
+    return text(buildRoundRecap(1, db)!.headline)
+  }
+
+  it('says "at the turn" only through 9', () => {
+    expect(through(9)).toBe('Kyle leads at the turn.')
+    for (const n of [6, 7, 8, 10, 11, 13]) expect(through(n)).toBe('Kyle out front.')
+  })
+})
