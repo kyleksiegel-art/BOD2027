@@ -1,12 +1,12 @@
-# Handoff — 2026-11-08 (radio call: more lines)
-- Branch `radio-call-more-lines`: every line pool in `src/lib/data/radioCall.ts` doubled (~290 new
-  takes) — openers, recent-action lead-ins, stretch review, colour notes, round/week stakes, next
-  hole, sign-offs, trip opener, previews, round wrap, finale. Blank "no quip" entries doubled too,
-  so quips stay as rare as before.
-- New takes are appended after the originals; `rand = () => 0` still picks the original wording.
-- Fixed single lines (strokes line, tee time, "Big news on the week", most of the finale) unchanged.
-- Rules kept: first names (full names only in opener/finale), no pronouns, walking not carts, CTP
-  paid outside the app, no em dashes. Diff scanned for pronouns/CTP/dashes: clean.
-- `vitest run --dir src` → 262, `npm run build` clean. Not listened to on a phone.
-- Discussed, not built: Claude-written calls via an Edge Function, fed the call log so nothing repeats.
-- Pre-trip checklist (late January, real phones) unchanged from the 2026-10-10 handoff.
+# Handoff — 2026-11-11
+
+Branch `radio-call-sportscast` (off `main`), **uncommitted**.
+
+- Radio call is commentary now, not a Field Report readout (Kyle 2026-11-11).
+- Round wrap = highlights show: `wrapShow` in `src/lib/data/radioCall.ts` (result, money, how it
+  was won, play of the day, a line per player, one blooper), then week / next up / sign-off.
+- Live calls: `recentAction` now calls each of the last two holes via `holeCall`; quiet holes are
+  skipped. A fresh real eagle is no longer said twice (hole call + color note).
+- Trip finale and the first-tee preview are unchanged.
+- Tests: `radioCall.test.ts` 17; `vitest run --dir src` → 264. `npm run build` clean.
+- Next: Kyle listens to a few takes on the phone (Admin → Radio call) and says what to tune.
