@@ -1148,3 +1148,13 @@ it darkens on the tap, before Save). The light rows are the players still missin
 - Every row is `-mx-3 px-3` so the tint bleeds 12px into the page gutter and names stay on the
   page's column. A did-not-play row never darkens.
 - 14% keeps "1 stroke here" at 4.65:1 on the tint; much stronger drops it under 4.5.
+
+## "Hole N saved" bar on Enter (2026-11-12, branch `enter-saved-bar`) — the shape to reuse
+
+Save advances to the next hole, where nothing said the last one went in. `savedToast` (the hole
+just saved) is set in `saveHole` beside `justSaved` and cleared by a 2.5 s timer
+(`SAVED_TOAST_MS`). It renders in the message slot under the Save button, after the error /
+"still need" / CTP-blocked lines and **before** "Unsaved on N holes", which comes back when it
+clears. Right-hand text is "on this phone · syncing", or "syncs when online" off
+`useOnlineStatus`. Colour is the new `--olive-deep` token (`#5a5f0d`, light text 6:1); `--olive`
+is too pale for light text. The slot grows ~20px while the bar is up; nothing below is tappable.

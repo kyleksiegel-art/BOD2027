@@ -8,6 +8,7 @@ import type { EnterDraft } from '@/lib/data/compute'
 import { saveCells, saveCtp, subscribeWriteState, getWriteState } from '@/lib/data/mutations'
 import { draftMatchesStored, loadEnterDrafts, putEnterDraft } from '@/lib/data/drafts'
 import { courseShortName } from '@/lib/format'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 
 function useWriteState() {
   return useSyncExternalStore(subscribeWriteState, getWriteState, getWriteState)
@@ -17,6 +18,9 @@ function useWriteState() {
 type DraftsByHole = Record<number, Record<string, EnterDraft>>
 
 const EMPTY: Record<string, EnterDraft> = {}
+
+/** How long the "Hole N saved" bar stays up after Save. */
+const SAVED_TOAST_MS = 2500
 
 export default function Enter() {
   const rounds = useRoundChoices()
@@ -33,6 +37,16 @@ export default function Enter() {
   const [roundsOpen, setRoundsOpen] = useState(false)
   // Which hole was most recently saved, so an untouched hole doesn't claim "Saved".
   const [justSaved, setJustSaved] = useState<number | null>(null)
+  // The hole whose save is being announced. Save moves the screen to the next hole, where
+  // nothing would otherwise say the last one went in, so a "Hole N saved" bar shows under
+  // the Save button for a moment (Kyle 2026-11-12). Cleared by the timer below.
+  const [savedToast, setSavedToast] = useState<number | null>(null)
+  const online = useOnlineStatus()
+  useEffect(() => {
+    if (savedToast === null) return
+    const t = setTimeout(() => setSavedToast(null), SAVED_TOAST_MS)
+    return () => clearTimeout(t)
+  }, [savedToast])
 
   // Nothing is written until Save is tapped, so unsaved edits have to survive paging
   // between holes — otherwise walking back to check hole 12 would throw away hole 13.
@@ -300,6 +314,7 @@ export default function Enter() {
       clearSentDrafts(h, null, ctpRef.current[h] === sentCtpWinner)
     }
     setJustSaved(h)
+    setSavedToast(h)
     // Save is gated on every playing player being in, so a saved hole is a finished hole:
     // move on to the next one. The "Saved" state stays on the hole left behind, so paging
     // back confirms it. The 18th stays put — there is nowhere to go. Only advance if the
@@ -617,6 +632,15 @@ export default function Enter() {
                 <span className="text-gold-bright">
                   {ctpPick!.name} is over par here, so can’t take the CTP. Pick someone else or No
                   winner.
+                </span>
+              ) : savedToast !== null ? (
+                // Announces the save on the hole the screen has just moved to. Brief, and
+                // ahead of the standing "unsaved on N holes" line, which returns after it.
+                <span className="flex items-center gap-2 rounded-md bg-olive-deep px-3.5 py-2 text-[1rem] font-bold text-ground-2">
+                  <span aria-hidden>✓</span> Hole {savedToast} saved
+                  <span className="ml-auto text-[0.85rem] font-medium opacity-90">
+                    {online ? 'on this phone · syncing' : 'on this phone · syncs when online'}
+                  </span>
                 </span>
               ) : dirtyHoles.length > 1 ? (
                 <span className="text-gold-bright">

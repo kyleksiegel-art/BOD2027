@@ -22,6 +22,7 @@ export default {
         'gold-fill': 'rgb(var(--gold-fill-rgb) / <alpha-value>)',
         blue: 'rgb(var(--blue-rgb) / <alpha-value>)',
         olive: 'rgb(var(--olive-rgb) / <alpha-value>)',
+        'olive-deep': 'rgb(var(--olive-deep-rgb) / <alpha-value>)',
         hair: 'rgb(var(--paper-rgb) / calc(0.14 * <alpha-value>))',
         'hair-strong': 'rgb(var(--paper-rgb) / calc(0.24 * <alpha-value>))',
       },
