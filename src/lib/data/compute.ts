@@ -2015,7 +2015,9 @@ export function buildRoundRecap(roundNumber: number, dbData: Db): RoundRecapVM |
     case 'moving':
       headline = [
         { text: leadLabel, gold: true },
-        { text: multi ? ' share the lead.' : roundThru <= 10 ? ' leads at the turn.' : ' out front.' },
+        // "At the turn" is the 9th and nowhere else. It used to cover everything up to the
+        // 10th, so the card said it from the 6th hole on.
+        { text: multi ? ' share the lead.' : roundThru === 9 ? ' leads at the turn.' : ' out front.' },
       ]
       break
     case 'closing':
