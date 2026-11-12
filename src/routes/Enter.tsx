@@ -6,7 +6,7 @@ import { PlayerEntryRow } from '@/components/enter/PlayerEntryRow'
 import { canClaimCtp, useEnterHole, usePendingHoles, useRoundChoices } from '@/lib/data/selectors'
 import type { EnterDraft } from '@/lib/data/compute'
 import { saveCells, saveCtp, subscribeWriteState, getWriteState } from '@/lib/data/mutations'
-import { loadEnterDrafts, putEnterDraft } from '@/lib/data/drafts'
+import { draftMatchesStored, loadEnterDrafts, putEnterDraft } from '@/lib/data/drafts'
 import { courseShortName } from '@/lib/format'
 
 function useWriteState() {
@@ -93,6 +93,30 @@ export default function Enter() {
   useEffect(() => {
     if (hole === null && firstOpenHole !== null) setHole(firstOpenHole)
   }, [hole, firstOpenHole])
+
+  // Drafts that already say what is saved are dropped: left over from before a save on
+  // another phone, or from an older version that kept every tap. Only for the hole shown,
+  // and only once this round's drafts are loaded and the VM has caught up with the hole.
+  const shownDrafts = drafts[holeShown]
+  const vmPlayers = vmIsForRound && vm.hole?.holeNumber === holeShown ? vm.players : null
+  useEffect(() => {
+    if (!shownDrafts || !vmPlayers || draftsRoundRef.current !== roundId) return
+    const current = draftsRef.current[holeShown]
+    if (!current) return
+    const kept: Record<string, EnterDraft> = {}
+    for (const [pid, d] of Object.entries(current)) {
+      const stored = vmPlayers.find((p) => p.playerId === pid)
+      if (!stored || !draftMatchesStored(d, stored)) kept[pid] = d
+    }
+    if (Object.keys(kept).length === Object.keys(current).length) return
+    const next = { ...draftsRef.current }
+    if (Object.keys(kept).length > 0) next[holeShown] = kept
+    else delete next[holeShown]
+    draftsRef.current = next
+    setDrafts(next)
+    persistHole(holeShown)
+    // persistHole reads refs only; it is stable in everything that matters here.
+  }, [shownDrafts, vmPlayers, holeShown, roundId])
   // Holes recorded on this phone but not yet acknowledged by the server. Distinct from a
   // draft: a draft is not recorded anywhere, a pending hole is recorded and merely owed.
   const pendingHoles = usePendingHoles(vm?.round.id ?? null)
@@ -111,11 +135,40 @@ export default function Enter() {
     })
   }
 
+  /** The saved cell for a player on the hole shown, or null while the VM is still for
+   *  another hole or round (it lags a render behind paging) — then nothing is compared. */
+  function storedCell(playerId: string) {
+    if (!vmIsForRound || vm.hole?.holeNumber !== holeShown) return null
+    return vm.players.find((p) => p.playerId === playerId) ?? null
+  }
+
   function setDraft(playerId: string, draft: EnterDraft) {
     const h = holeShown
-    const forHole = { ...(draftsRef.current[h] ?? {}), [playerId]: draft }
-    draftsRef.current = { ...draftsRef.current, [h]: forHole }
-    setDrafts(draftsRef.current)
+    const forHole = { ...(draftsRef.current[h] ?? {}) }
+    // An edit that lands back on the saved value is not an edit: forget it, so a stepper
+    // nudged up and back doesn't leave the hole "unsaved".
+    const stored = storedCell(playerId)
+    if (stored && draftMatchesStored(draft, stored)) delete forHole[playerId]
+    else forHole[playerId] = draft
+    const next = { ...draftsRef.current }
+    if (Object.keys(forHole).length > 0) next[h] = forHole
+    else delete next[h]
+    draftsRef.current = next
+    setDrafts(next)
+    persistHole(h)
+  }
+
+  /** Throw away everything unsaved on the hole shown: scores and the closest-to-pin pick. */
+  function discardHole() {
+    const h = holeShown
+    const nextDrafts = { ...draftsRef.current }
+    delete nextDrafts[h]
+    draftsRef.current = nextDrafts
+    setDrafts(nextDrafts)
+    const nextCtp = { ...ctpRef.current }
+    delete nextCtp[h]
+    ctpRef.current = nextCtp
+    setCtpDrafts(nextCtp)
     persistHole(h)
   }
 
@@ -516,24 +569,38 @@ export default function Enter() {
             className="sticky z-10 -mx-5 mt-5 border-t border-hair bg-ground/95 px-5 pt-3 pb-1 backdrop-blur-sm short:mt-3 short:pt-2"
             style={{ bottom: 'var(--tabbar-h, 0px)' }}
           >
-            <button
-              type="button"
-              disabled={!dirty || !allEntered || ctpBlocked || write.status === 'saving'}
-              onClick={() => void saveHole()}
-              className="tap w-full rounded-md bg-gold-fill px-4 py-3 font-semibold text-paper disabled:bg-transparent disabled:text-paper-faint disabled:outline disabled:outline-1 disabled:outline-hair"
-            >
-              {write.status === 'saving'
-                ? 'Saving…'
-                : !dirty
-                  ? justSaved === hole
-                    ? 'Saved'
-                    : 'No changes'
-                  : !allEntered
-                    ? `All ${playing.length} scores needed`
-                    : ctpBlocked
-                      ? 'Change closest to pin'
-                      : `Save hole ${hole}`}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={!dirty || !allEntered || ctpBlocked || write.status === 'saving'}
+                onClick={() => void saveHole()}
+                className="tap min-w-0 flex-1 rounded-md bg-gold-fill px-4 py-3 font-semibold text-paper disabled:bg-transparent disabled:text-paper-faint disabled:outline disabled:outline-1 disabled:outline-hair"
+              >
+                {write.status === 'saving'
+                  ? 'Saving…'
+                  : !dirty
+                    ? justSaved === hole
+                      ? 'Saved'
+                      : 'No changes'
+                    : !allEntered
+                      ? `All ${playing.length} scores needed`
+                      : ctpBlocked
+                        ? 'Change closest to pin'
+                        : `Save hole ${hole}`}
+              </button>
+              {/* The eraser. Only while this hole has something unsaved: one tap puts it back
+                  to what is saved, so a stray tap on the wrong hole doesn't sit there nagging. */}
+              {dirty && write.status !== 'saving' ? (
+                <button
+                  type="button"
+                  onClick={discardHole}
+                  aria-label={`Discard unsaved changes on hole ${hole}`}
+                  className="tap shrink-0 rounded-md border border-hair-strong px-4 text-[0.9rem] text-paper-dim"
+                >
+                  Discard
+                </button>
+              ) : null}
+            </div>
 
             <div className="mt-2 min-h-[1.25rem] text-[0.82rem] tnum" aria-live="polite">
               {write.status === 'error' ? (

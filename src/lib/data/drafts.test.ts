@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '@/lib/db'
-import { loadEnterDrafts, putEnterDraft, clearEnterDraft, isEmptyDraft } from './drafts'
+import { loadEnterDrafts, putEnterDraft, clearEnterDraft, isEmptyDraft, draftMatchesStored } from './drafts'
 
 const R1 = 'r0000000-0000-0000-0000-000000000001'
 const R2 = 'r0000000-0000-0000-0000-000000000002'
@@ -65,5 +65,27 @@ describe('enter drafts persistence', () => {
     await clearEnterDraft(R1, 1)
     const rows = await loadEnterDrafts(R1)
     expect(rows.map((r) => r.hole_number)).toEqual([2])
+  })
+})
+
+describe('draftMatchesStored — an edit that lands back on the saved value is not an edit', () => {
+  const saved5 = { storedGross: 5, storedPickedUp: false }
+  const blank = { storedGross: null, storedPickedUp: false }
+  const pickedUp = { storedGross: null, storedPickedUp: true }
+
+  it('matches when the stepper comes back to the saved score', () => {
+    expect(draftMatchesStored({ grossStrokes: 5, pickedUp: false }, saved5)).toBe(true)
+    expect(draftMatchesStored({ grossStrokes: 6, pickedUp: false }, saved5)).toBe(false)
+  })
+
+  it('a score on a blank cell is a real edit; un-picking-up back to blank is not', () => {
+    expect(draftMatchesStored({ grossStrokes: 4, pickedUp: false }, blank)).toBe(false)
+    expect(draftMatchesStored({ grossStrokes: null, pickedUp: true }, blank)).toBe(false)
+    expect(draftMatchesStored({ grossStrokes: null, pickedUp: false }, blank)).toBe(true)
+  })
+
+  it('a saved pick-up matches only a pick-up', () => {
+    expect(draftMatchesStored({ grossStrokes: null, pickedUp: true }, pickedUp)).toBe(true)
+    expect(draftMatchesStored({ grossStrokes: null, pickedUp: false }, pickedUp)).toBe(false)
   })
 })

@@ -623,6 +623,10 @@ export interface EnterPlayerVM {
   strokesOnHole: number // allocated to THIS hole; negative for a plus handicap
   gross: number | null
   pickedUp: boolean
+  /** What is SAVED for this cell, ignoring any unsaved draft. Enter compares a draft against
+   *  it so an edit that lands back on the saved value stops counting as unsaved. */
+  storedGross: number | null
+  storedPickedUp: boolean
   /** null when nothing has been entered — the difference between "0 points" and "blank". */
   points: number | null
   netToPar: number | null
@@ -831,6 +835,9 @@ export function buildEnterHole(
 
   const players: EnterPlayerVM[] = (detail?.players ?? []).map((p) => {
     const hr = p.holeResults.find((h) => h.holeNumber === holeNumber)
+    const saved = rawDb.scores.find(
+      (s) => s.round_id === round.id && s.player_id === p.playerId && s.hole_number === holeNumber,
+    )
     return {
       playerId: p.playerId,
       name: p.name,
@@ -838,6 +845,8 @@ export function buildEnterHole(
       strokesOnHole: hr?.strokesReceived ?? 0,
       gross: hr?.grossStrokes ?? null,
       pickedUp: hr?.pickedUp ?? false,
+      storedGross: saved?.gross_strokes ?? null,
+      storedPickedUp: saved?.picked_up ?? false,
       points: hr?.completed ? (hr.points ?? 0) : null,
       netToPar: hr?.netToPar ?? null,
       thru: p.thru,

@@ -28,3 +28,15 @@ export async function putEnterDraft(row: EnterDraftRow): Promise<void> {
 export async function clearEnterDraft(roundId: string, holeNumber: number): Promise<void> {
   await db.enter_drafts.delete([roundId, holeNumber])
 }
+
+/**
+ * Does an unsaved edit say exactly what is already saved for that cell? Then it is not an
+ * edit: a stepper nudged up and back, or a score another phone has since saved. Enter drops
+ * such a draft instead of holding the hole "unsaved" until someone re-saves it.
+ */
+export function draftMatchesStored(
+  draft: { grossStrokes: number | null; pickedUp: boolean },
+  stored: { storedGross: number | null; storedPickedUp: boolean },
+): boolean {
+  return draft.grossStrokes === stored.storedGross && draft.pickedUp === stored.storedPickedUp
+}
