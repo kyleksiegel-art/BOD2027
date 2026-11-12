@@ -38,9 +38,13 @@ export function PlayerEntryRow({
 
   return (
     <div
-      className={`border-t py-3 short:py-2 ${
-        getsStroke ? 'border-l-2 border-l-gold bg-gold/[0.14] pl-3' : 'border-hair'
-      } ${dnp ? 'opacity-40' : ''}`}
+      // The row darkens once it has a score (a tap counts, saved or not), so the light rows
+      // are the players still missing (Kyle 2026-11-12). The tint therefore can NOT also mean
+      // "gets a stroke": that keeps its brass bar, bold copy and pips. Every row bleeds 12px
+      // into the page gutter so the tint has room and names stay on the page's column.
+      className={`-mx-3 border-t px-3 py-3 short:py-2 ${
+        getsStroke ? 'border-l-2 border-l-gold' : 'border-hair'
+      } ${entered && !dnp ? 'bg-gold/[0.14]' : ''} ${dnp ? 'opacity-40' : ''}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">

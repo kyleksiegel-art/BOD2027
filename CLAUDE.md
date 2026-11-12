@@ -1135,3 +1135,16 @@ Kyle found it on his phone: the stroke rows weren't tinted.
 - `hair` / `hair-strong` are `rgb(var(--paper-rgb) / calc(0.14|0.24 * <alpha-value>))`.
 - Component CSS in `index.css` still uses the hex `var(--token)` directly; that is fine.
 - Check after touching colours: `grep 'bg-gold' dist/_assets/*.css` must find the `/` classes.
+
+## Enter rows darken when scored (2026-11-12, branch `tint-opacity-fix`) — don't regress
+
+Kyle's idea, and his words when it wasn't there: "it doesn't go darker on my phone." A player's
+row on Enter gets `bg-gold/[0.14]` as soon as it has a score or a pick-up (a draft counts, so
+it darkens on the tap, before Save). The light rows are the players still missing.
+
+- **The tint no longer means "gets a stroke."** That keeps the brass left bar, the bold
+  "1 stroke here" and the pips. Don't put a background back on stroke rows: a blank stroke
+  row would read as entered.
+- Every row is `-mx-3 px-3` so the tint bleeds 12px into the page gutter and names stay on the
+  page's column. A did-not-play row never darkens.
+- 14% keeps "1 stroke here" at 4.65:1 on the tint; much stronger drops it under 4.5.
