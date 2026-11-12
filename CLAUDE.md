@@ -1106,3 +1106,18 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
 - Tests: `radioCall.test.ts` (17). Full `vitest run --dir src` → **264**.
+
+## Enter drafts have an eraser (2026-11-11, branch `enter-discard-drafts`) — don't regress
+
+A stray tap used to leave a hole "unsaved" with no way back ("Unsaved on 2 holes: 13, 15").
+
+- **A draft equal to the saved cell is dropped, not kept.** `EnterPlayerVM.storedGross` /
+  `storedPickedUp` are the saved values read from the raw rows (drafts not overlaid);
+  `draftMatchesStored` (`drafts.ts`) compares. `setDraft` deletes instead of adding on a match,
+  and an effect prunes matching drafts on the hole shown (left by another phone's save, or by
+  older builds). Both compare only when the VM is for the hole shown: it lags a render behind
+  paging, and comparing against the previous hole's cells would drop a real edit.
+- **Discard** sits beside Save only while the hole shown has unsaved scores or a CTP pick; it
+  clears both for that hole and deletes the Dexie row. Nothing reaches the outbox.
+- Not done: a round's drafts are not deleted when it is reset or finalized.
+- Tests: `drafts.test.ts` (+3), `enter.test.ts` (+3). Full `vitest run --dir src` → **270**.

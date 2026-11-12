@@ -113,3 +113,29 @@ describe('canClaimCtp', () => {
     expect(canClaimCtp({ gross: null, pickedUp: false }, 3)).toBe(true)
   })
 })
+
+describe('buildEnterHole stored cell — what is saved, whatever the draft says', () => {
+  it('a draft changes the shown score but not the stored one', () => {
+    const db = makeDb(FOUR, [cell(A, 3, 5)])
+    const vm = buildEnterHole(1, 3, db, { [A]: { grossStrokes: 6, pickedUp: false } })!
+    const a = vm.players.find((p) => p.playerId === A)!
+    expect(a.gross).toBe(6)
+    expect(a.storedGross).toBe(5)
+    expect(a.storedPickedUp).toBe(false)
+  })
+
+  it('a cell with nothing saved is stored blank, even with a draft on it', () => {
+    const vm = buildEnterHole(1, 3, makeDb(FOUR, []), { [B]: { grossStrokes: 4, pickedUp: false } })!
+    const b = vm.players.find((p) => p.playerId === B)!
+    expect(b.gross).toBe(4)
+    expect(b.storedGross).toBeNull()
+    expect(b.storedPickedUp).toBe(false)
+  })
+
+  it('a saved pick-up is stored as a pick-up', () => {
+    const vm = buildEnterHole(1, 3, makeDb(FOUR, [cell(C, 3, null, true)]))!
+    const c = vm.players.find((p) => p.playerId === C)!
+    expect(c.storedGross).toBeNull()
+    expect(c.storedPickedUp).toBe(true)
+  })
+})
