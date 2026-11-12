@@ -39,7 +39,7 @@ export function PlayerEntryRow({
   return (
     <div
       className={`border-t py-3 short:py-2 ${
-        getsStroke ? 'border-l-2 border-l-gold bg-gold/[0.07] pl-3' : 'border-hair'
+        getsStroke ? 'border-l-2 border-l-gold bg-gold/[0.14] pl-3' : 'border-hair'
       } ${dnp ? 'opacity-40' : ''}`}
     >
       <div className="flex items-center justify-between gap-3">
