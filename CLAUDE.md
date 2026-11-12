@@ -1121,3 +1121,17 @@ A stray tap used to leave a hole "unsaved" with no way back ("Unsaved on 2 holes
   clears both for that hole and deletes the Dexie row. Nothing reaches the outbox.
 - Not done: a round's drafts are not deleted when it is reset or finalized.
 - Tests: `drafts.test.ts` (+3), `enter.test.ts` (+3). Full `vitest run --dir src` → **270**.
+
+## Opacity modifiers on token colours (2026-11-12, branch `tint-opacity-fix`) — don't regress
+
+Tailwind 3 cannot apply an opacity to a colour defined as a bare `var(--token)`: it **drops the
+class** with no warning. Every `bg-gold/10`, `bg-gold/[0.07]`, `border-gold/40`, `bg-ground/95`
+(36 uses) had never rendered — no stroke-row tint on Enter, no warning-box tints, and the top
+bar, tab bar and Enter's Save bar had **no background** (page text ghosted through the blur).
+Kyle found it on his phone: the stroke rows weren't tinted.
+
+- `tailwind.config.ts` colours are now `rgb(var(--X-rgb) / <alpha-value>)`; `src/index.css`
+  carries a `--X-rgb` channel triplet beside each hex token. **Change a hex, change its triplet.**
+- `hair` / `hair-strong` are `rgb(var(--paper-rgb) / calc(0.14|0.24 * <alpha-value>))`.
+- Component CSS in `index.css` still uses the hex `var(--token)` directly; that is fine.
+- Check after touching colours: `grep 'bg-gold' dist/_assets/*.css` must find the `/` classes.
