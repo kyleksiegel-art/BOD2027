@@ -474,7 +474,7 @@ function buildLetter(input: LetterInput): ReportSeg[][] {
   const hookFor = (id: string): string | null => {
     const mine = superlatives.find((x) => x.playerId === id)
     if (!mine) return null
-    if (mine.key === 'ctp') return `${mine.value} closest-to-pins and, as designed, no money for them`
+    if (mine.key === 'ctp') return `${mine.value} closest-to-pins, paid outside the app`
     if (mine.key === 'net-birdies') return `the field's most net birdies (${mine.value})`
     if (mine.key === 'streak') return `a ${mine.value}-hole run of scoring holes`
     if (mine.key === 'holes-won') return `${mine.value} holes won outright`
