@@ -1127,6 +1127,14 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   `finale-last-hole`): after the margin line, where the champion and runner-up stood for the WEEK
   on the last tee and what each made (lead turned over / level / held / cut but short). The plain
   `holeCall` for the last hole plays only when the finish wasn't that close.
+- **Finale weeks (2026-11-19, branch `finale-weeks`).** `tripFinale` builds `cum` / `leadAfter`
+  once (cumulative points and the sole leader after each round) and uses them twice. After the
+  margin and last-hole lines it says how the champion won the week: led after every round /
+  took the lead for good on a given course (with the biggest earlier deficit) / only on the last
+  day (having led earlier, or never). Each other player then gets ONE line from a different
+  angle, best first, no angle kind twice: led the week and lost it (30) · better or worse every
+  day, 3+ rounds (24) · best or worst round was the last by 3+ (16) · slow first day (14) ·
+  within 3 all week (12) · plain high and low (8). A player with no angle left is skipped.
 - **A gross score is "true", not "real" (Kyle 2026-11-19).** "True eagle", "true birdies", "a
   true albatross" in the radio call, the Field Report and the round report. Every older note in
   this file that says "real eagle" describes the same thing under its old name. Don't bring

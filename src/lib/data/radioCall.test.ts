@@ -233,8 +233,11 @@ describe('the calls as a broadcast', () => {
     expect(lines).toContain('Kyle Siegel is your champion!')
     // Two true eagles that week. Chris's left the other three with zeros and won the round; Jon's came on the last, too late.
     expect(lines).toContain('Play of the trip: Chris, a true eagle on the par-5 7th at the Red. Still talking about it.')
-    expect(lines).toContain("Chris's week: a high of 44 on the Red, a low of 30 on the Blue.")
-    expect(lines).toContain("Jon's week: a high of 38 on the Blue, a low of 31 on the Red.")
+    // How the champion won the week, then a different angle on each of the others.
+    expect(lines).toContain('Kyle did not lead the week until the last day. Eight back going into the Blue, and champion coming out of it.')
+    expect(lines).toContain('Chris led the week after the Red and finished second. That one will sting.')
+    expect(lines).toContain('Jon saved the best for last: 38 on the Blue.')
+    expect(lines).toContain('Adam needed a day to get going: 27 on the Red, and never that bad again.')
   })
 })
 
