@@ -2095,6 +2095,22 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
   const lastHole = closing ? '' : holeCall(c, c.n, pick)
   if (lastHole) out.push(`${pick(['The last hole of the trip.', 'One last hole to report.', 'And the final hole.', 'The last word from the course.', 'One more hole to call.', 'Before the trophy, the final hole.'])} ${lastHole}`)
 
+  // The week round by round: cumulative totals, and who led alone on points after each round.
+  const played = rounds.filter((r) => r.status === 'final' || r.round_number === c.roundNumber)
+  const whereOf = (i: number) => {
+    const course = c.db.courses.find((x) => x.id === played[i].course_id)
+    return course ? courseRef(course.name) : `round ${played[i].round_number}`
+  }
+  const cum = new Map<string, number[]>()
+  for (const r of rows) {
+    let t = 0
+    cum.set(r.playerId, played.map((pr) => (t += r.byRound.find((e) => e.roundNumber === pr.round_number && e.counts)?.points ?? 0)))
+  }
+  const leadAfter = played.map((_, i) => {
+    const xs = rows.map((r) => ({ id: r.playerId, t: cum.get(r.playerId)![i] })).sort((a, b) => b.t - a.t)
+    return xs.length > 1 && xs[0].t > xs[1].t ? xs[0].id : null
+  })
+
   // The champion.
   if (champs.length > 1) {
     out.push(`We have co-champions! ${listOf(champs.map((r) => fullName(r.playerId)))} share the title, level after every tiebreaker.`)
@@ -2108,6 +2124,54 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
     else if (margin >= 10) out.push(`${margin} points clear. That wasn't a tournament, that was a statement.`)
     else out.push(pick([`${short(champ.playerId)} wins it by ${margin}, and it was never really in doubt.`, `${short(champ.playerId)} wins it by ${margin}. Earned, every point of it.`, `${short(champ.playerId)} wins by ${margin}. Bragging rights secured for a full calendar year.`, `${short(champ.playerId)} wins by ${margin}. Clean, clear, and well earned.`, `${short(champ.playerId)} by ${margin}. A deserving champion.`, `${short(champ.playerId)} takes it by ${margin}. Somebody get the trophy polished.`]))
     if (closing) out.push(closing)
+    // How the week was won: wire to wire, taken for good on a given day, or only on the last one.
+    const L = played.length - 1
+    if (L >= 1 && leadAfter[L] === champ.playerId) {
+      const C = short(champ.playerId)
+      const mine = cum.get(champ.playerId)!
+      const behind = played.map((_, i) => Math.max(...rows.filter((r) => r.playerId !== champ.playerId).map((r) => cum.get(r.playerId)![i])) - mine[i])
+      let good = L
+      while (good > 0 && leadAfter[good - 1] === champ.playerId) good--
+      const firstLed = leadAfter.indexOf(champ.playerId)
+      let maxDef = 0
+      let maxDefAt = 0
+      behind.forEach((d, i) => {
+        if (i < L && d > maxDef) [maxDef, maxDefAt] = [d, i]
+      })
+      if (good === 0) {
+        out.push(
+          pick([
+            `${C} led after every one of the ${words(played.length)} rounds. Wire to wire.`,
+            `${C} was in front after day one and stayed there all week.`,
+            `Nobody else led this thing after a single round. It was ${C}'s week from ${whereOf(0)} on.`,
+          ]),
+        )
+      } else if (good === L) {
+        const d = behind[L - 1]
+        out.push(
+          firstLed < L
+            ? pick([
+                `${C} had the lead, lost it, and came into the last day ${d > 0 ? `${d} back` : 'level'}. ${C} leaves as champion.`,
+                `A week of swings for ${C}: in front after ${whereOf(firstLed)}, ${d > 0 ? `${d} behind` : 'level'} going into ${whereOf(L)}, and champion at the end of it.`,
+                `${C} led this week, gave it away, and took it back on the final day.`,
+              ])
+            : pick([
+                `${C} did not lead the week until the last day. ${d > 0 ? `${cap(words(d))} back` : 'Level'} going into ${whereOf(L)}, and champion coming out of it.`,
+                `${C} trailed all week and won it on the final day${d > 0 ? `, from ${d} back` : ''}.`,
+                `For ${L === 1 ? 'a day' : `${words(L)} days`} somebody else led. On the last one, ${C} took it${d > 0 ? `, making up ${d}` : ''}.`,
+              ]),
+        )
+      } else {
+        const tail = maxDef > 0 && maxDefAt < good ? ` after being ${maxDef} back following ${whereOf(maxDefAt)}` : ''
+        out.push(
+          pick([
+            `${C} took the lead for good on ${whereOf(good)}${tail}, and never gave it up.`,
+            `The week turned on ${whereOf(good)}. ${C} went in front there${tail} and stayed in front.`,
+            `${C} has led since ${whereOf(good)}${tail}. Nobody got back past.`,
+          ]),
+        )
+      }
+    }
   }
 
   out.push(`Final standings. ${rows.map((r) => `${short(r.playerId)}, ${r.total}`).join('. ')}.`)
@@ -2171,26 +2235,62 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
     const pt = playOfTrip
     out.push(`${pick(['Play of the trip:', 'The shot of the week:', 'Your play of the trip:', 'The highlight of the whole week:', 'The one shot we are taking home:', 'Shot of the trip:'])} ${pt.who}, ${SHOT[pt.kind].noun} on the par-${pt.par} ${ordinalOf(pt.hole)} at ${pt.where}.${pick([' Still talking about it.', ' That one comes home with us.', ' Put it in the trip history.', ' Nobody topped it.', ' The best thing anyone hit all week.', ''])}`)
   }
-  // Everyone else's week in a line: the best day and the worst.
-  if (rounds.filter((r) => r.status === 'final' || r.round_number === c.roundNumber).length > 1)
-    for (const r of rows) {
-      if (champs.includes(r)) continue
+  // Everyone else's week in a line, each from a different angle so three in a row don't read as
+  // the same sentence: led the week and lost it, a trend, a strong or weak last day, a slow first
+  // day, steady all week, and only then the plain best day / worst day. A player with no angle
+  // left is skipped; the standings already named everyone.
+  if (played.length > 1) {
+    const usedAngles = new Set<string>()
+    const PLACE = ['first', 'second', 'third', 'fourth', 'fifth']
+    rows.forEach((r, idx) => {
+      if (champs.includes(r)) return
       const ds = days.get(r.playerId) ?? []
-      if (ds.length < 2) continue
+      if (ds.length < 2) return
+      const who = short(r.playerId)
       const hi = ds.reduce((x, y) => (y.pts > x.pts ? y : x))
       const lo = ds.reduce((x, y) => (y.pts < x.pts ? y : x))
-      const who = short(r.playerId)
-      out.push(
-        hi.pts === lo.pts
-          ? `${who}'s week: ${hi.pts} every single day. A metronome.`
-          : pick([
-              `${who}'s week: a high of ${hi.pts} on ${hi.where}, a low of ${lo.pts} on ${lo.where}.`,
-              `${who} peaked on ${hi.where} with ${hi.pts} and bottomed out on ${lo.where} with ${lo.pts}.`,
-              `For ${who}, the best day was ${hi.where}, ${hi.pts} points. The one to forget was ${lo.where}, ${lo.pts}.`,
-              `${who}: ${hi.pts} on ${hi.where}, the good day. ${lo.pts} on ${lo.where}, the other kind.`, `${who} would like to be remembered for ${hi.where}, ${hi.pts} points, and not for ${lo.where}, ${lo.pts}.`, `${who} had ${hi.where}, ${hi.pts} points. ${who} also had ${lo.where}, ${lo.pts}.`, `The range for ${who}: ${hi.pts} at the top, on ${hi.where}, and ${lo.pts} at the bottom, on ${lo.where}.`,
-            ]),
-      )
-    }
+      const lastDay = ds[ds.length - 1]
+      const scores = ds.map((d) => d.pts).join(', ')
+      const ledOn = played.map((_, i) => i).filter((i) => i < played.length - 1 && leadAfter[i] === r.playerId)
+      const up = ds.length >= 3 && ds.every((d, i) => i === 0 || d.pts > ds[i - 1].pts)
+      const down = ds.length >= 3 && ds.every((d, i) => i === 0 || d.pts < ds[i - 1].pts)
+      const angles: [string, number, () => string][] = []
+      if (ledOn.length)
+        angles.push(['led', 30, () => {
+          const courses = listOf(ledOn.map(whereOf))
+          const place = PLACE[idx] ?? 'down the board'
+          return pick([`${who} led the week after ${courses} and finished ${place}. That one will sting.`, `${who} had this trip in hand after ${courses}. ${who} finishes ${place}.`, `After ${courses}, ${who} was the leader. It did not last.`])
+        }])
+      if (up) angles.push(['trend', 24, () => pick([`${who} got better every single day: ${scores}. One more round and who knows.`, `${who} improved every day of the trip, from ${ds[0].pts} to ${lastDay.pts}.`, `${who} went the right way all week: ${scores}. Just started too far back.`])])
+      if (down) angles.push(['trend', 24, () => pick([`${who} went the wrong way all week: ${scores}.`, `${who} peaked on day one with ${ds[0].pts}, and it was downhill from there to ${lastDay.pts}.`, `Every day a little worse for ${who}: ${scores}.`])])
+      if (hi === lastDay && ds.every((d) => d === hi || hi.pts - d.pts >= 3))
+        angles.push(['finish', 16, () => pick([`${who} saved the best for last: ${hi.pts} on ${hi.where}.`, `${who} found it on the final day, ${hi.pts} on ${hi.where}. A week too late.`, `${who}'s best round was the last one, ${hi.pts}. Typical.`])])
+      if (lo === lastDay && ds.every((d) => d === lo || d.pts - lo.pts >= 3))
+        angles.push(['finish', 16, () => pick([`${who} ran out of steam: ${lo.pts} on the last day, the worst of the week.`, `${who} limped home with ${lo.pts} on ${lo.where}, the low point of the trip.`, `The last day was not kind to ${who}: ${lo.pts}, the worst round of the week.`])])
+      if (lo === ds[0] && ds.slice(1).every((d) => d.pts - lo.pts >= 3))
+        angles.push(['start', 14, () => pick([`${who} needed a day to get going: ${lo.pts} on ${lo.where}, and never that bad again.`, `${who} spotted the field a round. ${lo.pts} on ${lo.where} to open, and much better after.`, `Take away ${lo.where}, where ${who} made ${lo.pts}, and it is a different week.`])])
+      if (hi.pts - lo.pts <= 3)
+        angles.push(['steady', 12, () =>
+          hi.pts === lo.pts
+            ? `${who}'s week: ${hi.pts} every single day. A metronome.`
+            : pick([`${who} was the same golfer every day: between ${lo.pts} and ${hi.pts} all week.`, `No highs, no lows for ${who}. ${lo.pts} to ${hi.pts}, every round.`, `${who}, a model of consistency: never worse than ${lo.pts}, never better than ${hi.pts}.`])])
+      if (hi.pts > lo.pts)
+        angles.push(['range', 8, () =>
+          pick([
+            `${who}'s week: a high of ${hi.pts} on ${hi.where}, a low of ${lo.pts} on ${lo.where}.`,
+            `${who} peaked on ${hi.where} with ${hi.pts} and bottomed out on ${lo.where} with ${lo.pts}.`,
+            `For ${who}, the best day was ${hi.where}, ${hi.pts} points. The one to forget was ${lo.where}, ${lo.pts}.`,
+            `${who}: ${hi.pts} on ${hi.where}, the good day. ${lo.pts} on ${lo.where}, the other kind.`,
+            `${who} would like to be remembered for ${hi.where}, ${hi.pts} points, and not for ${lo.where}, ${lo.pts}.`,
+            `${who} had ${hi.where}, ${hi.pts} points. ${who} also had ${lo.where}, ${lo.pts}.`,
+            `The range for ${who}: ${hi.pts} at the top, on ${hi.where}, and ${lo.pts} at the bottom, on ${lo.where}.`,
+          ])])
+      const angle = angles.sort((x, y) => y[1] - x[1]).find(([kind]) => !usedAngles.has(kind))
+      if (!angle) return
+      usedAngles.add(angle[0])
+      out.push(angle[2]())
+    })
+  }
   // Blooper of the week: the worst single hole, else whoever took the most zeros.
   if (worst) {
     const x = worst
