@@ -1123,6 +1123,10 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   day" says "hole in one" (`compute.ts`). Fixture: `weekDb([ROUND_ONE, ROUND_TWO])`.
   Variety pass the same day: 209 takes appended across the 73 pools these two passes added
   (most now hold 6 to 10); first entries untouched, so the pinned tests still hold.
+- **A finish within three points always gets a last-hole call in the finale** (2026-11-19, branch
+  `finale-last-hole`): after the margin line, where the champion and runner-up stood for the WEEK
+  on the last tee and what each made (lead turned over / level / held / cut but short). The plain
+  `holeCall` for the last hole plays only when the finish wasn't that close.
 - **A gross score is "true", not "real" (Kyle 2026-11-19).** "True eagle", "true birdies", "a
   true albatross" in the radio call, the Field Report and the round report. Every older note in
   this file that says "real eagle" describes the same thing under its old name. Don't bring
@@ -1132,7 +1136,7 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (26). Full `vitest run --dir src` → **280**.
+- Tests: `radioCall.test.ts` (27). Full `vitest run --dir src` → **281**.
 
 ## Enter drafts have an eraser (2026-11-11, branch `enter-discard-drafts`) — don't regress
 
