@@ -71,3 +71,24 @@ export const ROUND_ONE: FixturePlayer[] = [
   { name: 'Adam Hersh', strokes: 0, pts: [1, 1, 0, 3, 1, 1, 0, 1, 1, 3, 1, 1, 2, 2, 2, 2, 2, 3] },
   { name: 'Chris Denove', strokes: 8, pts: [2, 3, 3, 1, 2, 3, 4, 3, 4, 1, 4, 2, 2, 2, 3, 3, 2, 0] },
 ]
+
+/** A second day for the same four: Kyle wins it by 4 and takes the week lead from Chris. */
+export const ROUND_TWO: FixturePlayer[] = [
+  { name: 'Jon Aronson', strokes: 0, pts: [2, 2, 3, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] },
+  { name: 'Kyle Siegel', strokes: 4, pts: [3, 2, 2, 3, 2, 2, 3, 2, 2, 3, 2, 2, 3, 2, 2, 3, 2, 2] },
+  { name: 'Adam Hersh', strokes: 0, pts: [2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2] },
+  { name: 'Chris Denove', strokes: 8, pts: [2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 1, 2] },
+]
+
+/** Several final rounds in one Db, round 1 first. Rounds after them stay `upcoming`. */
+export function weekDb(days: FixturePlayer[][], ctp: Record<number, number> = {}): Db {
+  const db = reportDb(days[0], { ctp })
+  days.slice(1).forEach((players, i) => {
+    const day = reportDb(players)
+    const to = db.rounds[i + 1].id
+    db.rounds[i + 1] = { ...db.rounds[i + 1], status: 'final' }
+    db.scores.push(...day.scores.map((s) => ({ ...s, id: `${s.id}-r${i + 2}`, round_id: to })))
+    db.round_players.push(...day.round_players.map((rp) => ({ ...rp, round_id: to })))
+  })
+  return db
+}

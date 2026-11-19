@@ -1106,12 +1106,28 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   ahead of everything else on the hole (no lead-in, the announcer shouts, the lead comes last as
   an afterthought); the color note stays all round; it is always play of the day in the wrap; the
   trip finale names every ace. The round report always gets a "made a hole in one" sentence.
+- **Second commentary pass (Kyle 2026-11-18, "work through all of them", branch
+  `radio-call-round-two`).** `holeCall` = `holeAction` + extras: a real eagle is shouted on the
+  hole with what it did to the lead (no lead-in, and the color note is dropped so it is said
+  once); a par-3's closest-to-the-pin winner is called on the hole, even a quiet one; a **blow-up**
+  (`blowUps`: gross four over par or worse, holed out) gets a line and replaces a bare "takes a
+  zero". Blow-ups also outrank the other bloopers in the wrap. The turn adds `halftime`: play of
+  the front nine, report cards (A ≥22, B 19+, C 16+, D 12+, else F; net par for nine is 18), and
+  the last-place player's plight at 8+ back. After a round that isn't the first, the wrap's week
+  segment is `weekWrap` (new leader / tie broken / day winner vs week leader / lead grew or
+  shrank, plus a mover of the day at 4+ closed); it returns null on round 1 or a points tie and
+  `weekStakes` takes over. `tripFinale` now calls the last hole via `holeCall` and adds a play of
+  the trip (every hole in one, else the best shot), each non-champion's best and worst day, and a
+  blooper of the week (worst blow-up, else a unique 5+ zero count). The recap card's "Shot of the
+  day" says "hole in one" (`compute.ts`). Fixture: `weekDb([ROUND_ONE, ROUND_TWO])`.
+  Variety pass the same day: 209 takes appended across the 73 pools these two passes added
+  (most now hold 6 to 10); first entries untouched, so the pinned tests still hold.
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (20). Full `vitest run --dir src` → **274**.
+- Tests: `radioCall.test.ts` (26). Full `vitest run --dir src` → **280**.
 
 ## Enter drafts have an eraser (2026-11-11, branch `enter-discard-drafts`) — don't regress
 

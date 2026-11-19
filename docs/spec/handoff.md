@@ -1,11 +1,14 @@
 # Handoff — 2026-11-18
 
-Branch `hole-in-one` (off `main`), **uncommitted**.
+Branch `radio-call-round-two`, stacked on `hole-in-one` (PR #71, open). **Uncommitted.**
 
-- Bug (Kyle, testing): a 1 on a par 3 was called "a real eagle" (it is two under par).
-- Fix: `ace` shot kind (`grossStrokes === 1`) in `fieldStory.ts` and `report.ts`.
-- Radio call: the announcer goes wild on the hole (`holeCall`), keeps bringing it up for the
-  rest of the round, makes it play of the day in the wrap, and names it in the trip finale.
-- Field Report says "makes a hole in one"; the round report always carries a sentence for it.
-- Tests: `radioCall.test.ts` 20; `vitest run --dir src` → 274. `npm run build` clean.
-- Next: Kyle re-enters a 1 on a par 3 and listens (Admin → Radio call).
+- Second commentary pass on the radio call, all six items Kyle approved:
+  eagles shouted on the hole, closest to the pin called on the hole, blow-up holes (gross four
+  over or worse), the turn as a halftime show, a real week segment after rounds 2 and 3, and
+  the trip finale with a play of the trip, each player's week and a blooper of the week.
+- Recap card "Shot of the day" now says "hole in one".
+- Variety pass: 209 takes appended across the 73 new pools (appended, never inserted).
+- New fixture: `ROUND_TWO` + `weekDb` in `src/test/reportFixture.ts`.
+- Tests: `radioCall.test.ts` 26; `vitest run --dir src` → 280. `npm run build` clean.
+- Not heard on a phone. Rounds 3 and 4 and a real finale only exist as fixture data.
+- Next: merge #71 first, then this; Kyle listens to takes from Admin → Radio call.

@@ -3,7 +3,7 @@ import { buildRadioCall, signature } from './radioCall'
 import { logCall, readCallLog, readRecentSignatures, removeLoggedCall, restoreLoggedCall, CALL_LOG_MAX } from './callLog'
 import { db as dexie } from '@/lib/db'
 import type { Db } from './compute'
-import { reportDb, ROUND_ONE } from '@/test/reportFixture'
+import { reportDb, weekDb, ROUND_ONE, ROUND_TWO } from '@/test/reportFixture'
 import { buildFieldStory } from './fieldStory'
 import { buildRoundReport } from './report'
 import { pickVoice } from '@/lib/speech/speak'
@@ -61,7 +61,7 @@ describe('buildRadioCall', () => {
   it('down the stretch: the last two holes, the last nine, the finish', () => {
     const { lines } = call(live(16))
     // The last two holes are called, not read out: the quiet 15th is skipped, the 16th had a winner.
-    expect(lines).toContain('Last time through. Chris wins the 16th outright with a net birdie. The lead grows to 11.')
+    expect(lines).toContain('Last time through. Chris wins the 16th outright with a net birdie. The lead grows to 11. Kyle wins closest to the pin there.')
     expect(lines.join(' ')).not.toMatch(/On the 15th:/)
     expect(lines.some((l) => l.startsWith('Over the last nine holes'))).toBe(true)
     expect(lines).toContain('Then the 18th, a par 5, to finish.')
@@ -188,6 +188,52 @@ describe('a hole in one', () => {
     const report = buildRoundReport(1, aced(18, 'final'))!.paragraphs.map((p) => p.map((x) => x.text).join('')).join(' ')
     expect(report).toMatch(/hole in one/)
     expect(report).not.toMatch(/eagle on the (par-3 )?14th/)
+  })
+})
+
+describe('the calls as a broadcast', () => {
+  it('a real eagle is shouted on the hole, once, with what it did to the lead', () => {
+    const lines = call(live(7)).lines
+    expect(lines).toContain('Stop everything. Chris just made a real eagle on the par-5 7th! No strokes. No asterisk. The other three took zeros. The lead goes from 3 to 7.')
+    expect(lines.filter((l) => /real eagle/.test(l))).toHaveLength(1)
+  })
+
+  it('calls closest to the pin on the hole, even a quiet one', () => {
+    expect(call(live(6)).lines).toContain('Last time through. Adam wins closest to the pin on the 6th.')
+  })
+
+  it('a blow-up hole is a story, in the call and on the blooper reel', () => {
+    const boom = (db: Db) => ({ ...db, scores: db.scores.map((s) => (s.hole_number === 13 && s.player_id.startsWith('00000002') ? { ...s, gross_strokes: 9 } : s)) })
+    expect(call(boom(live(13))).lines).toContain('Adam made a 9 on the par-5 13th. We counted twice.')
+    const wrap = call(boom({ ...reportDb(ROUND_ONE), settings: [PURSE] })).lines
+    expect(wrap).toContain('From the blooper reel. Adam made a 9 on the par-5 13th. A 9. We have the scorecard.')
+  })
+
+  it('the turn is a halftime show: play of the front nine, report cards, who needs a back nine', () => {
+    const { lines } = call(live(9))
+    expect(lines).toContain('Play of the front nine: Chris, a real eagle on the par-5 7th. Roll that one again.')
+    expect(lines).toContain('Halftime report cards. Chris gets an A. Kyle, a D. Jon, an F. Adam, an F. Parents will be notified.')
+    expect(lines).toContain('Adam is 16 back and needs the back nine of a lifetime. Or a very good dinner.')
+  })
+
+  it('after a later round, the wrap says what the day did to the week', () => {
+    const db = { ...weekDb([ROUND_ONE, ROUND_TWO]), settings: [PURSE] }
+    const { lines } = call(db, '2027-02-05')
+    expect(lines).toContain('And the week has a new leader. Kyle started the day 8 behind Chris and ends it 4 in front.')
+    expect(lines).toContain('Mover of the day: Jon, from 13 back to 9 back.')
+    expect(lines).toContain('Two rounds to play.')
+    expect(lines).toContain('If it ended right now, Kyle takes home $600 and Chris $200.')
+    expect(lines.some((l) => l.startsWith('Chris finishes level with Adam on 30.'))).toBe(true)
+  })
+
+  it('the finale has a play of the trip and a line on everyone else\'s week', () => {
+    const db = { ...weekDb([ROUND_ONE, ROUND_TWO]), settings: [PURSE] }
+    db.rounds = db.rounds.map((r) => (r.round_number <= 2 ? r : { ...r, status: 'abandoned' as const }))
+    const { lines } = call(db, '2027-02-05')
+    expect(lines).toContain('Kyle Siegel is your champion!')
+    expect(lines).toContain('Play of the trip: Jon, a real eagle on the par-5 18th at the Red. Still talking about it.')
+    expect(lines).toContain("Chris's week: a high of 44 on the Red, a low of 30 on the Blue.")
+    expect(lines).toContain("Jon's week: a high of 38 on the Blue, a low of 31 on the Red.")
   })
 })
 
