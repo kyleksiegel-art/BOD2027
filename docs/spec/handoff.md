@@ -1,14 +1,12 @@
-# Handoff — 2026-11-18
+# Handoff — 2026-11-19
 
-Branch `radio-call-round-two`, stacked on `hole-in-one` (PR #71, open). **Uncommitted.**
+Branch `play-of-the-trip` (off `main`), **uncommitted**.
 
-- Second commentary pass on the radio call, all six items Kyle approved:
-  eagles shouted on the hole, closest to the pin called on the hole, blow-up holes (gross four
-  over or worse), the turn as a halftime show, a real week segment after rounds 2 and 3, and
-  the trip finale with a play of the trip, each player's week and a blooper of the week.
-- Recap card "Shot of the day" now says "hole in one".
-- Variety pass: 209 takes appended across the 73 new pools (appended, never inserted).
-- New fixture: `ROUND_TWO` + `weekDb` in `src/test/reportFixture.ts`.
-- Tests: `radioCall.test.ts` 26; `vitest run --dir src` → 280. `npm run build` clean.
-- Not heard on a phone. Rounds 3 and 4 and a real finale only exist as fixture data.
-- Next: merge #71 first, then this; Kyle listens to takes from Admin → Radio call.
+- Trip finale's play of the trip no longer takes the first of equal shots. Like shots are split
+  by what they did: +10 if the rest of the group took zeros on the hole, +5 if the maker won
+  that round (same rule as the round wrap's play of the day). `tripFinale` in `radioCall.ts`.
+- Test updated: Chris's eagle on the 7th beats Jon's on the 18th in the two-round fixture.
+- Gross shots are now "true" (true eagle, true birdies), not "real", in the radio call, Field
+  Report and round report (Kyle 2026-11-19). 105 replacements incl. tests.
+- Tests: `vitest run --dir src` → 280. `npm run build` clean.
+- Still open: the finale has only been run on two rounds of fixture data, not four.

@@ -1117,11 +1117,16 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   segment is `weekWrap` (new leader / tie broken / day winner vs week leader / lead grew or
   shrank, plus a mover of the day at 4+ closed); it returns null on round 1 or a points tie and
   `weekStakes` takes over. `tripFinale` now calls the last hole via `holeCall` and adds a play of
-  the trip (every hole in one, else the best shot), each non-champion's best and worst day, and a
+  the trip (every hole in one, else the best shot; like shots are split by +10 if everyone else
+  took a zero on the hole and +5 if its maker won that round), each non-champion's best and worst day, and a
   blooper of the week (worst blow-up, else a unique 5+ zero count). The recap card's "Shot of the
   day" says "hole in one" (`compute.ts`). Fixture: `weekDb([ROUND_ONE, ROUND_TWO])`.
   Variety pass the same day: 209 takes appended across the 73 pools these two passes added
   (most now hold 6 to 10); first entries untouched, so the pinned tests still hold.
+- **A gross score is "true", not "real" (Kyle 2026-11-19).** "True eagle", "true birdies", "a
+  true albatross" in the radio call, the Field Report and the round report. Every older note in
+  this file that says "real eagle" describes the same thing under its old name. Don't bring
+  "real" back for shots; "the nerves are real" and "real money" are ordinary uses and stay.
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.

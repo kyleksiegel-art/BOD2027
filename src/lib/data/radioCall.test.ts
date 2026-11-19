@@ -96,8 +96,8 @@ describe('buildRadioCall', () => {
       'Final scores: Chris 44, Kyle 36, Jon 31, Adam 27.',
       "That's $50 to Chris.",
       'Chris took the lead on the 2nd and never gave it back. It got as big as 12 after the 11th.',
-      "Play of the day. The par-5 7th. Chris makes a real eagle, while the other three walk off with nothing. No strokes. No asterisk. Chris's lead went from 3 to 7 on one hole. That was the round.",
-      'Honorable mention: Jon, with a real eagle on the last. Too late to matter, but it will come up at dinner. Repeatedly.',
+      "Play of the day. The par-5 7th. Chris makes a true eagle, while the other three walk off with nothing. No strokes. No asterisk. Chris's lead went from 3 to 7 on one hole. That was the round.",
+      'Honorable mention: Jon, with a true eagle on the last. Too late to matter, but it will come up at dinner. Repeatedly.',
       "Kyle finishes second on 36. Kyle actually won the back nine with 21, but gave Chris a 10-point head start at the turn. You can't do that.",
       '11 going out, 20 coming home. Somebody tell Jon the round starts on the 1st.'.replace(/^/, 'Jon is third on 31. '),
       'Adam brings up the rear on 27. But Adam won three closest to the pins. Last on the card, first to the cash.',
@@ -155,7 +155,7 @@ describe('buildRadioCall', () => {
 })
 
 describe('a hole in one', () => {
-  // Kyle holes the tee shot on the par-3 14th. One swing is never "a real eagle".
+  // Kyle holes the tee shot on the par-3 14th. One swing is never "a true eagle".
   const aced = (thru: number, status: 'in_progress' | 'final' = 'in_progress'): Db => {
     const db = reportDb(ROUND_ONE, { status, ctp: { 14: 1 } })
     const scores = db.scores.map((s) => (s.hole_number === 14 && s.player_id.startsWith('00000001') ? { ...s, gross_strokes: 1 } : s))
@@ -168,7 +168,7 @@ describe('a hole in one', () => {
       const callLine = lines.find((l) => /hole in one/i.test(l))!
       expect(callLine).toMatch(/Kyle/)
       expect(callLine).toMatch(/!/)
-      expect(lines.join(' ')).not.toMatch(/Kyle[^.]*real eagle|real eagle[^.]*14th/)
+      expect(lines.join(' ')).not.toMatch(/Kyle[^.]*true eagle|true eagle[^.]*14th/)
     }
     expect(buildRadioCall(aced(14), '2027-02-04')!.script(() => 0)).toContain(
       'Stop everything. Stop everything! Kyle has made a hole in one on the 14th! A hole in one! One swing, one ball, bottom of the cup! Safe to say that wins closest to the pin. The drinks tonight are on Kyle. Those are the rules. Oh, and Chris leads by 8.',
@@ -179,7 +179,7 @@ describe('a hole in one', () => {
     expect(buildRadioCall(aced(17), '2027-02-04')!.script(() => 0).join(' ')).toMatch(/Kyle made a hole in one on the 14th today/)
     const wrap = buildRadioCall(aced(18, 'final'), '2027-02-04')!.script(() => 0)
     expect(wrap).toContain('Play of the day, play of the trip, play of a lifetime. The par-3 14th. Kyle makes a hole in one. A hole in one! One swing. Bottom of the cup.')
-    expect(wrap.join(' ')).toMatch(/Honorable mention: Chris, with a real eagle on the 7th/)
+    expect(wrap.join(' ')).toMatch(/Honorable mention: Chris, with a true eagle on the 7th/)
   })
 
   it('the Field Report and the round report say hole in one too', () => {
@@ -192,10 +192,10 @@ describe('a hole in one', () => {
 })
 
 describe('the calls as a broadcast', () => {
-  it('a real eagle is shouted on the hole, once, with what it did to the lead', () => {
+  it('a true eagle is shouted on the hole, once, with what it did to the lead', () => {
     const lines = call(live(7)).lines
-    expect(lines).toContain('Stop everything. Chris just made a real eagle on the par-5 7th! No strokes. No asterisk. The other three took zeros. The lead goes from 3 to 7.')
-    expect(lines.filter((l) => /real eagle/.test(l))).toHaveLength(1)
+    expect(lines).toContain('Stop everything. Chris just made a true eagle on the par-5 7th! No strokes. No asterisk. The other three took zeros. The lead goes from 3 to 7.')
+    expect(lines.filter((l) => /true eagle/.test(l))).toHaveLength(1)
   })
 
   it('calls closest to the pin on the hole, even a quiet one', () => {
@@ -211,7 +211,7 @@ describe('the calls as a broadcast', () => {
 
   it('the turn is a halftime show: play of the front nine, report cards, who needs a back nine', () => {
     const { lines } = call(live(9))
-    expect(lines).toContain('Play of the front nine: Chris, a real eagle on the par-5 7th. Roll that one again.')
+    expect(lines).toContain('Play of the front nine: Chris, a true eagle on the par-5 7th. Roll that one again.')
     expect(lines).toContain('Halftime report cards. Chris gets an A. Kyle, a D. Jon, an F. Adam, an F. Parents will be notified.')
     expect(lines).toContain('Adam is 16 back and needs the back nine of a lifetime. Or a very good dinner.')
   })
@@ -231,7 +231,8 @@ describe('the calls as a broadcast', () => {
     db.rounds = db.rounds.map((r) => (r.round_number <= 2 ? r : { ...r, status: 'abandoned' as const }))
     const { lines } = call(db, '2027-02-05')
     expect(lines).toContain('Kyle Siegel is your champion!')
-    expect(lines).toContain('Play of the trip: Jon, a real eagle on the par-5 18th at the Red. Still talking about it.')
+    // Two true eagles that week. Chris's left the other three with zeros and won the round; Jon's came on the last, too late.
+    expect(lines).toContain('Play of the trip: Chris, a true eagle on the par-5 7th at the Red. Still talking about it.')
     expect(lines).toContain("Chris's week: a high of 44 on the Red, a low of 30 on the Blue.")
     expect(lines).toContain("Jon's week: a high of 38 on the Blue, a low of 31 on the Red.")
   })

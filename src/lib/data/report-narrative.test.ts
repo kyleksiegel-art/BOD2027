@@ -40,12 +40,12 @@ describe('buildRoundReport narrative', () => {
     expect(vm.stretch).toEqual({ from: 6, to: 9, aPts: 14, bPts: 6, gapBefore: 2, gapAfter: 10 })
     expect(vm.headline).toBe('Chris runs away with the Red.')
     expect(text).toEqual([
-      // 7th: gross 3 on a par 5 with no stroke = a real eagle. 9th: gross birdie + a stroke = net eagle.
-      'It was close for five holes. Chris led Kyle by 2 after the 5th. Then the round broke open: a birdie on the 6th, a real eagle on the par-5 7th and a net eagle on the 9th. From the 6th through the 9th, Chris made 14 points to Kyle\'s 6, and the lead went from 2 to 10.',
+      // 7th: gross 3 on a par 5 with no stroke = a true eagle. 9th: gross birdie + a stroke = net eagle.
+      'It was close for five holes. Chris led Kyle by 2 after the 5th. Then the round broke open: a birdie on the 6th, a true eagle on the par-5 7th and a net eagle on the 9th. From the 6th through the 9th, Chris made 14 points to Kyle\'s 6, and the lead went from 2 to 10.',
       // Back nines: Kyle 21, Jon 20, Chris 19, Adam 18. Chris 0 on 18 after 1–17 all scoring. Peak 12, final 8.
       'Kyle had the best back nine in the group, 21 points, and Chris finally blanked the 18th after 17 straight holes with points. It only brought the final margin down to 8.',
       // Jon 1+0+1 = 2 through three, back 20, gross eagle on the par-5 18th. Adam gross birdies 4, 10, 18.
-      'Jon opened with 2 points through three holes, then came home in 20 and finished with a real eagle on 18. Adam made three real birdies and won three of the four closest-to-pins.',
+      'Jon opened with 2 points through three holes, then came home in 20 and finished with a true eagle on 18. Adam made three true birdies and won three of the four closest-to-pins.',
       'Chris leads the week by 8. The Blue tomorrow, three rounds to go.',
     ])
   })
@@ -60,7 +60,7 @@ describe('buildRoundReport narrative', () => {
     expect(vm.kind).toBe('late')
     expect(vm.headline).toBe('Kyle catches Jon on the last.')
     expect(text[0]).toBe(
-      "Jon led Kyle by 6 after the 15th. Kyle answered with birdies on the 16th and 17th and a real eagle on the par-5 18th. From the 16th through the 18th, Kyle made 10 points to Jon's 2, and a 6-point deficit became a 2-point lead.",
+      "Jon led Kyle by 6 after the 15th. Kyle answered with birdies on the 16th and 17th and a true eagle on the par-5 18th. From the 16th through the 18th, Kyle made 10 points to Jon's 2, and a 6-point deficit became a 2-point lead.",
     )
   })
 
@@ -90,12 +90,12 @@ describe('buildRoundReport narrative', () => {
   })
 
   it('a corrected score rewrites the story', () => {
-    // Chris's real eagle on the 7th becomes a par: the stretch, its shots and the margin all move.
+    // Chris's true eagle on the 7th becomes a par: the stretch, its shots and the margin all move.
     const corrected = ROUND_ONE.map((p) =>
       p.name === 'Chris Denove' ? { ...p, pts: p.pts.map((v, i) => (i === 6 ? 2 : v)) } : p,
     )
     const { vm, text } = body(corrected)
-    expect(text.join(' ')).not.toContain('real eagle on the par-5 7th')
+    expect(text.join(' ')).not.toContain('true eagle on the par-5 7th')
     expect(text.join(' ')).toContain('final margin down to 6')
     expect(vm.stretch?.aPts).not.toBe(14)
   })

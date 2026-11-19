@@ -23,7 +23,7 @@ import { courseShortName, formatDay, formatDayLong, ordinalOf } from '@/lib/form
  *      after, everyone else (one specific line each), and the week.
  *
  * Plain language (CLAUDE.md conventions): no business jargon, no em dashes, first names only,
- * and never a pronoun, so a template never has to guess one. "Real eagle" means the gross score;
+ * and never a pronoun, so a template never has to guess one. "True eagle" means the gross score;
  * anything earned with a stroke says "net".
  */
 
@@ -151,14 +151,14 @@ export function decisiveStretch(a: number[], b: number[], n: number, after = 0):
 
 const SHOTS: Record<string, { one: string; many: string }> = {
   ace: { one: 'a hole in one', many: 'holes in one' },
-  albatross: { one: 'a real albatross', many: 'real albatrosses' },
-  eagle: { one: 'a real eagle', many: 'real eagles' },
+  albatross: { one: 'a true albatross', many: 'true albatrosses' },
+  eagle: { one: 'a true eagle', many: 'true eagles' },
   netEagle: { one: 'a net eagle', many: 'net eagles' },
   birdie: { one: 'a birdie', many: 'birdies' },
   netBirdie: { one: 'a net birdie', many: 'net birdies' },
 }
 
-/** A notable hole's kind. Gross first ("a real eagle"); "net" only when a stroke earned it. */
+/** A notable hole's kind. Gross first ("a true eagle"); "net" only when a stroke earned it. */
 function shotKind(hr: PlayerRoundVM['holeResults'][number]): { kind: string; rank: number } | null {
   if (!hr.completed || hr.pickedUp || hr.grossStrokes === null) return null
   const gross = hr.grossStrokes - hr.par
@@ -174,7 +174,7 @@ function shotKind(hr: PlayerRoundVM['holeResults'][number]): { kind: string; ran
 
 /**
  * Up to three of a player's best holes inside a stretch, in hole order, with like shots grouped:
- * "birdies on the 16th and 17th and a real eagle on the par-5 18th".
+ * "birdies on the 16th and 17th and a true eagle on the par-5 18th".
  */
 function stretchShots(l: Line, from: number, to: number): string[] {
   const picked = l.holes
@@ -427,10 +427,10 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
         kind: 'eagle',
         text:
           eagles.length > 1
-            ? `made ${words(eagles.length)} real eagles`
+            ? `made ${words(eagles.length)} true eagles`
             : last === n
-              ? `finished with a real eagle on ${last}`
-              : `made a real eagle on the ${ordinalOf(last)}`,
+              ? `finished with a true eagle on ${last}`
+              : `made a true eagle on the ${ordinalOf(last)}`,
       })
     }
     const ctps = ctpWins.get(l.id) ?? []
@@ -438,7 +438,7 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
       hooks.push({ kind: 'ctp', text: `won ${words(ctps.length)} of the ${words(ctpHoles.length)} closest-to-pins` })
     }
     const birdies = l.holes.filter((h) => h.completed && h.grossStrokes !== null && h.grossStrokes - h.par === -1).length
-    if (birdies >= 2) hooks.push({ kind: 'birdies', text: `made ${words(birdies)} real birdies` })
+    if (birdies >= 2) hooks.push({ kind: 'birdies', text: `made ${words(birdies)} true birdies` })
     const blanks = l.pts.filter((p) => p === 0).length
     if (blanks >= 4) hooks.push({ kind: 'blanks', text: `blanked ${words(blanks)} holes` })
 

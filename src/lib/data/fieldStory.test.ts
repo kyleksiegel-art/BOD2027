@@ -12,7 +12,7 @@ describe('buildFieldStory', () => {
   it('tells the real Round 1, newest first', () => {
     const vm = buildFieldStory(reportDb(ROUND_ONE, { ctp: { 6: 2, 8: 2, 14: 2, 16: 1 }, status: 'in_progress' }))!
     expect(lines(vm)).toEqual([
-      "18th · Chris takes a zero on the last, the first of the day. Jon makes a real eagle and Kyle and Adam birdie. Chris's lead is cut to 8. [Chris 44, Kyle 36, Jon 31, Adam 27]",
+      "18th · Chris takes a zero on the last, the first of the day. Jon makes a true eagle and Kyle and Adam birdie. Chris's lead is cut to 8. [Chris 44, Kyle 36, Jon 31, Adam 27]",
       '17th · Pars all round. Chris still leads by 11.',
       '16th · Chris makes a net birdie to lead by 11. Kyle wins the CTP.',
       '15th · Kyle and Chris make net birdies. Chris still leads by 10.',
@@ -25,7 +25,7 @@ describe('buildFieldStory', () => {
       '9th · Chris birdies for a net eagle and Kyle birdies. Chris leads by 10.',
       '8th · Jon and Chris birdie. Chris leads by 9. Adam wins a second CTP of the day.',
       // Gross 3 on the par-5 7th with no stroke: a REAL eagle. Everyone else 0.
-      "7th · The hole that broke it open: Chris makes a real eagle while the other three take zeros. Chris's lead goes from 3 to 7.",
+      "7th · The hole that broke it open: Chris makes a true eagle while the other three take zeros. Chris's lead goes from 3 to 7.",
       '6th · Jon and Chris birdie. Chris leads by 3. Adam wins the CTP.',
       '3rd–5th · Chris birdies the 3rd and Kyle and Adam birdie the 4th. Chris leads by 2.',
       // The 2nd is a par with a stroke for Chris: a NET birdie.
