@@ -407,7 +407,8 @@ function recentAction(c: Ctx, pick: Pick): string[] {
       ]),
     )
   } else for (const x of calls) if (x.text) lines.push(x.text)
-  if (lines.length > 0) lines[0] = `${pick(['Last time through.', "Here's what you missed.", 'The recent action.', 'Let\'s go to the tape.', 'Quick recap.', 'Catching you up.', 'In case you were in the porta-potty.', 'The last little while, in brief.', 'Rewind.', 'The latest.', 'Previously, on the Board of Directors.', 'What just happened.', "Here's the action.", "If you blinked, here's what you missed.", 'From the last couple of holes.', 'For those just tuning in.'])} ${lines[0]}`
+  // A hole in one needs no lead-in.
+  if (lines.length > 0 && !/hole in one/i.test(lines[0])) lines[0] = `${pick(['Last time through.', "Here's what you missed.", 'The recent action.', 'Let\'s go to the tape.', 'Quick recap.', 'Catching you up.', 'In case you were in the porta-potty.', 'The last little while, in brief.', 'Rewind.', 'The latest.', 'Previously, on the Board of Directors.', 'What just happened.', "Here's the action.", "If you blinked, here's what you missed.", 'From the last couple of holes.', 'For those just tuning in.'])} ${lines[0]}`
   const partial = c.story?.entries.find((e) => e.kind === 'partial')
   if (partial) lines.push(storyLine(partial))
   return lines
@@ -427,6 +428,23 @@ function holeCall(c: Ctx, h: number, pick: Pick): string {
   const zeros = rows.filter((r) => r.pts === 0).map((r) => r.p)
   const lead = soleNow ? `${soleNow.first} leads by ${now.gap}` : `${listOf(now.leaders.map((p) => p.first))} share the lead`
 
+  // A hole in one outranks everything else that happened on the hole. The announcer loses it.
+  const ace = rows.find((r) => r.kind === 'ace')
+  if (ace) {
+    const par = c.holes.find((x) => x.holeNumber === h)?.par ?? 3
+    const a = ace.p.first
+    const ctp = par === 3 ? pick([' Safe to say that wins closest to the pin.', ' And yes, that counts as closest to the pin.', ' Closest to the pin? Try in the pin.', '']) : ''
+    return `${pick([
+      `Stop everything. Stop everything! ${a} has made a hole in one on the ${on}! A hole in one! One swing, one ball, bottom of the cup!`,
+      `Oh my goodness. Oh my goodness! ${a} just made a hole in one on the ${on}! It's in the hole! It is in the hole!`,
+      `Are you kidding me? ${a}! A hole in one on the par-${par} ${on}! I have seen it all now. An ace! At the Board of Directors!`,
+      `Hole in one! Hole in one! ${a} has aced the ${on}! Somebody call the clubhouse, somebody call the newspaper, somebody call ${a}'s mother!`,
+      `You are not going to believe this. ${a}. The ${on}. One shot. A hole in one! Pandemonium at Streamsong!`,
+      `It's in! It's in the hole! ${a} with a hole in one on the ${on}! Ladies and gentlemen, we have just witnessed history!`,
+      `No. No way. No way! ${a} has holed it from the tee on the ${on}! A hole in one! I need to sit down.`,
+      `Call it in, call everyone! ${a}, a hole in one on the par-${par} ${on}! Unbelievable! Absolutely unbelievable!`,
+    ])}${ctp} ${pick([`The drinks tonight are on ${a}. Those are the rules.`, `${a} is buying tonight. That is not a suggestion.`, `Frame the ball. Frame the card. Frame ${a}.`, `Nobody in this group is ever going to hear the end of it.`])} ${pick(['Oh, and', 'For the record,', 'Almost forgot, there is a tournament on:'])} ${lead}.`
+  }
   if (best.pts === 0)
     return pick([
       `The ${on} beat everybody. ${cap(words(rows.length))} players, zero points. ${lead}.`,
@@ -758,6 +776,29 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
     // Real eagles today.
     for (let q = 1; q <= h; q++) {
       const kind = shotOf(p.holes.get(q))
+      if (kind === 'ace') {
+        // A hole in one never becomes a footnote: it stays in the call for the rest of the round.
+        const fresh = q >= h - 2
+        notes.push({
+          who: p.id,
+          rank: fresh ? 20 : 8,
+          text: fresh
+            ? pick([
+                `We are still not over it. ${p.first} made a hole in one on the ${ordinalOf(q)}. A hole in one!`,
+                `In case anyone forgot, and nobody has: ${p.first}, hole in one, the ${ordinalOf(q)}.`,
+                `The buzz has not died down. ${p.first} aced the ${ordinalOf(q)}, and the drinks tonight are on ${p.first}. That's the rule.`,
+                `Nobody has stopped talking about it. ${p.first}. The ${ordinalOf(q)}. One swing. In the hole.`,
+              ])
+            : pick([
+                `A reminder that ${p.first} made a hole in one on the ${ordinalOf(q)} today. ${p.first} will be reminding everyone for the rest of time.`,
+                `And yes, ${p.first} still has a hole in one on the card, from the ${ordinalOf(q)}.`,
+                `Lest we forget: ${p.first}, a hole in one, the ${ordinalOf(q)}. Drinks are on ${p.first} tonight.`,
+                `${p.first}'s hole in one on the ${ordinalOf(q)} is still the only thing anybody wants to talk about.`,
+                `Somewhere back on the ${ordinalOf(q)}, there is a ball mark one foot from the hole and no ball. ${p.first} made a hole in one.`,
+              ]),
+        })
+        break
+      }
       if (kind === 'eagle' || kind === 'albatross') {
         // Fresh, it's the headline; hours later, a footnote.
         const fresh = q >= h - 2
@@ -1171,8 +1212,8 @@ function liveCall(c: Ctx, phase: CallPhase, pick: Pick): string[] {
     out.push(...stretchReview(c, phase, pick))
   }
   // An eagle the hole call just covered doesn't need its own note as well.
-  const eagleCalled = out.some((l) => /real (eagle|albatross)/.test(l))
-  out.push(...colorNotes(c, pick, phase === 'early' ? 1 : 2).filter((l) => !(eagleCalled && /real (eagle|albatross)/.test(l))))
+  const eagleCalled = out.some((l) => /real (eagle|albatross)|hole in one/i.test(l))
+  out.push(...colorNotes(c, pick, phase === 'early' ? 1 : 2).filter((l) => !(eagleCalled && /real (eagle|albatross)|hole in one/i.test(l))))
   out.push(...roundStakes(c, pick))
   if (phase !== 'early') out.push(...weekStakes(c, pick, false))
   // The group's next hole. If part of the group has already finished it, they're "on" it.
@@ -1531,22 +1572,31 @@ function wrapShow(c: Ctx, pick: Pick): string[] {
   for (const p of c.players)
     for (let h = 1; h <= n; h++) {
       const kind = shotOf(p.holes.get(h))
-      const base = kind === 'albatross' ? 120 : kind === 'eagle' ? 100 : kind === 'birdieNetEagle' ? 50 : kind === 'netEagle' ? 40 : 0
+      const base = kind === 'ace' ? 300 : kind === 'albatross' ? 120 : kind === 'eagle' ? 100 : kind === 'birdieNetEagle' ? 50 : kind === 'netEagle' ? 40 : 0
       if (!base || !kind) continue
       const othersZero = c.players.length > 2 && c.players.every((q) => q.id === p.id || hp(q, h) === 0)
       plays.push({ rank: base + (othersZero ? 10 : 0) + (w && p.id === w.id ? 5 : 0) + hp(p, h), p, hole: h, kind, othersZero })
     }
   plays.sort((a, b) => b.rank - a.rank || a.hole - b.hole)
   const play = plays[0]
-  const noun = (k: string) => (k === 'albatross' ? 'a real albatross' : k === 'eagle' ? 'a real eagle' : k === 'birdieNetEagle' ? 'a birdie with a shot in hand' : 'a net eagle')
+  const noun = (k: string) => (k === 'ace' ? 'a hole in one' : k === 'albatross' ? 'a real albatross' : k === 'eagle' ? 'a real eagle' : k === 'birdieNetEagle' ? 'a birdie with a shot in hand' : 'a net eagle')
   if (play) {
     const where = `the par-${parOf(play.hole)} ${ordinalOf(play.hole)}`
     const real = play.kind === 'eagle' || play.kind === 'albatross'
+    const isAce = play.kind === 'ace'
     const victims = play.othersZero ? `, while the other ${words(c.players.length - 1)} walk off with nothing` : ''
-    const tag = real
+    const tag = isAce
+      ? pick([
+          ' A hole in one! One swing. Bottom of the cup.',
+          ' An ace! With witnesses! At the Board of Directors!',
+          ' A hole in one! We may never see another. Frame the card, frame the ball, frame the glove.',
+          ` A hole in one! The drinks tonight are on ${play.p.first}. Those are the rules, and nobody is letting it slide.`,
+          ' A hole in one! I still do not believe it, and I watched it go in.',
+        ])
+      : real
       ? pick([' No strokes. No asterisk.', ' Gross. On the card. With witnesses.', ' Not net. Real.', ' Somebody frame that scorecard.', ' The handicap committee has questions.', ' Drinks are on whoever makes the eagle. That is the rule.'])
       : pick([` ${cap(words(hp(play.p, play.hole)))} points on one hole.`, ` That's ${hp(play.p, play.hole)} points in one swing of the scoreboard.`, ` ${cap(words(hp(play.p, play.hole)))} points. Thank you, handicap.`])
-    let line = `${pick(['Play of the day.', 'The shot of the day.', 'Roll the highlight.', 'Your play of the day.', 'To the highlight reel.', 'The one they will be talking about.'])} ${cap(where)}. ${play.p.first} makes ${noun(play.kind)}${victims}.${tag}`
+    let line = `${isAce ? pick(['Play of the day, play of the trip, play of a lifetime.', 'There is only one play of the day, and it might be the play of the decade.', 'Stop the show. This is the only highlight that matters.', 'Play of the day. It was never going to be anything else.']) : pick(['Play of the day.', 'The shot of the day.', 'Roll the highlight.', 'Your play of the day.', 'To the highlight reel.', 'The one they will be talking about.'])} ${cap(where)}. ${play.p.first} makes ${noun(play.kind)}${victims}.${tag}`
     if (w && play.p.id === w.id && play.hole > 1) {
       const a = wm[play.hole - 1]
       const b = wm[play.hole]
@@ -1842,6 +1892,15 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
         ? `And ${fullName(id)}! Last on the card, but with ${plural(k, 'closest to the pin', 'closest to the pins')}, the closest to the pin king of Streamsong.`
         : `${fullName(id)} is the closest to the pin king of Streamsong, with ${plural(k, 'closest to the pin', 'closest to the pins')}.`,
     )
+  }
+  // A hole in one anywhere on the trip gets its own moment.
+  for (const r of rounds) {
+    const detail = buildRoundDetail(r.round_number, c.db)
+    const course = c.db.courses.find((x) => x.id === r.course_id)
+    for (const p of detail?.players ?? [])
+      for (const hr of p.holeResults)
+        if (hr.completed && !hr.pickedUp && hr.grossStrokes === 1)
+          out.push(`And nobody is ever going to forget it: ${first(p.name)} made a hole in one on the ${ordinalOf(hr.holeNumber)} at ${course ? courseRef(course.name) : `round ${r.round_number}`}. A hole in one!`)
   }
   out.push("Somebody's settling up at the nineteenth hole tonight. And then there's the shits. We'll let the nineteenth hole sort that out.")
 

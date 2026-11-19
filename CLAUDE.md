@@ -1100,12 +1100,18 @@ on the Field Report's title** starts it, another stops it (`useSecretCall` in `F
   Live calls' "recent action" is `holeCall` per hole (lead change, tie broken, leader's zero, hole
   won outright, gap moved 2+); a quiet hole is skipped and two quiet holes share one line. Only a
   half-finished hole and the trip finale's last hole still read the story's own line.
+- **A hole in one is its own shot (Kyle 2026-11-18, branch `hole-in-one`).** `grossStrokes === 1`
+  is `ace` in `fieldStory.ts shotOf`/`SHOT` and `report.ts shotKind`, checked before the
+  gross-to-par bands, so a 1 on a par 3 is never "a real eagle". Radio: `holeCall` puts the ace
+  ahead of everything else on the hole (no lead-in, the announcer shouts, the lead comes last as
+  an afterthought); the color note stays all round; it is always play of the day in the wrap; the
+  trip finale names every ace. The round report always gets a "made a hole in one" sentence.
 - `src/lib/speech/speak.ts` — `pickVoice` (Premium > Enhanced > on-device, novelty voices out),
   `speakLines` queues every utterance inside the tap (iOS gesture rule), `stopSpeaking`.
 - `fieldStory.ts` now exports `SHOT` / `shotOf`. Selector `useRadioCall()`.
 - iOS stops speech on lock/background. Better voice: Settings → Accessibility → Spoken Content →
   Voices → English → a Premium one (per phone, one time).
-- Tests: `radioCall.test.ts` (17). Full `vitest run --dir src` → **264**.
+- Tests: `radioCall.test.ts` (20). Full `vitest run --dir src` → **274**.
 
 ## Enter drafts have an eraser (2026-11-11, branch `enter-discard-drafts`) — don't regress
 

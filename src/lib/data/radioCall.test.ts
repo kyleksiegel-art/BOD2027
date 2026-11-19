@@ -4,6 +4,8 @@ import { logCall, readCallLog, readRecentSignatures, removeLoggedCall, restoreLo
 import { db as dexie } from '@/lib/db'
 import type { Db } from './compute'
 import { reportDb, ROUND_ONE } from '@/test/reportFixture'
+import { buildFieldStory } from './fieldStory'
+import { buildRoundReport } from './report'
 import { pickVoice } from '@/lib/speech/speak'
 
 const PURSE = { key: 'purse_amounts', value: { round_winner_cents: 5000, champ_first_cents: 60000, champ_second_cents: 20000 } }
@@ -149,6 +151,43 @@ describe('buildRadioCall', () => {
     // Full names only on the trip's first tee (the field and its history), never mid-round.
     const midRound = [2, 6, 9, 12, 16, 18].flatMap((t) => buildRadioCall(live(t), '2027-02-04')!.script(() => 0.5)).join(' ')
     expect(midRound).not.toMatch(/Aronson|Siegel|Hersh|Denove|Den-oh-vee/)
+  })
+})
+
+describe('a hole in one', () => {
+  // Kyle holes the tee shot on the par-3 14th. One swing is never "a real eagle".
+  const aced = (thru: number, status: 'in_progress' | 'final' = 'in_progress'): Db => {
+    const db = reportDb(ROUND_ONE, { status, ctp: { 14: 1 } })
+    const scores = db.scores.map((s) => (s.hole_number === 14 && s.player_id.startsWith('00000001') ? { ...s, gross_strokes: 1 } : s))
+    return { ...db, scores: scores.filter((s) => s.hole_number <= thru), settings: [PURSE] }
+  }
+
+  it('the announcer loses it on the hole, and never calls it an eagle', () => {
+    for (const r of [0, 0.4, 0.99]) {
+      const lines = buildRadioCall(aced(14), '2027-02-04')!.script(() => r)
+      const callLine = lines.find((l) => /hole in one/i.test(l))!
+      expect(callLine).toMatch(/Kyle/)
+      expect(callLine).toMatch(/!/)
+      expect(lines.join(' ')).not.toMatch(/Kyle[^.]*real eagle|real eagle[^.]*14th/)
+    }
+    expect(buildRadioCall(aced(14), '2027-02-04')!.script(() => 0)).toContain(
+      'Stop everything. Stop everything! Kyle has made a hole in one on the 14th! A hole in one! One swing, one ball, bottom of the cup! Safe to say that wins closest to the pin. The drinks tonight are on Kyle. Those are the rules. Oh, and Chris leads by 8.',
+    )
+  })
+
+  it('stays in the call for the rest of the round and is the play of the day', () => {
+    expect(buildRadioCall(aced(17), '2027-02-04')!.script(() => 0).join(' ')).toMatch(/Kyle made a hole in one on the 14th today/)
+    const wrap = buildRadioCall(aced(18, 'final'), '2027-02-04')!.script(() => 0)
+    expect(wrap).toContain('Play of the day, play of the trip, play of a lifetime. The par-3 14th. Kyle makes a hole in one. A hole in one! One swing. Bottom of the cup.')
+    expect(wrap.join(' ')).toMatch(/Honorable mention: Chris, with a real eagle on the 7th/)
+  })
+
+  it('the Field Report and the round report say hole in one too', () => {
+    const story = buildFieldStory(aced(18, 'final'))!.entries.map((e) => e.segs.map((x) => x.text).join('')).join(' ')
+    expect(story).toMatch(/Kyle makes a hole in one/)
+    const report = buildRoundReport(1, aced(18, 'final'))!.paragraphs.map((p) => p.map((x) => x.text).join('')).join(' ')
+    expect(report).toMatch(/hole in one/)
+    expect(report).not.toMatch(/eagle on the (par-3 )?14th/)
   })
 })
 

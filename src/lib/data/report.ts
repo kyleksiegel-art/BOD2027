@@ -150,6 +150,7 @@ export function decisiveStretch(a: number[], b: number[], n: number, after = 0):
 }
 
 const SHOTS: Record<string, { one: string; many: string }> = {
+  ace: { one: 'a hole in one', many: 'holes in one' },
   albatross: { one: 'a real albatross', many: 'real albatrosses' },
   eagle: { one: 'a real eagle', many: 'real eagles' },
   netEagle: { one: 'a net eagle', many: 'net eagles' },
@@ -162,6 +163,7 @@ function shotKind(hr: PlayerRoundVM['holeResults'][number]): { kind: string; ran
   if (!hr.completed || hr.pickedUp || hr.grossStrokes === null) return null
   const gross = hr.grossStrokes - hr.par
   const pts = hr.points ?? 0
+  if (hr.grossStrokes === 1) return { kind: 'ace', rank: 7 }
   if (gross <= -3) return { kind: 'albatross', rank: 6 }
   if (gross === -2) return { kind: 'eagle', rank: 5 }
   if (pts >= 4) return { kind: 'netEagle', rank: 4 }
@@ -192,7 +194,7 @@ function stretchShots(l: Line, from: number, to: number): string[] {
     const names = SHOTS[g.kind]
     if (g.holes.length > 1) return `${names.many} on the ${listOf(g.holes.map((h) => ordinalOf(h.holeNumber)))}`
     const h = g.holes[0]
-    const where = g.kind === 'eagle' || g.kind === 'albatross' ? `the par-${h.par} ${ordinalOf(h.holeNumber)}` : `the ${ordinalOf(h.holeNumber)}`
+    const where = g.kind === 'ace' || g.kind === 'eagle' || g.kind === 'albatross' ? `the par-${h.par} ${ordinalOf(h.holeNumber)}` : `the ${ordinalOf(h.holeNumber)}`
     return `${names.one} on ${where}`
   })
 }
@@ -416,7 +418,9 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
     } else if (back !== null && front - back >= 6) {
       hooks.push({ kind: 'fade', text: `went out in ${front} and came home in only ${back}` })
     }
-    const eagles = l.holes.filter((h) => h.completed && h.grossStrokes !== null && h.grossStrokes - h.par <= -2)
+    const aces = l.holes.filter((h) => h.completed && !h.pickedUp && h.grossStrokes === 1)
+    if (aces.length) hooks.push({ kind: 'ace', text: `made a hole in one on the ${listOf(aces.map((h) => `par-${h.par} ${ordinalOf(h.holeNumber)}`))}` })
+    const eagles = l.holes.filter((h) => h.completed && h.grossStrokes !== null && h.grossStrokes !== 1 && h.grossStrokes - h.par <= -2)
     if (eagles.length) {
       const last = eagles[eagles.length - 1].holeNumber
       hooks.push({
@@ -526,6 +530,14 @@ export function buildRoundReport(roundNumber: number, dbData: Db): ReportVM | nu
     default:
       headline = `${W.first} takes ${theShort} by ${margin}.`
   }
+
+  // A hole in one always makes the report, whoever made it and wherever the story went.
+  const said = [p1, p2, pField, p4].flat().map((x) => x.text).join('')
+  if (!/hole in one/.test(said))
+    for (const pl of detail.players)
+      for (const hr of pl.holeResults)
+        if (pl.status === 'playing' && hr.completed && !hr.pickedUp && hr.grossStrokes === 1)
+          pField.push(t(pField.length ? ' ' : ''), { text: `${pl.name.split(/\s+/)[0]} made a hole in one on the par-${hr.par} ${ordinalOf(hr.holeNumber)}.`, strong: true })
 
   return {
     roundNumber,

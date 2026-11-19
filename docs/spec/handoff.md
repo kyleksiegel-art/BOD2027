@@ -1,12 +1,11 @@
-# Handoff — 2026-11-11
+# Handoff — 2026-11-18
 
-Branch `radio-call-sportscast` (off `main`), **uncommitted**.
+Branch `hole-in-one` (off `main`), **uncommitted**.
 
-- Radio call is commentary now, not a Field Report readout (Kyle 2026-11-11).
-- Round wrap = highlights show: `wrapShow` in `src/lib/data/radioCall.ts` (result, money, how it
-  was won, play of the day, a line per player, one blooper), then week / next up / sign-off.
-- Live calls: `recentAction` now calls each of the last two holes via `holeCall`; quiet holes are
-  skipped. A fresh real eagle is no longer said twice (hole call + color note).
-- Trip finale and the first-tee preview are unchanged.
-- Tests: `radioCall.test.ts` 17; `vitest run --dir src` → 264. `npm run build` clean.
-- Next: Kyle listens to a few takes on the phone (Admin → Radio call) and says what to tune.
+- Bug (Kyle, testing): a 1 on a par 3 was called "a real eagle" (it is two under par).
+- Fix: `ace` shot kind (`grossStrokes === 1`) in `fieldStory.ts` and `report.ts`.
+- Radio call: the announcer goes wild on the hole (`holeCall`), keeps bringing it up for the
+  rest of the round, makes it play of the day in the wrap, and names it in the trip finale.
+- Field Report says "makes a hole in one"; the round report always carries a sentence for it.
+- Tests: `radioCall.test.ts` 20; `vitest run --dir src` → 274. `npm run build` clean.
+- Next: Kyle re-enters a 1 on a par 3 and listens (Admin → Radio call).
