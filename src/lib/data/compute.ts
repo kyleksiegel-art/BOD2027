@@ -1680,18 +1680,20 @@ function buildHighlights(a: {
 
   // Shot of the day — single best hole (net birdie or better).
   {
-    let best: { p: PlayerRoundVM; pts: number; hole: number } | null = null
+    // A hole in one outranks any number of points, and is never "a net eagle".
+    let best: { p: PlayerRoundVM; pts: number; hole: number; ace: boolean } | null = null
     for (const p of playing)
       for (const h of done(p)) {
         const pts = h.points ?? 0
-        if (pts >= 3 && (best === null || pts > best.pts)) best = { p, pts, hole: h.holeNumber }
+        const ace = h.grossStrokes === 1 && !h.pickedUp
+        if ((ace || pts >= 3) && (best === null || (ace && !best.ace) || (ace === best.ace && pts > best.pts))) best = { p, pts, hole: h.holeNumber, ace }
       }
     if (best)
       cands.push({
         key: 'shot',
         label: 'Shot of the day',
-        value: `${fn(best.p.name)} · ${best.pts >= 4 ? 'net eagle' : 'net birdie'}, ${ordinalOf(best.hole)}`,
-        notability: best.pts >= 4 ? 80 : 45,
+        value: `${fn(best.p.name)} · ${best.ace ? 'hole in one' : best.pts >= 4 ? 'net eagle' : 'net birdie'}, ${ordinalOf(best.hole)}`,
+        notability: best.ace ? 200 : best.pts >= 4 ? 80 : 45,
       })
   }
 
