@@ -72,6 +72,7 @@ const s = (text: string): StorySeg => ({ text, strong: true })
 
 // A shot worth naming, with its verb for one player and for several.
 export const SHOT: Record<string, { rank: number; one: string; many: string; noun: string }> = {
+  ace: { rank: 8, one: 'makes a hole in one', many: 'make holes in one', noun: 'a hole in one' },
   albatross: { rank: 7, one: 'makes a real albatross', many: 'make real albatrosses', noun: 'a real albatross' },
   eagle: { rank: 6, one: 'makes a real eagle', many: 'make real eagles', noun: 'a real eagle' },
   birdieNetEagle: { rank: 5, one: 'birdies for a net eagle', many: 'birdie for net eagles', noun: 'a birdie for a net eagle' },
@@ -86,6 +87,8 @@ export function shotOf(hr: Hr | undefined): string | null {
   const pts = hr.points ?? 0
   if (hr.pickedUp || pts === 0) return 'blank'
   if (hr.grossStrokes === null) return null
+  // One swing is a hole in one whatever the par: never "a real eagle" (Kyle 2026-11-18).
+  if (hr.grossStrokes === 1) return 'ace'
   const gross = hr.grossStrokes - hr.par
   if (gross <= -3) return 'albatross'
   if (gross === -2) return 'eagle'
@@ -95,7 +98,7 @@ export function shotOf(hr: Hr | undefined): string | null {
   return null
 }
 const ORDINAL_WORDS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth']
-const isEagleish = (k: string | null) => k === 'albatross' || k === 'eagle' || k === 'birdieNetEagle' || k === 'netEagle'
+const isEagleish = (k: string | null) => k === 'ace' || k === 'albatross' || k === 'eagle' || k === 'birdieNetEagle' || k === 'netEagle'
 
 /**
  * "Chris birdies for a net eagle and Kyle birdies": players grouped by shot, best first. With
