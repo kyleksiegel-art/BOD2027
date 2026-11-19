@@ -408,7 +408,7 @@ function recentAction(c: Ctx, pick: Pick): string[] {
     )
   } else for (const x of calls) if (x.text) lines.push(x.text)
   // A hole in one needs no lead-in.
-  if (lines.length > 0 && !/hole in one|real (eagle|albatross)/i.test(lines[0])) lines[0] = `${pick(['Last time through.', "Here's what you missed.", 'The recent action.', 'Let\'s go to the tape.', 'Quick recap.', 'Catching you up.', 'In case you were in the porta-potty.', 'The last little while, in brief.', 'Rewind.', 'The latest.', 'Previously, on the Board of Directors.', 'What just happened.', "Here's the action.", "If you blinked, here's what you missed.", 'From the last couple of holes.', 'For those just tuning in.'])} ${lines[0]}`
+  if (lines.length > 0 && !/hole in one|true (eagle|albatross)/i.test(lines[0])) lines[0] = `${pick(['Last time through.', "Here's what you missed.", 'The recent action.', 'Let\'s go to the tape.', 'Quick recap.', 'Catching you up.', 'In case you were in the porta-potty.', 'The last little while, in brief.', 'Rewind.', 'The latest.', 'Previously, on the Board of Directors.', 'What just happened.', "Here's the action.", "If you blinked, here's what you missed.", 'From the last couple of holes.', 'For those just tuning in.'])} ${lines[0]}`
   const partial = c.story?.entries.find((e) => e.kind === 'partial')
   if (partial) lines.push(storyLine(partial))
   return lines
@@ -485,7 +485,7 @@ function holeAction(c: Ctx, h: number, pick: Pick, skipZeros = false): string {
       `Call it in, call everyone! ${a}, a hole in one on the par-${par} ${on}! Unbelievable! Absolutely unbelievable!`,
     ])}${ctp} ${pick([`The drinks tonight are on ${a}. Those are the rules.`, `${a} is buying tonight. That is not a suggestion.`, `Frame the ball. Frame the card. Frame ${a}.`, `Nobody in this group is ever going to hear the end of it.`])} ${pick(['Oh, and', 'For the record,', 'Almost forgot, there is a tournament on:'])} ${lead}.`
   }
-  // A real eagle is the next loudest thing: the shot first, then what it did to the board.
+  // A true eagle is the next loudest thing: the shot first, then what it did to the board.
   const big = rows.find((r) => r.kind === 'eagle' || r.kind === 'albatross')
   if (big) {
     const par = c.holes.find((x) => x.holeNumber === h)?.par ?? 5
@@ -506,13 +506,13 @@ function holeAction(c: Ctx, h: number, pick: Pick, skipZeros = false): string {
               ? `That cuts ${soleNow.first}'s lead to ${now.gap}.`
               : `${soleNow.first} still leads by ${now.gap}.`
     return `${pick([
-      `Stop everything. ${e} just made a real ${k} on the par-${par} ${on}! No strokes. No asterisk.`,
-      `Hold the phone. A real ${k} for ${e} on the ${on}! Gross. On the card. With witnesses.`,
-      `Big news from the ${on}: ${e} with a real ${k}! Somebody get a photo of that scorecard.`,
-      `Did that just happen? ${e}, a real ${k} on the par-${par} ${on}! Not net. Real.`,
-      `${e} has made a real ${k} on the ${on}! The drinks are on ${e}. That's the rule now.`,
-      `${cap(k)}! A real ${k}! ${e}, on the par-${par} ${on}! The handicap committee has been notified.`,
-      `Oh, that is filthy. ${e} makes a real ${k} on the ${on}! Somebody frame that scorecard.`, `You have to be kidding. ${e}, a real ${k} on the par-${par} ${on}! Nobody gave ${e} a stroke for that.`, `Get the camera out. ${e} has just made a real ${k} on the ${on}!`, `A real ${k} on the ${on} for ${e}! That is not supposed to happen in this group.`,
+      `Stop everything. ${e} just made a true ${k} on the par-${par} ${on}! No strokes. No asterisk.`,
+      `Hold the phone. A true ${k} for ${e} on the ${on}! Gross. On the card. With witnesses.`,
+      `Big news from the ${on}: ${e} with a true ${k}! Somebody get a photo of that scorecard.`,
+      `Did that just happen? ${e}, a true ${k} on the par-${par} ${on}! Not net. A true one.`,
+      `${e} has made a true ${k} on the ${on}! The drinks are on ${e}. That's the rule now.`,
+      `${cap(k)}! A true ${k}! ${e}, on the par-${par} ${on}! The handicap committee has been notified.`,
+      `Oh, that is filthy. ${e} makes a true ${k} on the ${on}! Somebody frame that scorecard.`, `You have to be kidding. ${e}, a true ${k} on the par-${par} ${on}! Nobody gave ${e} a stroke for that.`, `Get the camera out. ${e} has just made a true ${k} on the ${on}!`, `A true ${k} on the ${on} for ${e}! That is not supposed to happen in this group.`,
     ])}${alone} ${tail}`
   }
   if (best.pts === 0)
@@ -691,28 +691,28 @@ function stretchReview(c: Ctx, phase: CallPhase, pick: Pick): string[] {
     lines.push(
       hot.length === 1 && birdieMan.p.id === hot[0].p.id
         ? pick([
-            `That includes ${words(birdieMan.b)} real birdies. Actual birdies. On the card.`,
-            `${cap(words(birdieMan.b))} of those were real birdies. No strokes needed.`,
-            `And ${words(birdieMan.b)} real birdies in there. The handicap committee has been notified.`,
-            `${cap(words(birdieMan.b))} real birdies in there, too. Sandbaggers, take note.`,
-            `That includes ${words(birdieMan.b)} real birdies, which, for this group, is basically witchcraft.`,
-            `That includes ${words(birdieMan.b)} real birdies.`,
-            `Including ${words(birdieMan.b)} real birdies. No help from the handicap.`,
-            `${cap(words(birdieMan.b))} real birdies in that haul. Gross, not net.`,
-            `And ${words(birdieMan.b)} of them real birdies. Somebody frame the card.`,
-            `With ${words(birdieMan.b)} real birdies mixed in. Witnesses available on request.`,
-            `${cap(words(birdieMan.b))} real birdies in there. That's not sandbagging, that's just golf.`,
-            `Including ${words(birdieMan.b)} real birdies.`,
+            `That includes ${words(birdieMan.b)} true birdies. Actual birdies. On the card.`,
+            `${cap(words(birdieMan.b))} of those were true birdies. No strokes needed.`,
+            `And ${words(birdieMan.b)} true birdies in there. The handicap committee has been notified.`,
+            `${cap(words(birdieMan.b))} true birdies in there, too. Sandbaggers, take note.`,
+            `That includes ${words(birdieMan.b)} true birdies, which, for this group, is basically witchcraft.`,
+            `That includes ${words(birdieMan.b)} true birdies.`,
+            `Including ${words(birdieMan.b)} true birdies. No help from the handicap.`,
+            `${cap(words(birdieMan.b))} true birdies in that haul. Gross, not net.`,
+            `And ${words(birdieMan.b)} of them true birdies. Somebody frame the card.`,
+            `With ${words(birdieMan.b)} true birdies mixed in. Witnesses available on request.`,
+            `${cap(words(birdieMan.b))} true birdies in there. That's not sandbagging, that's just golf.`,
+            `Including ${words(birdieMan.b)} true birdies.`,
           ])
         : pick([
-            `${birdieMan.p.first} has ${words(birdieMan.b)} real birdies in that stretch. Actual birdies. On the card.`,
-            `${birdieMan.p.first} has made ${words(birdieMan.b)} real birdies in that stretch. Somebody check the handicap.`,
-            `${cap(words(birdieMan.b))} real birdies for ${birdieMan.p.first} in that stretch. Gross birdies. With witnesses.`,
-            `${birdieMan.p.first} has ${words(birdieMan.b)} real birdies in that stretch. Somebody revisit that index.`,
-            `${birdieMan.p.first} has chipped in ${words(birdieMan.b)} real birdies over that stretch. Gross birdies, too.`,
-            `${cap(words(birdieMan.b))} real birdies for ${birdieMan.p.first} in that stretch. No strokes required.`,
-            `${birdieMan.p.first} has ${words(birdieMan.b)} real birdies over that stretch. The index is looking nervous.`,
-            `${birdieMan.p.first} made ${words(birdieMan.b)} real birdies in that stretch.`,
+            `${birdieMan.p.first} has ${words(birdieMan.b)} true birdies in that stretch. Actual birdies. On the card.`,
+            `${birdieMan.p.first} has made ${words(birdieMan.b)} true birdies in that stretch. Somebody check the handicap.`,
+            `${cap(words(birdieMan.b))} true birdies for ${birdieMan.p.first} in that stretch. Gross birdies. With witnesses.`,
+            `${birdieMan.p.first} has ${words(birdieMan.b)} true birdies in that stretch. Somebody revisit that index.`,
+            `${birdieMan.p.first} has chipped in ${words(birdieMan.b)} true birdies over that stretch. Gross birdies, too.`,
+            `${cap(words(birdieMan.b))} true birdies for ${birdieMan.p.first} in that stretch. No strokes required.`,
+            `${birdieMan.p.first} has ${words(birdieMan.b)} true birdies over that stretch. The index is looking nervous.`,
+            `${birdieMan.p.first} made ${words(birdieMan.b)} true birdies in that stretch.`,
           ]),
     )
   }
@@ -882,7 +882,7 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
         ]),
       })
     }
-    // Real eagles today.
+    // True eagles today.
     for (let q = 1; q <= h; q++) {
       const kind = shotOf(p.holes.get(q))
       if (kind === 'ace') {
@@ -916,26 +916,26 @@ function colorNotes(c: Ctx, pick: Pick, max: number): string[] {
           rank: fresh ? 9 : 2,
           text: fresh
             ? pick([
-                `Let's talk about that real ${kind} from ${p.first} on the ${ordinalOf(q)}. Frame that scorecard.`,
-                `We have to go back to the ${ordinalOf(q)}: a real ${kind} from ${p.first}. Not net. Real.`,
-                `A real ${kind} for ${p.first} on the ${ordinalOf(q)}. Somebody get a photo of that card.`,
-                `Stop everything. ${p.first} made a real ${kind} on the ${ordinalOf(q)}.`,
-                `A real ${kind} for ${p.first} on the ${ordinalOf(q)}. The drinks are on ${p.first}. That's the rule now.`,
-                `The shot of the day so far: a real ${kind} from ${p.first} on the ${ordinalOf(q)}.`,
-                `Hold the phone. A real ${kind} for ${p.first} on the ${ordinalOf(q)}.`,
-                `${p.first} just made a real ${kind} on the ${ordinalOf(q)}. No strokes. No asterisk.`,
-                `The ${ordinalOf(q)} belongs to ${p.first}: a real ${kind}. Somebody alert the local paper.`,
-                `A real ${kind}, ${p.first}, the ${ordinalOf(q)}. Say it again. A real ${kind}.`,
-                `Big news from the ${ordinalOf(q)}: ${p.first} with a real ${kind}. That's going in the trip history.`,
-                `${p.first} made a real ${kind} on the ${ordinalOf(q)}.`,
+                `Let's talk about that true ${kind} from ${p.first} on the ${ordinalOf(q)}. Frame that scorecard.`,
+                `We have to go back to the ${ordinalOf(q)}: a true ${kind} from ${p.first}. Not net. A true one.`,
+                `A true ${kind} for ${p.first} on the ${ordinalOf(q)}. Somebody get a photo of that card.`,
+                `Stop everything. ${p.first} made a true ${kind} on the ${ordinalOf(q)}.`,
+                `A true ${kind} for ${p.first} on the ${ordinalOf(q)}. The drinks are on ${p.first}. That's the rule now.`,
+                `The shot of the day so far: a true ${kind} from ${p.first} on the ${ordinalOf(q)}.`,
+                `Hold the phone. A true ${kind} for ${p.first} on the ${ordinalOf(q)}.`,
+                `${p.first} just made a true ${kind} on the ${ordinalOf(q)}. No strokes. No asterisk.`,
+                `The ${ordinalOf(q)} belongs to ${p.first}: a true ${kind}. Somebody alert the local paper.`,
+                `A true ${kind}, ${p.first}, the ${ordinalOf(q)}. Say it again. A true ${kind}.`,
+                `Big news from the ${ordinalOf(q)}: ${p.first} with a true ${kind}. That's going in the trip history.`,
+                `${p.first} made a true ${kind} on the ${ordinalOf(q)}.`,
               ])
             : pick([
-                `Never forget: ${p.first} made a real ${kind} on the ${ordinalOf(q)}.`,
-                `And for the record, ${p.first} still has that real ${kind} from the ${ordinalOf(q)}.`,
-                `A reminder, in case ${p.first} hasn't mentioned it in the last five minutes: a real ${kind} on the ${ordinalOf(q)}.`,
-                `Still talking about ${p.first}'s real ${kind} on the ${ordinalOf(q)}. We'll be talking about it all week.`,
-                `Lest anyone forget, ${p.first} made a real ${kind} on the ${ordinalOf(q)}.`,
-                `${p.first}'s real ${kind} on the ${ordinalOf(q)} is still the shot everyone is talking about.`,
+                `Never forget: ${p.first} made a true ${kind} on the ${ordinalOf(q)}.`,
+                `And for the record, ${p.first} still has that true ${kind} from the ${ordinalOf(q)}.`,
+                `A reminder, in case ${p.first} hasn't mentioned it in the last five minutes: a true ${kind} on the ${ordinalOf(q)}.`,
+                `Still talking about ${p.first}'s true ${kind} on the ${ordinalOf(q)}. We'll be talking about it all week.`,
+                `Lest anyone forget, ${p.first} made a true ${kind} on the ${ordinalOf(q)}.`,
+                `${p.first}'s true ${kind} on the ${ordinalOf(q)} is still the shot everyone is talking about.`,
               ]),
         })
         break
@@ -1405,8 +1405,8 @@ function liveCall(c: Ctx, phase: CallPhase, pick: Pick): string[] {
     out.push(...stretchReview(c, phase, pick))
   }
   // An eagle the hole call just covered doesn't need its own note as well.
-  const eagleCalled = out.some((l) => /real (eagle|albatross)|hole in one/i.test(l))
-  out.push(...colorNotes(c, pick, phase === 'early' ? 1 : 2).filter((l) => !(eagleCalled && /real (eagle|albatross)|hole in one/i.test(l))))
+  const eagleCalled = out.some((l) => /true (eagle|albatross)|hole in one/i.test(l))
+  out.push(...colorNotes(c, pick, phase === 'early' ? 1 : 2).filter((l) => !(eagleCalled && /true (eagle|albatross)|hole in one/i.test(l))))
   out.push(...roundStakes(c, pick))
   if (phase !== 'early') out.push(...weekStakes(c, pick, false))
   // The group's next hole. If part of the group has already finished it, they're "on" it.
@@ -1772,7 +1772,7 @@ function wrapShow(c: Ctx, pick: Pick): string[] {
     }
   plays.sort((a, b) => b.rank - a.rank || a.hole - b.hole)
   const play = plays[0]
-  const noun = (k: string) => (k === 'ace' ? 'a hole in one' : k === 'albatross' ? 'a real albatross' : k === 'eagle' ? 'a real eagle' : k === 'birdieNetEagle' ? 'a birdie with a shot in hand' : 'a net eagle')
+  const noun = (k: string) => (k === 'ace' ? 'a hole in one' : k === 'albatross' ? 'a true albatross' : k === 'eagle' ? 'a true eagle' : k === 'birdieNetEagle' ? 'a birdie with a shot in hand' : 'a net eagle')
   if (play) {
     const where = `the par-${parOf(play.hole)} ${ordinalOf(play.hole)}`
     const real = play.kind === 'eagle' || play.kind === 'albatross'
@@ -1787,7 +1787,7 @@ function wrapShow(c: Ctx, pick: Pick): string[] {
           ' A hole in one! I still do not believe it, and I watched it go in.',
         ])
       : real
-      ? pick([' No strokes. No asterisk.', ' Gross. On the card. With witnesses.', ' Not net. Real.', ' Somebody frame that scorecard.', ' The handicap committee has questions.', ' Drinks are on whoever makes the eagle. That is the rule.', ' That is going in the trip history.', ' You do not see many of those in this group.', ' The scorecard is being laminated.', ' Witnesses have signed statements.'])
+      ? pick([' No strokes. No asterisk.', ' Gross. On the card. With witnesses.', ' Not net. A true one.', ' Somebody frame that scorecard.', ' The handicap committee has questions.', ' Drinks are on whoever makes the eagle. That is the rule.', ' That is going in the trip history.', ' You do not see many of those in this group.', ' The scorecard is being laminated.', ' Witnesses have signed statements.'])
       : pick([` ${cap(words(hp(play.p, play.hole)))} points on one hole.`, ` That's ${hp(play.p, play.hole)} points in one swing of the scoreboard.`, ` ${cap(words(hp(play.p, play.hole)))} points. Thank you, handicap.`, ` A stroke well spent: ${hp(play.p, play.hole)} points.`, ` ${cap(words(hp(play.p, play.hole)))} points, and no apology for the stroke.`])
     let line = `${isAce ? pick(['Play of the day, play of the trip, play of a lifetime.', 'There is only one play of the day, and it might be the play of the decade.', 'Stop the show. This is the only highlight that matters.', 'Play of the day. It was never going to be anything else.']) : pick(['Play of the day.', 'The shot of the day.', 'Roll the highlight.', 'Your play of the day.', 'To the highlight reel.', 'The one they will be talking about.', 'Shot of the round.', 'If you only see one highlight, see this one.', 'The moment of the day.', 'Cue the replay.'])} ${cap(where)}. ${play.p.first} makes ${noun(play.kind)}${victims}.${tag}`
     if (w && play.p.id === w.id && play.hole > 1) {
@@ -1873,7 +1873,7 @@ function wrapShow(c: Ctx, pick: Pick): string[] {
           `${cap(words(z))} zeros. The other holes were fine. There just weren't enough of them.`, `${cap(words(z))} zeros did the damage.`, `Take away the ${words(z)} zeros and it is a different day. Nobody takes them away.`, `${cap(words(z))} blank holes. That is a lot of walking for nothing.`, `${p.first} left points out there on ${words(z)} holes. All of the points, in fact.`,
         ])],
       ['birdies', rb >= 2, () =>
-        pick([`${cap(words(rb))} real birdies, though. The golf was in there somewhere.`, `There were ${words(rb)} real birdies in that. Just not enough around them.`, `${cap(words(rb))} real birdies on the card, for what it's worth.`, `${cap(words(rb))} real birdies in there, which makes the total harder to explain.`, `${p.first} did make ${words(rb)} real birdies. The rest of the card let the side down.`, `Credit where due: ${words(rb)} real birdies.`])],
+        pick([`${cap(words(rb))} true birdies, though. The golf was in there somewhere.`, `There were ${words(rb)} true birdies in that. Just not enough around them.`, `${cap(words(rb))} true birdies on the card, for what it's worth.`, `${cap(words(rb))} true birdies in there, which makes the total harder to explain.`, `${p.first} did make ${words(rb)} true birdies. The rest of the card let the side down.`, `Credit where due: ${words(rb)} true birdies.`])],
     ]
     const live = hooks.filter(([, ok]) => ok)
     const hook = live.find(([name]) => !usedHooks.has(name)) ?? live[0]
@@ -2100,6 +2100,8 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
     const detail = buildRoundDetail(r.round_number, c.db)
     const course = c.db.courses.find((x) => x.id === r.course_id)
     const where = course ? courseRef(course.name) : `round ${r.round_number}`
+    const playing = (detail?.players ?? []).filter((q) => q.status === 'playing')
+    const wonRound = detail ? resolveRoundWinnerIds(detail).ids : []
     for (const p of detail?.players ?? []) {
       if (p.status !== 'playing') continue
       days.set(p.playerId, [...(days.get(p.playerId) ?? []), { pts: p.totalPoints, where }])
@@ -2111,7 +2113,10 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
           aces++
           out.push(`${aces === 1 ? 'Play of the trip, and it was never going to be anything else:' : 'And another one:'} ${first(p.name)} made a hole in one on the ${ordinalOf(hr.holeNumber)} at ${where}. A hole in one!`)
         } else if (kind && RANK[kind]) {
-          const rank = RANK[kind] + (hr.points ?? 0)
+          // Between like shots, the one that mattered: it left the rest of the group with nothing,
+          // or it was made by the player who went on to win that round (the wrap's own rule).
+          const alone = playing.length > 2 && playing.every((q) => q.playerId === p.playerId || (q.holeResults.find((x) => x.holeNumber === hr.holeNumber)?.points ?? 0) === 0)
+          const rank = RANK[kind] + (hr.points ?? 0) + (alone ? 10 : 0) + (wonRound.includes(p.playerId) ? 5 : 0)
           if (!playOfTrip || rank > playOfTrip.rank) playOfTrip = { who: first(p.name), kind, hole: hr.holeNumber, par: hr.par, where, rank }
         }
         if (!hr.pickedUp && hr.grossStrokes !== null && hr.grossStrokes - hr.par >= 4 && (!worst || hr.grossStrokes - hr.par > worst.over))

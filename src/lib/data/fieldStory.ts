@@ -9,7 +9,7 @@ import { ordinalOf } from '@/lib/format'
  * ("story only", 2026-10-02), which was removed; this is the whole Field Report and its ticker.
  *
  * Same rules as the round report: analysis first (per-hole points, the lead before/after every
- * hole), prose second; first names, no pronouns, no em dashes; "real eagle" is the gross score,
+ * hole), prose second; first names, no pronouns, no em dashes; "true eagle" is the gross score,
  * anything earned with a stroke says "net". A hole only counts once EVERY playing player has it;
  * a half-finished hole is reported as such and never calls a lead change.
  */
@@ -73,8 +73,8 @@ const s = (text: string): StorySeg => ({ text, strong: true })
 // A shot worth naming, with its verb for one player and for several.
 export const SHOT: Record<string, { rank: number; one: string; many: string; noun: string }> = {
   ace: { rank: 8, one: 'makes a hole in one', many: 'make holes in one', noun: 'a hole in one' },
-  albatross: { rank: 7, one: 'makes a real albatross', many: 'make real albatrosses', noun: 'a real albatross' },
-  eagle: { rank: 6, one: 'makes a real eagle', many: 'make real eagles', noun: 'a real eagle' },
+  albatross: { rank: 7, one: 'makes a true albatross', many: 'make true albatrosses', noun: 'a true albatross' },
+  eagle: { rank: 6, one: 'makes a true eagle', many: 'make true eagles', noun: 'a true eagle' },
   birdieNetEagle: { rank: 5, one: 'birdies for a net eagle', many: 'birdie for net eagles', noun: 'a birdie for a net eagle' },
   netEagle: { rank: 4, one: 'makes a net eagle', many: 'make net eagles', noun: 'a net eagle' },
   birdie: { rank: 3, one: 'birdies', many: 'birdie', noun: 'a birdie' },
@@ -87,7 +87,7 @@ export function shotOf(hr: Hr | undefined): string | null {
   const pts = hr.points ?? 0
   if (hr.pickedUp || pts === 0) return 'blank'
   if (hr.grossStrokes === null) return null
-  // One swing is a hole in one whatever the par: never "a real eagle" (Kyle 2026-11-18).
+  // One swing is a hole in one whatever the par: never "a true eagle" (Kyle 2026-11-18).
   if (hr.grossStrokes === 1) return 'ace'
   const gross = hr.grossStrokes - hr.par
   if (gross <= -3) return 'albatross'
