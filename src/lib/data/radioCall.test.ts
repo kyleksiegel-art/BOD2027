@@ -238,6 +238,23 @@ describe('the calls as a broadcast', () => {
   })
 })
 
+describe('a close finish', () => {
+  it('the finale always calls the last hole when the trip was decided by three or fewer', () => {
+    // Round 2 with Chris three better: the week ends Kyle 78, Chris 77. Both make net par on the last.
+    const tight = ROUND_TWO.map((p) => (p.name.startsWith('Chris') ? { ...p, pts: p.pts.map((v, h) => (h < 3 ? v + 1 : v)) } : p))
+    const db = { ...weekDb([ROUND_ONE, tight]), settings: [PURSE] }
+    db.rounds = db.rounds.map((r) => (r.round_number <= 2 ? r : { ...r, status: 'abandoned' as const }))
+    const { lines } = call(db, '2027-02-05')
+    const i = lines.indexOf('One point. 36 holes, and it comes down to one point.')
+    expect(i).toBeGreaterThan(0)
+    expect(lines[i + 1]).toBe('It went to the last hole. Kyle came to the 18th tee one point ahead for the week and made a net par. Chris made a net par, and it was not enough.')
+    // A four-point finish (the plain two-round week) gets no such line.
+    const wide = { ...weekDb([ROUND_ONE, ROUND_TWO]), settings: [PURSE] }
+    wide.rounds = wide.rounds.map((r) => (r.round_number <= 2 ? r : { ...r, status: 'abandoned' as const }))
+    expect(call(wide, '2027-02-05').lines.join(' ')).not.toMatch(/last tee|18th tee/)
+  })
+})
+
 describe('variety', () => {
   it('a template keeps its signature whoever and whatever it is about', () => {
     expect(signature("Chris has taken zeros on three straight holes. Thoughts and prayers.")).toBe(

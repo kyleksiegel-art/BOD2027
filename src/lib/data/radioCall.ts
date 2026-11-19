@@ -2049,8 +2049,50 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
     ]),
   )
 
-  // How the last round finished: its final hole, as the Field Report told it.
-  const lastHole = holeCall(c, c.n, pick)
+  // A finish within three points was decided on the last hole whether or not anything "happened"
+  // there, so it always gets a call: where the two stood for the WEEK on the last tee, and what
+  // each made. It plays after the champion is named. Otherwise the last hole is called only if
+  // it had something in it.
+  let closing = ''
+  const cp = champs.length === 1 ? c.players.find((p) => p.id === champs[0].playerId) : undefined
+  const rp = runnerUp ? c.players.find((p) => p.id === runnerUp.playerId) : undefined
+  if (cp && rp && margin >= 1 && margin <= 3) {
+    const made = (p: Pl) => {
+      const hr = p.holes.get(c.n)
+      const kind = shotOf(hr)
+      return kind && kind !== 'blank' ? SHOT[kind].noun : (hr?.points ?? 0) === 2 ? 'a net par' : (hr?.points ?? 0) === 1 ? 'a net bogey' : 'a zero'
+    }
+    const a = cp.holes.get(c.n)?.points ?? 0
+    const b = rp.holes.get(c.n)?.points ?? 0
+    const before = margin - (a - b) // the champion's lead for the week standing on the last tee
+    const on = ordinalOf(c.n)
+    const [C, R] = [cp.first, rp.first]
+    closing =
+      before < 0
+        ? pick([
+            `And it turned over on the very last hole. ${R} stood on the ${on} tee ${plural(-before, 'point')} ahead for the week. ${C} made ${made(cp)}, ${R} made ${made(rp)}, and the trip changed hands.`,
+            `${R} had it. ${cap(plural(-before, 'point'))} up for the week with one hole to play. Then ${C} made ${made(cp)} on the ${on}, ${R} made ${made(rp)}, and it was gone.`,
+            `Stolen on the last. ${R} led the week by ${-before} on the ${on} tee. ${cap(made(cp))} for ${C}, ${made(rp)} for ${R}, and a new champion.`,
+          ])
+        : before === 0
+          ? pick([
+              `They came to the ${on} tee dead level for the week. ${C} made ${made(cp)}. ${R} made ${made(rp)}. That was the whole trip.`,
+              `${totalHoles - 1} holes could not separate ${C} and ${R}. The last one did: ${made(cp)} for ${C}, ${made(rp)} for ${R}.`,
+              `All square for the week on the last tee. ${C} made ${made(cp)} on the ${on}, ${R} made ${made(rp)}, and that settled everything.`,
+            ])
+          : a >= b
+            ? pick([
+                `It went to the last hole. ${C} came to the ${on} tee ${plural(before, 'point')} ahead for the week and made ${made(cp)}. ${R} made ${made(rp)}, and it was not enough.`,
+                `${R} needed something on the ${on}, ${plural(before, 'point')} back for the week. ${R} made ${made(rp)}. ${C} made ${made(cp)}, and held on.`,
+                `${cap(plural(before, 'point'))} in it on the last tee. ${C} made ${made(cp)} on the ${on}, ${R} made ${made(rp)}, and the lead survived.`,
+              ])
+            : pick([
+                `${R} made it interesting. ${cap(made(rp))} on the ${on} to ${made(cp)} for ${C}, and a ${before}-point lead for the week came down to ${margin}. One hole too few.`,
+                `It nearly got away. ${C} led the week by ${before} on the last tee, made ${made(cp)}, and watched ${R} make ${made(rp)}. ${C} survives by ${margin}.`,
+                `${R} took ${words(b - a)} back on the ${on}, ${made(rp)} to ${made(cp)}, but ran out of holes. ${cap(plural(margin, 'point'))} short.`,
+              ])
+  }
+  const lastHole = closing ? '' : holeCall(c, c.n, pick)
   if (lastHole) out.push(`${pick(['The last hole of the trip.', 'One last hole to report.', 'And the final hole.', 'The last word from the course.', 'One more hole to call.', 'Before the trophy, the final hole.'])} ${lastHole}`)
 
   // The champion.
@@ -2065,6 +2107,7 @@ function tripFinale(c: Ctx, pick: Pick): string[] {
     else if (margin <= 3) out.push(`${cap(words(margin))} points. A photo finish over ${totalHoles} holes.`)
     else if (margin >= 10) out.push(`${margin} points clear. That wasn't a tournament, that was a statement.`)
     else out.push(pick([`${short(champ.playerId)} wins it by ${margin}, and it was never really in doubt.`, `${short(champ.playerId)} wins it by ${margin}. Earned, every point of it.`, `${short(champ.playerId)} wins by ${margin}. Bragging rights secured for a full calendar year.`, `${short(champ.playerId)} wins by ${margin}. Clean, clear, and well earned.`, `${short(champ.playerId)} by ${margin}. A deserving champion.`, `${short(champ.playerId)} takes it by ${margin}. Somebody get the trophy polished.`]))
+    if (closing) out.push(closing)
   }
 
   out.push(`Final standings. ${rows.map((r) => `${short(r.playerId)}, ${r.total}`).join('. ')}.`)

@@ -1,12 +1,11 @@
 # Handoff — 2026-11-19
 
-Branch `play-of-the-trip` (off `main`), **uncommitted**.
+Branch `finale-last-hole` (off `main`), **uncommitted**.
 
-- Trip finale's play of the trip no longer takes the first of equal shots. Like shots are split
-  by what they did: +10 if the rest of the group took zeros on the hole, +5 if the maker won
-  that round (same rule as the round wrap's play of the day). `tripFinale` in `radioCall.ts`.
-- Test updated: Chris's eagle on the 7th beats Jon's on the 18th in the two-round fixture.
-- Gross shots are now "true" (true eagle, true birdies), not "real", in the radio call, Field
-  Report and round report (Kyle 2026-11-19). 105 replacements incl. tests.
-- Tests: `vitest run --dir src` → 280. `npm run build` clean.
-- Still open: the finale has only been run on two rounds of fixture data, not four.
+- Trip finale: a finish decided by one to three points now always gets a last-hole call (where
+  the two stood for the week on the last tee, what each made), right after the margin line.
+  Before, an uneventful last hole was skipped even on a one-point finish.
+- `tripFinale` in `src/lib/data/radioCall.ts`; test "a close finish" in `radioCall.test.ts`.
+- Tests: `vitest run --dir src` → 281. `npm run build` clean.
+- Noted, not done: the three per-player "week" lines drag on four rounds, and the champion's
+  own week is never described.
